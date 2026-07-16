@@ -59,6 +59,14 @@
 /* --- RESET ------------------------------------------------ */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Global SVG fix — prevent browser default 300×150px size */
+svg {
+    display: block;
+    overflow: hidden;
+    max-width: 100%;
+    flex-shrink: 0;
+}
+
 html, body {
     height: 100%;
     overflow: hidden;
@@ -193,15 +201,22 @@ html, body {
 .nav-icon {
     width: 32px;
     height: 32px;
+    min-width: 32px;
     border-radius: var(--radius-sm);
     background: rgba(255,255,255,0.04);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
     transition: background 0.2s;
 }
-.nav-icon svg { width: 16px; height: 16px; }
+.nav-icon svg {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px;
+    min-height: 16px;
+}
 .nav-btn.active .nav-icon {
     background: linear-gradient(135deg, var(--purple), var(--pink));
     box-shadow: var(--shadow-purple);
@@ -345,13 +360,19 @@ html, body {
 .card-icon {
     width: 42px;
     height: 42px;
+    min-width: 42px;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
 }
-.card-icon svg { width: 20px; height: 20px; stroke: white; }
+.card-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke: white;
+}
 .card-icon--purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: var(--shadow-purple); }
 .card-icon--green  { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 8px 24px rgba(34,197,94,0.25); }
 .card-icon--blue   { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 8px 24px rgba(59,130,246,0.25); }
@@ -506,8 +527,8 @@ html, body {
     left: 11px;
     top: 50%;
     transform: translateY(-50%);
-    width: 15px;
-    height: 15px;
+    width: 15px !important;
+    height: 15px !important;
     stroke: var(--text-muted);
     pointer-events: none;
 }
@@ -628,7 +649,12 @@ html, body {
     gap: 8px;
     text-align: center;
 }
-.empty-state svg { width: 44px; height: 44px; stroke: var(--text-muted); margin-bottom: 4px; }
+.empty-state svg {
+    width: 40px !important;
+    height: 40px !important;
+    stroke: var(--text-muted);
+    margin-bottom: 4px;
+}
 .empty-state p { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); }
 .empty-state span { font-size: 0.8rem; color: var(--text-muted); }
 
@@ -661,6 +687,7 @@ html, body {
 .chat-active-header { display: flex; align-items: center; gap: 12px; width: 100%; }
 .back-btn-chat {
     width: 34px; height: 34px;
+    min-width: 34px;
     border-radius: 50%;
     background: rgba(255,255,255,0.05);
     border: 1px solid var(--color-border);
@@ -670,9 +697,10 @@ html, body {
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
+    overflow: hidden;
     transition: all 0.2s;
 }
-.back-btn-chat svg { width: 18px; height: 18px; }
+.back-btn-chat svg { width: 18px !important; height: 18px !important; }
 .back-btn-chat:hover { background: rgba(255,255,255,0.09); color: var(--text-primary); }
 .chat-header-avatar img {
     width: 38px;
@@ -714,17 +742,23 @@ html, body {
     text-align: center;
 }
 .chat-empty-icon {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
     background: rgba(255,255,255,0.03);
     border: 1px solid var(--color-border);
-    border-radius: 24px;
+    border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     margin-bottom: 4px;
+    flex-shrink: 0;
 }
-.chat-empty-icon svg { width: 32px; height: 32px; stroke: var(--text-muted); }
+.chat-empty-icon svg {
+    width: 28px !important;
+    height: 28px !important;
+    stroke: var(--text-muted);
+}
 .chat-empty-state h3 { font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
 .chat-empty-state p { font-size: 0.84rem; color: var(--text-muted); max-width: 240px; }
 
@@ -823,7 +857,7 @@ html, body {
     box-shadow: var(--shadow-purple);
 }
 .composer-send:hover { transform: scale(1.08); }
-.composer-send svg { width: 16px; height: 16px; }
+.composer-send svg { width: 16px !important; height: 16px !important; }
 
 /* Contact Detail Column */
 .contact-detail-col {
@@ -1008,7 +1042,7 @@ html, body {
     cursor: pointer;
     transition: all 0.2s;
 }
-.rule-btn svg { width: 13px; height: 13px; }
+.rule-btn svg { width: 13px !important; height: 13px !important; }
 .rule-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
 .rule-btn.danger:hover { background: rgba(239,68,68,0.1); color: var(--red); border-color: rgba(239,68,68,0.3); }
 .rule-status {
@@ -1112,6 +1146,7 @@ html, body {
     left: 0;
     right: 0;
     height: 62px;
+
     background: rgba(13,15,28,0.95);
     backdrop-filter: blur(20px);
     border-top: 1px solid var(--color-border);
@@ -1136,7 +1171,11 @@ html, body {
     border-radius: var(--radius-sm);
     transition: color 0.2s;
 }
-.mobile-nav-btn svg { width: 20px; height: 20px; stroke: currentColor; }
+.mobile-nav-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke: currentColor;
+}
 .mobile-nav-btn.active { color: var(--purple); }
 .mobile-nav-btn.active svg { filter: drop-shadow(0 0 6px rgba(139,92,246,0.6)); }
 .mobile-nav-btn--sim.active { color: var(--orange); }
