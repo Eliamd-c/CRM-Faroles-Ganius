@@ -11,17 +11,17 @@
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
-    <!-- Ambient background orbs -->
     <div class="bg-orb orb-1"></div>
     <div class="bg-orb orb-2"></div>
     <div class="bg-orb orb-3"></div>
 
     <div class="app-shell">
-        <!-- ===================== SIDEBAR ===================== -->
+
+        <!-- ===== SIDEBAR ===== -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <div class="brand-logo">
-                    <svg viewBox="0 0 32 32" fill="none">
+                    <svg width="38" height="38" viewBox="0 0 32 32" fill="none">
                         <defs>
                             <linearGradient id="igGrad" x1="0%" y1="100%" x2="100%" y2="0%">
                                 <stop offset="0%" stop-color="#f09433"/>
@@ -47,27 +47,20 @@
             <nav class="sidebar-nav">
                 <button class="nav-btn active" data-tab="inbox" id="nav-inbox">
                     <span class="nav-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     </span>
                     <span class="nav-label">Bandeja de entrada</span>
                     <span class="nav-badge" id="total-unread-badge" style="display:none">0</span>
                 </button>
                 <button class="nav-btn" data-tab="pipeline" id="nav-pipeline">
                     <span class="nav-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="3"/>
-                            <path d="M3 9h18M9 21V9"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
                     </span>
                     <span class="nav-label">Embudo CRM</span>
                 </button>
                 <button class="nav-btn" data-tab="automation" id="nav-automation">
                     <span class="nav-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                     </span>
                     <span class="nav-label">Automatización</span>
                 </button>
@@ -77,19 +70,13 @@
             <nav class="sidebar-nav">
                 <button class="nav-btn" data-tab="settings" id="nav-settings">
                     <span class="nav-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     </span>
                     <span class="nav-label">Configuración Meta</span>
                 </button>
                 <button class="nav-btn nav-btn--simulator" data-tab="simulator" id="nav-simulator">
                     <span class="nav-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/>
-                            <polygon points="10 8 16 12 10 16 10 8"/>
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                     </span>
                     <span class="nav-label">Simulador DM</span>
                     <span class="nav-pill">TEST</span>
@@ -104,36 +91,36 @@
             </div>
         </aside>
 
-        <!-- ===================== MAIN ===================== -->
+        <!-- ===== MAIN ===== -->
         <main class="main-area">
 
             <!-- VIEW: INBOX -->
             <section class="view active" id="view-inbox">
                 <div class="inbox-wrap">
-                    <!-- Chat list column -->
+                    <!-- Chat list -->
                     <div class="chat-list-col" id="chat-list-col">
                         <div class="col-header">
                             <h2 class="col-title">Mensajes</h2>
                             <div class="search-wrap">
-                                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                                 <input type="text" id="chat-search" placeholder="Buscar conversación..." class="search-input">
                             </div>
                         </div>
                         <div class="chat-list" id="chats-list-container">
                             <div class="empty-state">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                                 <p>Sin conversaciones aún</p>
                                 <span>Usa el simulador para comenzar</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Chat window column -->
+                    <!-- Chat window -->
                     <div class="chat-win-col" id="chat-win-col">
                         <div class="chat-win-header" id="chat-header-area">
                             <div class="chat-placeholder-header">
                                 <div class="placeholder-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                                 </div>
                                 <p>Selecciona una conversación</p>
                             </div>
@@ -141,7 +128,7 @@
                         <div class="chat-messages" id="chat-messages-container">
                             <div class="chat-empty-state">
                                 <div class="chat-empty-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                                 </div>
                                 <h3>Tu bandeja está lista</h3>
                                 <p>Los mensajes de Instagram aparecerán aquí en tiempo real</p>
@@ -151,13 +138,13 @@
                             <div class="composer-inner">
                                 <input type="text" id="chat-message-input" placeholder="Escribe un mensaje..." class="composer-input">
                                 <button id="chat-send-btn" class="composer-send">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Contact detail column -->
+                    <!-- Contact detail -->
                     <div class="contact-detail-col" id="contact-details-panel" style="display:none">
                         <div class="detail-header">
                             <h3>Perfil de Contacto</h3>
@@ -189,7 +176,7 @@
                                 <textarea id="contact-detail-notes" rows="5" placeholder="Detalles del cliente, recordatorios..." class="field-textarea"></textarea>
                             </div>
                             <button id="save-contact-btn" class="btn-primary w-full">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                                 Guardar Ficha
                             </button>
                         </div>
@@ -197,7 +184,7 @@
                 </div>
             </section>
 
-            <!-- VIEW: PIPELINE KANBAN -->
+            <!-- VIEW: PIPELINE -->
             <section class="view" id="view-pipeline">
                 <div class="view-page-header">
                     <div>
@@ -208,40 +195,28 @@
                 <div class="kanban-wrap">
                     <div class="kanban-col" id="col-Lead" data-stage="Lead">
                         <div class="kanban-col-header kanban-col-header--lead">
-                            <div class="kanban-col-title">
-                                <span class="col-dot col-dot--lead"></span>
-                                Prospecto
-                            </div>
+                            <div class="kanban-col-title"><span class="col-dot col-dot--lead"></span>Prospecto</div>
                             <span class="col-count" id="count-Lead">0</span>
                         </div>
                         <div class="kanban-cards" id="cards-Lead"></div>
                     </div>
                     <div class="kanban-col" id="col-Contacted" data-stage="Contacted">
                         <div class="kanban-col-header kanban-col-header--contacted">
-                            <div class="kanban-col-title">
-                                <span class="col-dot col-dot--contacted"></span>
-                                Contactado
-                            </div>
+                            <div class="kanban-col-title"><span class="col-dot col-dot--contacted"></span>Contactado</div>
                             <span class="col-count" id="count-Contacted">0</span>
                         </div>
                         <div class="kanban-cards" id="cards-Contacted"></div>
                     </div>
                     <div class="kanban-col" id="col-Customer" data-stage="Customer">
                         <div class="kanban-col-header kanban-col-header--customer">
-                            <div class="kanban-col-title">
-                                <span class="col-dot col-dot--customer"></span>
-                                Cliente
-                            </div>
+                            <div class="kanban-col-title"><span class="col-dot col-dot--customer"></span>Cliente</div>
                             <span class="col-count" id="count-Customer">0</span>
                         </div>
                         <div class="kanban-cards" id="cards-Customer"></div>
                     </div>
                     <div class="kanban-col" id="col-Lost" data-stage="Lost">
                         <div class="kanban-col-header kanban-col-header--lost">
-                            <div class="kanban-col-title">
-                                <span class="col-dot col-dot--lost"></span>
-                                Perdido
-                            </div>
+                            <div class="kanban-col-title"><span class="col-dot col-dot--lost"></span>Perdido</div>
                             <span class="col-count" id="count-Lost">0</span>
                         </div>
                         <div class="kanban-cards" id="cards-Lost"></div>
@@ -261,7 +236,7 @@
                     <div class="glass-card">
                         <div class="card-header-row">
                             <div class="card-icon card-icon--purple">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                             </div>
                             <div>
                                 <h3 class="card-title">Nueva Regla</h3>
@@ -284,7 +259,7 @@
                     <div class="glass-card">
                         <div class="card-header-row">
                             <div class="card-icon card-icon--green">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                             </div>
                             <div>
                                 <h3 class="card-title">Reglas Activas</h3>
@@ -308,7 +283,7 @@
                     <div class="glass-card">
                         <div class="card-header-row">
                             <div class="card-icon card-icon--blue">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                             </div>
                             <div>
                                 <h3 class="card-title">Credenciales de API</h3>
@@ -334,7 +309,7 @@
                     <div class="glass-card">
                         <div class="card-header-row">
                             <div class="card-icon card-icon--orange">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                             </div>
                             <div>
                                 <h3 class="card-title">Configurar Webhook</h3>
@@ -382,7 +357,7 @@
                         <p class="page-subtitle">Inyecta mensajes directos de Instagram para probar el flujo completo del CRM</p>
                     </div>
                     <div class="test-badge">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                         Modo Prueba
                     </div>
                 </div>
@@ -417,7 +392,7 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn-simulator">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                                 Inyectar Webhook
                             </button>
                         </form>
@@ -441,26 +416,26 @@
 
         </main>
 
-        <!-- Bottom nav for mobile -->
+        <!-- Mobile bottom nav -->
         <nav class="mobile-bottom-nav">
             <button class="mobile-nav-btn active" data-tab="inbox">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 <span>Inbox</span>
             </button>
             <button class="mobile-nav-btn" data-tab="pipeline">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
                 <span>Embudo</span>
             </button>
             <button class="mobile-nav-btn" data-tab="automation">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 <span>Bots</span>
             </button>
             <button class="mobile-nav-btn" data-tab="settings">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span>Ajustes</span>
             </button>
             <button class="mobile-nav-btn mobile-nav-btn--sim" data-tab="simulator">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                 <span>Sim</span>
             </button>
         </nav>
