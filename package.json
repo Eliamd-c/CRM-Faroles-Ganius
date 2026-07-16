@@ -1,0 +1,21 @@
+{
+  "name": "crm-faroles-ganius",
+  "version": "1.0.0",
+  "description": "Instagram CRM Meta Graph API Integration",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Eliamd-c",
+  "license": "ISC"
+}

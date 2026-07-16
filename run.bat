@@ -1,43 +1,49 @@
 @echo off
-title Instagram CRM Server
+title CMR Faroles - Node.js Server
 echo ======================================================================
-echo           InstaCRM - Sistema de Gestion y Automatizacion
+echo           CMR Faroles - Sistema de Gestion y Automatizacion
 echo ======================================================================
 echo.
 
 pushd "%~dp0"
 
-:: Verificar Python
-python --version >nul 2>&1
+:: Verificar Node.js
+node -v >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Python no esta instalado o no se encuentra en el PATH.
-    echo Por favor instala Python 3.8+ antes de continuar.
+    echo [ERROR] Node.js no esta instalado o no se encuentra en el PATH.
+    echo Por favor instala Node.js (LTS recomendado) desde https://nodejs.org/
     popd
     pause
     exit /b 1
 )
 
-:: Instalar dependencias
-echo [INFO] Instalando/Actualizando dependencias de python (Flask, Requests)...
-python -m pip install -r requirements.txt
+:: Instalar dependencias de Node.js
+if not exist node_modules (
+    echo [INFO] Carpeta node_modules no encontrada. Instalando dependencias...
+    call npm install
+) else (
+    echo [INFO] Dependencias ya instaladas. Verificando actualizaciones...
+    call npm install
+)
+
 if %errorlevel% neq 0 (
-    echo [ERROR] Error al instalar dependencias con pip.
+    echo [ERROR] Hubo un error al ejecutar 'npm install'.
     popd
     pause
     exit /b 1
 )
 
 echo.
-echo [INFO] Iniciando el servidor local de Flask en puerto 5000...
+echo [INFO] Iniciando el servidor de Node.js en puerto 5000...
 echo [INFO] Se abrira el navegador predeterminado automaticamente en segundos...
 echo.
 
-:: Iniciar el navegador con retraso para dar tiempo a Flask a arrancar
+:: Iniciar el navegador con un pequeño retraso
 timeout /t 3 /nobreak >nul
 start "" "http://127.0.0.1:5000"
 
-:: Arrancar el servidor
-python app.py
+:: Arrancar el servidor Express
+node app.js
 
 popd
 pause
