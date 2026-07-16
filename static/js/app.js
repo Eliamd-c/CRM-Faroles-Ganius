@@ -284,6 +284,12 @@ async function selectChat(chat) {
     // Actualizar clase activa en UI
     document.querySelectorAll('.chat-card').forEach(card => card.classList.remove('active'));
     
+    // Activar clase chat-active en el layout para responsive móvil
+    const inboxLayout = document.querySelector('.inbox-layout');
+    if (inboxLayout) {
+        inboxLayout.classList.add('chat-active');
+    }
+    
     // Obtener y renderizar detalles del contacto
     state.activeContact = chat;
     renderContactDetailsPanel(chat);
@@ -291,13 +297,49 @@ async function selectChat(chat) {
     // Cargar mensajes de la conversación
     await loadMessages(chat.conversation_id);
     
-    // Renderizar cabecera del chat
+    // Renderizar cabecera del chat con soporte para botón de retroceso móvil
     elements.chatHeader.innerHTML = `
-        <div class="chat-user-info">
-            <h3>${chat.name}</h3>
-            <p>@${chat.username} | Cuenta: ${chat.contact_id}</p>
+        <div class="chat-header-content">
+            <button class="back-btn" id="chat-back-btn" title="Volver a los chats">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 20px; height: 20px;">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </button>
+            <div class="chat-user-info">
+                <h3>${chat.name}</h3>
+                <p>@${chat.username} | Cuenta: ${chat.contact_id}</p>
+            </div>
         </div>
     `;
+    
+    // Vincular evento del botón de regreso
+    const backBtn = document.getElementById('chat-back-btn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            state.activeChatId = null;
+            if (inboxLayout) {
+                inboxLayout.classList.remove('chat-active');
+            }
+            document.querySelectorAll('.chat-card').forEach(card => card.classList.remove('active'));
+            elements.inputWrapper.style.display = 'none';
+            elements.messagesContainer.innerHTML = `
+                <div class="no-chat-selected">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <p>Bandeja de entrada lista para operar</p>
+                </div>
+            `;
+            elements.chatHeader.innerHTML = `
+                <div class="chat-user-info">
+                    <h3>Selecciona un chat</h3>
+                    <p>Elige una conversación de la izquierda para comenzar</p>
+                </div>
+            `;
+            loadChats();
+        });
+    }
     
     elements.inputWrapper.style.display = 'flex';
     elements.messageInput.focus();

@@ -1,7 +1,14 @@
 # Base de datos local (¡No subir credenciales ni historial de chats!)
 crm.db
 
-# Python
+# Node.js
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (por si quedaron residuos)
 __pycache__/
 *.pyc
 *.pyo
