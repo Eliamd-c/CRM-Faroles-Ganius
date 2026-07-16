@@ -10,7 +10,8 @@ from meta_client import MetaInstagramClient
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-DATABASE = 'crm.db'
+DATABASE = os.environ.get('DATABASE_PATH', 'crm.db')
+
 
 app = Flask(__name__, 
             static_folder='static', 
