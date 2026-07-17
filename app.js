@@ -5,6 +5,8 @@ const path = require('path');
 const axios = require('axios');
 require('dotenv').config();
 
+const { getGeminiLeadScore, getChatGptSuggestion } = require('./ai_copilot');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const DATABASE_PATH = process.env.DATABASE_PATH || 'crm.db';
@@ -71,11 +73,27 @@ async function getSetting(key) {
     return row ? row.value : null;
 }
 
-async function sendMetaMessage(recipientId, text) {
+async function sendMetaMessage(recipientId, text, buttonsJson = null) {
     const token = await getSetting('page_access_token');
     if (!token) {
         console.warn('Meta API no configurada (falta Page Access Token). Mensaje omitido.');
         return null;
+    }
+
+    const messageData = { text };
+    if (buttonsJson) {
+        try {
+            const buttons = typeof buttonsJson === 'string' ? JSON.parse(buttonsJson) : buttonsJson;
+            if (buttons && buttons.length > 0) {
+                messageData.quick_replies = buttons.map(b => ({
+                    content_type: "text",
+                    title: b.title.substring(0, 20), // IG limita a 20 caracteres
+                    payload: b.payload
+                }));
+            }
+        } catch (e) {
+            console.error("Error parseando botones para Quick Replies:", e);
+        }
     }
 
     const url = `https://graph.facebook.com/v19.0/me/messages`;
@@ -83,7 +101,7 @@ async function sendMetaMessage(recipientId, text) {
         console.log(`Enviando mensaje a Meta API para ${recipientId}...`);
         const response = await axios.post(url, {
             recipient: { id: recipientId },
-            message: { text }
+            message: messageData
         }, {
             params: { access_token: token }
         });
@@ -174,16 +192,17 @@ async function processMessagingEvent(messagingEvent) {
     }
 
     const message = messagingEvent.message || {};
-    const text = message.text || '';
+    let text = message.text || '';
+    const quickReplyPayload = message.quick_reply ? message.quick_reply.payload : null;
     let mediaUrl = null;
 
     if (message.attachments && message.attachments.length > 0) {
         mediaUrl = message.attachments[0].payload ? message.attachments[0].payload.url : null;
     }
 
-    if (!text && !mediaUrl) return;
+    if (!text && !mediaUrl && !quickReplyPayload) return;
 
-    console.log(`Procesando mensaje de ${senderId}: "${text}"`);
+    console.log(`Procesando mensaje de ${senderId}: "${text}" (Payload: ${quickReplyPayload})`);
 
     // 1. Asegurar contacto en BD
     let contact = await dbGet("SELECT * FROM contacts WHERE id = ?", [senderId]);
@@ -200,10 +219,10 @@ async function processMessagingEvent(messagingEvent) {
         }
 
         await dbRun(
-            "INSERT INTO contacts (id, username, name, avatar_url, stage) VALUES (?, ?, ?, ?, 'Lead')",
+            "INSERT INTO contacts (id, username, name, avatar_url, stage, flow_step) VALUES (?, ?, ?, ?, 'Lead', 'start')",
             [senderId, username, name, avatarUrl]
         );
-        contact = { id: senderId, username, name, avatar_url: avatarUrl, stage: 'Lead' };
+        contact = { id: senderId, username, name, avatar_url: avatarUrl, stage: 'Lead', flow_step: 'start' };
     }
 
     // 2. Asegurar conversación en BD
@@ -226,7 +245,60 @@ async function processMessagingEvent(messagingEvent) {
         [senderId, senderId, recipientId, text, mediaUrl]
     );
 
-    // 4. Ejecutar respuestas automáticas
+    // 4. Lógica de State Machine (Flujos Persuasivos) y Respuestas
+    await handleBotResponseLogic(senderId, text, quickReplyPayload, contact);
+}
+
+async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact) {
+    const input = quickReplyPayload || text.toLowerCase().trim();
+    
+    // WA Bridge Links generator
+    const generateWaLink = (msg) => \`https://wa.me/573000000000?text=\${encodeURIComponent(msg + " Mi usuario es @" + contact.username)}\`;
+    
+    // Si el usuario toca un botón de ir a WhatsApp (WA Bridge)
+    if (input === 'WA_BUSINESS' || input === 'WA_HOME') {
+        const waMsg = input === 'WA_BUSINESS' 
+            ? "¡Hola! Quiero iniciar como distribuidor y vender faroles."
+            : "¡Hola! Quiero el catálogo para decorar mi hogar y conocer el descuento por cantidad.";
+        
+        const finalMsg = \`¡Excelente! 📲 Haz clic aquí para ir a nuestro WhatsApp y te envío todo de inmediato: \n\n\${generateWaLink(waMsg)}\`;
+        
+        await dbRun(
+            "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
+            [senderId, senderId, finalMsg]
+        );
+        await dbRun("UPDATE contacts SET stage = 'Contacted' WHERE id = ?", [senderId]);
+        await sendMetaMessage(senderId, finalMsg);
+        return;
+    }
+
+    // Si toca un Payload de flujo, usamos la tabla flows
+    if (quickReplyPayload && quickReplyPayload.startsWith('FLOW_')) {
+        const flowStep = await dbGet("SELECT * FROM flows WHERE id = ?", [quickReplyPayload]);
+        if (flowStep) {
+            await dbRun(
+                "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
+                [senderId, senderId, flowStep.message_text]
+            );
+            await sendMetaMessage(senderId, flowStep.message_text, flowStep.buttons_json);
+            return;
+        }
+    }
+
+    // Si no fue un botón, intentar flujo de bienvenida (ej: si dice hola)
+    if (input === 'hola' || input === 'buenas' || input === 'saludos') {
+        const flowStep = await dbGet("SELECT * FROM flows WHERE id = ?", ['start']);
+        if (flowStep) {
+            await dbRun(
+                "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
+                [senderId, senderId, flowStep.message_text]
+            );
+            await sendMetaMessage(senderId, flowStep.message_text, flowStep.buttons_json);
+            return;
+        }
+    }
+
+    // Fallback: Ejecutar autoresponders antiguos si existen
     await checkAndTriggerAutoresponder(senderId, text);
 }
 
@@ -553,6 +625,44 @@ app.post('/api/simulator/receive', async (req, res) => {
             message: 'Mensaje simulado procesado.',
             details: { sender_id, username: cleanUsername, text }
         });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- AI COPILOT ENDPOINTS ---
+
+app.post('/api/ai/analyze-lead/:id', async (req, res) => {
+    const convId = req.params.id;
+    try {
+        const messages = await dbAll("SELECT text, sender_type FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC", [convId]);
+        if (messages.length === 0) return res.status(400).json({ error: "No hay historial" });
+
+        const historyStr = messages.map(m => `${m.sender_type === 'customer' ? 'Cliente' : 'Vendedor'}: ${m.text}`).join('\n');
+        const score = await getGeminiLeadScore(historyStr);
+        
+        if (score.error) return res.status(500).json({ error: score.error });
+        res.json(score);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ai/suggest-response/:id', async (req, res) => {
+    const convId = req.params.id;
+    try {
+        const contact = await dbGet("SELECT * FROM contacts WHERE id = ?", [convId]);
+        if (!contact) return res.status(404).json({ error: "Contacto no encontrado" });
+
+        const messages = await dbAll("SELECT text, sender_type FROM messages WHERE conversation_id = ? ORDER BY timestamp DESC LIMIT 10", [convId]);
+        if (messages.length === 0) return res.status(400).json({ error: "No hay historial para sugerir" });
+
+        // Invertimos para que el más viejo quede arriba
+        const historyStr = messages.reverse().map(m => `${m.sender_type === 'customer' ? 'Cliente' : 'Vendedor'}: ${m.text}`).join('\n');
+        const suggestion = await getChatGptSuggestion(historyStr, contact);
+
+        if (suggestion.error) return res.status(500).json({ error: suggestion.error });
+        res.json(suggestion);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

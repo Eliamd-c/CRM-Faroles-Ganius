@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS contacts (
     stage TEXT DEFAULT 'Lead',     -- Etapa del pipeline: Lead, Contacted, Customer, Lost
     tags TEXT DEFAULT '',          -- Etiquetas separadas por comas (ej: "vip,interesado")
     notes TEXT DEFAULT '',         -- Notas internas de seguimiento
+    phone_number TEXT,             -- Capturado del puente WhatsApp
+    is_wholesaler_potential INTEGER DEFAULT 0, -- 1 si mostró interés en vender
+    flow_step TEXT DEFAULT 'start',-- Paso actual del embudo persuasivo
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -54,3 +57,17 @@ INSERT OR IGNORE INTO auto_responders (keyword, response_text, is_active) VALUES
 ('precio', '¡Hola! Nuestros precios varían según el producto. ¿De cuál te gustaría recibir información?', 1),
 ('hola', '¡Hola! Bienvenido a nuestro canal de soporte. ¿En qué podemos ayudarte hoy?', 1),
 ('info', 'Hola, gracias por escribirnos. Puedes ver nuestro catálogo completo en el enlace de nuestra biografía.', 1);
+
+-- Embudos persuasivos (Manychat style)
+CREATE TABLE IF NOT EXISTS flows (
+    id TEXT PRIMARY KEY,           -- Identificador del paso (ej: 'welcome', 'wholesaler_pitch')
+    message_text TEXT,             -- El texto persuasivo
+    media_url TEXT,                -- Opcional imagen
+    buttons_json TEXT              -- Botones (Quick Replies) en formato JSON
+);
+
+-- Insertar pasos por defecto del embudo persuasivo
+INSERT OR IGNORE INTO flows (id, message_text, buttons_json) VALUES 
+('start', '¡Hola! Qué alegría saludarte. 🌟 Sabemos que los faroles iluminan momentos especiales. ¿Buscas faroles para decorar tu hogar o te gustaría descubrir cómo generar ingresos extra con nosotros? 👇', '[{"type":"text","title":"🏠 Decorar mi hogar","payload":"FLOW_HOME"},{"type":"text","title":"💰 Generar ingresos","payload":"FLOW_BUSINESS"}]'),
+('FLOW_BUSINESS', '¡Excelente visión! 🚀 Tenemos un programa para distribuidores donde puedes comprar con descuentos exclusivos y obtener un gran margen de ganancia. Además te damos todo el material publicitario.', '[{"type":"text","title":"📲 Enviar material al WA","payload":"WA_BUSINESS"}]'),
+('FLOW_HOME', '¡Perfecto! Tenemos diseños hermosos listos. Por cierto, ¿sabías que si te unes con amigos o familiares para comprar, les sale a precio de mayorista? 😉', '[{"type":"text","title":"📲 Ver catálogo en WA","payload":"WA_HOME"}]');

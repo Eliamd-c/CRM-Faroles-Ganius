@@ -38,6 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
         sendBtn:        document.getElementById('chat-send-btn'),
         searchInput:    document.getElementById('chat-search'),
         inboxWrap:      document.querySelector('.inbox-wrap'),
+        
+        // AI Copilot
+        btnAiSuggest:   document.getElementById('btn-ai-suggest'),
+        btnAiAnalyze:   document.getElementById('btn-ai-analyze'),
 
         // Contact panel
         contactPanel:   document.getElementById('contact-details-panel'),
@@ -129,6 +133,9 @@ function wireEvents() {
     el.simForm.addEventListener('submit', handleSimSubmit);
     el.searchInput.addEventListener('input', () => renderChatsList());
     el.cTags.addEventListener('input', e => renderTagsPreview(e.target.value));
+    
+    if(el.btnAiSuggest) el.btnAiSuggest.addEventListener('click', handleAiSuggest);
+    if(el.btnAiAnalyze) el.btnAiAnalyze.addEventListener('click', handleAiAnalyze);
 }
 
 // ============================================================
@@ -458,6 +465,60 @@ async function saveContactDetails() {
             showToast('❌ ' + result.error, 'error');
         }
     } catch (err) { console.error(err); }
+}
+
+// ============================================================
+//  AI COPILOT
+// ============================================================
+async function handleAiSuggest() {
+    if (!state.activeChatId) return;
+    el.btnAiSuggest.textContent = "🪄 Generando...";
+    el.btnAiSuggest.disabled = true;
+
+    try {
+        const res = await fetch(`/api/ai/suggest-response/${state.activeChatId}`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.suggestion) {
+            el.msgInput.value = data.suggestion;
+            el.msgInput.focus();
+            showToast('🪄 Sugerencia lista. Edita y envía.');
+        } else {
+            showToast('❌ ' + (data.error || 'Error IA'), 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error de red', 'error');
+    } finally {
+        el.btnAiSuggest.textContent = "🪄 Sugerencia IA";
+        el.btnAiSuggest.disabled = false;
+    }
+}
+
+async function handleAiAnalyze() {
+    if (!state.activeChatId || !state.activeContact) return;
+    el.btnAiAnalyze.textContent = "🔥 Analizando...";
+    el.btnAiAnalyze.disabled = true;
+
+    try {
+        const res = await fetch(`/api/ai/analyze-lead/${state.activeChatId}`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.temperatura) {
+            const oldNotes = el.cNotes.value;
+            const aiNotes = `[IA Analysis]\nTemp: ${data.temperatura}\nObjeciones: ${data.objeciones ? data.objeciones.join(', ') : 'Ninguna'}\nResumen: ${data.resumen_breve}`;
+            el.cNotes.value = oldNotes ? oldNotes + "\n\n" + aiNotes : aiNotes;
+            
+            await saveContactDetails();
+            showToast('🔥 Lead analizado por Gemini.');
+        } else {
+            showToast('❌ ' + (data.error || 'Error IA'), 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error de red', 'error');
+    } finally {
+        el.btnAiAnalyze.textContent = "🔥 Analizar Lead";
+        el.btnAiAnalyze.disabled = false;
+    }
 }
 
 // ============================================================
