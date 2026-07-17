@@ -253,7 +253,7 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
     const input = quickReplyPayload || text.toLowerCase().trim();
     
     // WA Bridge Links generator
-    const generateWaLink = (msg) => \`https://wa.me/573000000000?text=\${encodeURIComponent(msg + " Mi usuario es @" + contact.username)}\`;
+    const generateWaLink = (msg) => `https://wa.me/573000000000?text=${encodeURIComponent(msg + " Mi usuario es @" + contact.username)}`;
     
     // Si el usuario toca un botón de ir a WhatsApp (WA Bridge)
     if (input === 'WA_BUSINESS' || input === 'WA_HOME') {
@@ -261,7 +261,7 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
             ? "¡Hola! Quiero iniciar como distribuidor y vender faroles."
             : "¡Hola! Quiero el catálogo para decorar mi hogar y conocer el descuento por cantidad.";
         
-        const finalMsg = \`¡Excelente! 📲 Haz clic aquí para ir a nuestro WhatsApp y te envío todo de inmediato: \n\n\${generateWaLink(waMsg)}\`;
+        const finalMsg = `¡Excelente! 📲 Haz clic aquí para ir a nuestro WhatsApp y te envío todo de inmediato: \n\n${generateWaLink(waMsg)}`;
         
         await dbRun(
             "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
