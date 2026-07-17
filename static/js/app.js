@@ -101,6 +101,24 @@ function initNavigation() {
     });
 }
 
+function switchView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.querySelectorAll('.nav-item').forEach(v => v.classList.remove('active'));
+    
+    document.getElementById(viewId).style.display = 'block';
+    const activeNav = document.querySelector(`[data-view="${viewId}"]`);
+    if(activeNav) activeNav.classList.add('active');
+
+    if (viewId === 'view-inbox') {
+        renderChatsList();
+    } else if (viewId === 'view-pipeline') {
+        loadPipeline();
+    } else if (viewId === 'view-automation') {
+        loadAutoresponders();
+        loadFlows();
+    }
+}
+
 function switchTab(tab, clickedBtn) {
     // Deactivate all nav buttons
     el.allNavBtns.forEach(b => b.classList.remove('active'));
@@ -115,7 +133,10 @@ function switchTab(tab, clickedBtn) {
     state.activeTab = tab;
 
     if (tab === 'pipeline')   loadPipeline();
-    if (tab === 'automation') loadAutoResponders();
+    if (tab === 'automation') {
+        loadAutoResponders();
+        loadFlows();
+    }
     if (tab === 'inbox')      loadChats();
 }
 
@@ -661,6 +682,149 @@ function renderRules() {
                 </button>
             </div>`;
         el.rulesList.appendChild(div);
+    });
+}
+
+// ============================================================
+//  AUTO RESPONDERS & FLOW BUILDER
+// ============================================================
+async function loadAutoresponders() {
+    try {
+        const res = await fetch('/api/autoresponders');
+        const data = await res.json();
+        const list = document.getElementById('rules-list');
+        if(!list) return;
+
+        if (data.length === 0) {
+            list.innerHTML = '<p style="color:var(--text-muted); font-size:13px; padding:16px;">No hay reglas activas.</p>';
+            return;
+        }
+
+        list.innerHTML = data.map(rule => `
+            <div class="rule-item" style="padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; color: #34d399; margin-bottom: 4px;">"${rule.keyword}"</div>
+                    <div style="color: var(--text-muted); font-size: 13px;">${rule.response_text}</div>
+                </div>
+                <button onclick="deleteAutoresponder(${rule.id})" class="btn-icon" style="color:#ef4444;" title="Eliminar regla">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error("Error loading autoresponders", err);
+    }
+}
+
+async function loadFlows() {
+    try {
+        const res = await fetch('/api/flows');
+        const data = await res.json();
+        renderFlowsGrid(data);
+    } catch (err) {
+        console.error("Error loading flows", err);
+    }
+}
+
+function renderFlowsGrid(flows) {
+    const grid = document.getElementById('flows-grid');
+    if (!grid) return;
+
+    grid.innerHTML = flows.map(f => {
+        let btns = [];
+        try { btns = JSON.parse(f.buttons_json || "[]"); } catch(e){}
+        
+        return `
+        <div class="flow-card" data-id="${f.id}">
+            <div class="flow-card-header">
+                <input type="text" class="flow-id-badge flow-id-input" value="${f.id}" placeholder="ID_DEL_PASO">
+                <button onclick="deleteFlow('${f.id}')" class="flow-delete-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>
+            <div>
+                <textarea class="field-textarea flow-msg-input" rows="3" placeholder="Mensaje persuasivo...">${f.message_text || ''}</textarea>
+            </div>
+            <div class="flow-buttons-list">
+                ${btns.map((b, i) => `
+                <div class="flow-button-item">
+                    <input type="text" placeholder="Título del botón" class="btn-title-input" value="${b.title}">
+                    <input type="text" placeholder="ID de Destino o WA:..." class="payload-input" value="${b.payload}">
+                    <button class="btn-icon btn-remove-flow-btn" onclick="this.parentElement.remove(); saveAllFlows();" style="color:var(--text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                </div>
+                `).join('')}
+            </div>
+            ${btns.length < 3 ? `<div class="add-btn-row"><button class="btn-outline add-flow-btn-trigger">+ Botón</button></div>` : ''}
+        </div>
+        `;
+    }).join('');
+
+    // Attach events
+    grid.querySelectorAll('.flow-id-input, .flow-msg-input, .btn-title-input, .payload-input').forEach(el => {
+        el.addEventListener('change', saveAllFlows);
+    });
+
+    grid.querySelectorAll('.add-flow-btn-trigger').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const card = e.target.closest('.flow-card');
+            const list = card.querySelector('.flow-buttons-list');
+            const newBtn = document.createElement('div');
+            newBtn.className = 'flow-button-item';
+            newBtn.innerHTML = `
+                <input type="text" placeholder="Título" class="btn-title-input" value="">
+                <input type="text" placeholder="Destino (WA: o ID)" class="payload-input" value="">
+                <button class="btn-icon btn-remove-flow-btn" onclick="this.parentElement.remove(); saveAllFlows();" style="color:var(--text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            `;
+            list.appendChild(newBtn);
+            newBtn.querySelectorAll('input').forEach(i => i.addEventListener('change', saveAllFlows));
+            saveAllFlows();
+            loadFlows(); // re-render to update the "+ Botón" visibility
+        });
+    });
+}
+
+async function saveAllFlows() {
+    const grid = document.getElementById('flows-grid');
+    if (!grid) return;
+
+    const cards = grid.querySelectorAll('.flow-card');
+    for (let card of cards) {
+        const oldId = card.getAttribute('data-id');
+        const id = card.querySelector('.flow-id-input').value.trim() || oldId;
+        const msg = card.querySelector('.flow-msg-input').value;
+        const btnItems = card.querySelectorAll('.flow-button-item');
+        
+        let buttons = [];
+        btnItems.forEach(item => {
+            const title = item.querySelector('.btn-title-input').value.trim();
+            const payload = item.querySelector('.payload-input').value.trim();
+            if(title && payload) buttons.push({ type: 'text', title, payload });
+        });
+
+        await fetch('/api/flows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, message_text: msg, buttons_json: JSON.stringify(buttons) })
+        });
+    }
+    showToast("✅ Flujos guardados automáticamente.");
+}
+
+async function deleteFlow(id) {
+    if(!confirm(`¿Eliminar paso ${id}?`)) return;
+    await fetch(`/api/flows/${id}`, { method: 'DELETE' });
+    showToast("🗑️ Paso eliminado.");
+    loadFlows();
+}
+
+const addFlowBtn = document.getElementById('btn-add-flow');
+if(addFlowBtn) {
+    addFlowBtn.addEventListener('click', async () => {
+        const id = 'FLOW_NUEVO_' + Date.now().toString().slice(-4);
+        await fetch('/api/flows', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, message_text: 'Nuevo mensaje...', buttons_json: '[]' })
+        });
+        loadFlows();
     });
 }
 

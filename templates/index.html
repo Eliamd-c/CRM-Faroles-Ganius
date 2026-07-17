@@ -267,9 +267,26 @@
                             </div>
                             <div>
                                 <h3 class="card-title">Reglas Activas</h3>
-                                <p class="card-subtitle">Gestiona tus respuestas</p>
+                                <p class="card-subtitle">Gestiona tus respuestas simples</p>
                             </div>
                         </div>
+                        <div id="rules-list" class="rules-list"></div>
+                    </div>
+                </div>
+
+                <!-- FLOW BUILDER SECTION -->
+                <div style="margin-top: 32px;">
+                    <div class="view-page-header">
+                        <div>
+                            <h2 class="page-title">Constructor de Embudos (Flows)</h2>
+                            <p class="page-subtitle">Construye experiencias interactivas guiadas con botones</p>
+                        </div>
+                        <button id="btn-add-flow" class="btn-primary">+ Nuevo Paso</button>
+                    </div>
+                    <div id="flows-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; margin-top: 24px;">
+                        <!-- Flow blocks will be injected here -->
+                    </div>
+                </div>
                         <div class="rules-list" id="rules-list-body"></div>
                     </div>
                 </div>

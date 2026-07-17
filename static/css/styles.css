@@ -1200,6 +1200,20 @@ html, body {
     .simulator-layout { grid-template-columns: 1fr; }
 }
 
+/* Flow Builder Styles */
+.flow-card { background: rgba(255,255,255,0.03); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 16px; position: relative; }
+.flow-card-header { display: flex; justify-content: space-between; align-items: center; }
+.flow-id-badge { background: rgba(139,92,246,0.15); color: #c4b5fd; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; font-family: monospace;}
+.flow-delete-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
+.flow-delete-btn:hover { color: #ef4444; }
+.flow-buttons-list { display: flex; flex-direction: column; gap: 8px; }
+.flow-button-item { display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.2); padding: 8px; border-radius: var(--radius-sm); border: 1px dashed var(--color-border); }
+.flow-button-item input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 13px; }
+.flow-button-item .payload-input { color: #34d399; font-family: monospace; }
+.add-btn-row { display: flex; justify-content: center; margin-top: 8px; }
+.btn-outline { background: transparent; border: 1px solid var(--color-border); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.btn-outline:hover { background: rgba(255,255,255,0.05); }
+
 @media (max-width: 768px) {
     .sidebar { display: none !important; }
     .mobile-bottom-nav { display: flex; }

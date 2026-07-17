@@ -254,26 +254,24 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
     
     // WA Bridge Links generator
     const generateWaLink = (msg) => `https://wa.me/573000000000?text=${encodeURIComponent(msg + " Mi usuario es @" + contact.username)}`;
-    
-    // Si el usuario toca un botón de ir a WhatsApp (WA Bridge)
-    if (input === 'WA_BUSINESS' || input === 'WA_HOME') {
-        const waMsg = input === 'WA_BUSINESS' 
-            ? "¡Hola! Quiero iniciar como distribuidor y vender faroles."
-            : "¡Hola! Quiero el catálogo para decorar mi hogar y conocer el descuento por cantidad.";
-        
-        const finalMsg = `¡Excelente! 📲 Haz clic aquí para ir a nuestro WhatsApp y te envío todo de inmediato: \n\n${generateWaLink(waMsg)}`;
-        
-        await dbRun(
-            "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
-            [senderId, senderId, finalMsg]
-        );
-        await dbRun("UPDATE contacts SET stage = 'Contacted' WHERE id = ?", [senderId]);
-        await sendMetaMessage(senderId, finalMsg);
-        return;
-    }
 
-    // Si toca un Payload de flujo, usamos la tabla flows
-    if (quickReplyPayload && quickReplyPayload.startsWith('FLOW_')) {
+    // Si toca un Payload de flujo (Quick Reply)
+    if (quickReplyPayload) {
+        // Verificar si es una instrucción especial de WhatsApp
+        if (quickReplyPayload.startsWith('WA:')) {
+            const waMsg = quickReplyPayload.replace('WA:', '').trim();
+            const finalMsg = `¡Excelente! 📲 Haz clic aquí para ir a nuestro WhatsApp: \n\n${generateWaLink(waMsg)}`;
+            
+            await dbRun(
+                "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
+                [senderId, senderId, finalMsg]
+            );
+            await dbRun("UPDATE contacts SET stage = 'Contacted' WHERE id = ?", [senderId]);
+            await sendMetaMessage(senderId, finalMsg);
+            return;
+        }
+
+        // De lo contrario, buscar si el payload coincide con un ID de flujo
         const flowStep = await dbGet("SELECT * FROM flows WHERE id = ?", [quickReplyPayload]);
         if (flowStep) {
             await dbRun(
@@ -285,8 +283,10 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
         }
     }
 
-    // Si no fue un botón, intentar flujo de bienvenida (ej: si dice hola)
-    if (input === 'hola' || input === 'buenas' || input === 'saludos') {
+    // Buscar si alguna palabra en el texto coincide con un flujo "Start" u otro
+    // Para simplificar, buscamos si el texto exacto es un ID de flujo (ej: 'start' para 'hola')
+    // O si hay un autoresponder. Modificamos para siempre enviar el 'start' si dicen hola.
+    if (input === 'hola' || input === 'buenas' || input === 'saludos' || input === 'start') {
         const flowStep = await dbGet("SELECT * FROM flows WHERE id = ?", ['start']);
         if (flowStep) {
             await dbRun(
@@ -663,6 +663,42 @@ app.post('/api/ai/suggest-response/:id', async (req, res) => {
 
         if (suggestion.error) return res.status(500).json({ error: suggestion.error });
         res.json(suggestion);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- FLOWS ENDPOINTS (Flow Builder) ---
+
+app.get('/api/flows', async (req, res) => {
+    try {
+        const rows = await dbAll("SELECT * FROM flows");
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/flows', async (req, res) => {
+    const { id, message_text, buttons_json } = req.body;
+    try {
+        await dbRun(`
+            INSERT INTO flows (id, message_text, buttons_json) 
+            VALUES (?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET 
+                message_text=excluded.message_text, 
+                buttons_json=excluded.buttons_json
+        `, [id, message_text, buttons_json]);
+        res.json({ success: true, id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/flows/:id', async (req, res) => {
+    try {
+        await dbRun("DELETE FROM flows WHERE id = ?", [req.params.id]);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
