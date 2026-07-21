@@ -24,11 +24,21 @@ Responde SOLO en formato JSON válido con esta estructura:
         const response = await axios.post(url, {
             contents: [{ parts: [{ text: prompt }] }]
         });
-        
+
+        if (!response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            throw new Error("Respuesta Gemini con estructura inválida: faltan campos esperados");
+        }
+
         let text = response.data.candidates[0].content.parts[0].text;
         // Limpiar backticks de markdown si vienen en la respuesta
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(text);
+
+        try {
+            return JSON.parse(text);
+        } catch (parseErr) {
+            console.error("Error parseando JSON:", parseErr.message);
+            return { error: "Error: respuesta no es JSON válido" };
+        }
     } catch (err) {
         console.error("Error en Gemini API:", err.message);
         return { error: "Error analizando lead" };

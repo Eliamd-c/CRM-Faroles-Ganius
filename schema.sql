@@ -58,6 +58,23 @@ INSERT OR IGNORE INTO auto_responders (keyword, response_text, is_active) VALUES
 ('hola', '¡Hola! Bienvenido a nuestro canal de soporte. ¿En qué podemos ayudarte hoy?', 1),
 ('info', 'Hola, gracias por escribirnos. Puedes ver nuestro catálogo completo en el enlace de nuestra biografía.', 1);
 
+-- Disparadores de intención basados en IA
+-- La IA lee cada mensaje entrante y decide cuál intención expresa el cliente,
+-- sin importar las palabras exactas que use.
+CREATE TABLE IF NOT EXISTS ai_triggers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    intent_name TEXT UNIQUE,       -- Identificador de la intención (ej: 'interes_negocio')
+    description TEXT,              -- Qué significa la intención (esto lo lee la IA)
+    examples TEXT,                 -- Frases de ejemplo separadas por " | "
+    target_flow TEXT,              -- Paso del flujo que se dispara al detectarla
+    is_active INTEGER DEFAULT 1
+);
+
+INSERT OR IGNORE INTO ai_triggers (intent_name, description, examples, target_flow, is_active) VALUES
+('saludo', 'El cliente saluda o inicia la conversación sin pedir nada específico todavía', 'hola | buenas tardes | hey qué tal, vi su página', 'start', 1),
+('interes_hogar', 'El cliente quiere comprar faroles para decorar su casa, un evento, un regalo o uso personal', 'quiero un farol para mi sala | ¿tienen faroles para una boda? | busco algo para decorar mi jardín', 'FLOW_HOME', 1),
+('interes_negocio', 'El cliente pregunta por revender, distribuir, comprar al por mayor o generar ingresos con los productos', 'quiero vender sus faroles | ¿manejan precio mayorista? | ¿cómo funciona lo de distribuir?', 'FLOW_BUSINESS', 1);
+
 -- Embudos persuasivos (Manychat style)
 CREATE TABLE IF NOT EXISTS flows (
     id TEXT PRIMARY KEY,           -- Identificador del paso (ej: 'welcome', 'wholesaler_pitch')
