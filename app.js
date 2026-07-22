@@ -27,6 +27,37 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 console.log('✅ Conectado a Supabase:', SUPABASE_URL);
 
+// --- CARGAR CREDENCIALES DE ENTORNO (HOSTING) ---
+const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
+const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
+const INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
+const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+
+// Inicializar BD con credenciales si existen
+async function initializeMetaCredentials() {
+    if (META_PAGE_ACCESS_TOKEN) {
+        await setSetting('page_access_token', META_PAGE_ACCESS_TOKEN);
+        console.log('✅ Meta Page Access Token cargado de .env');
+    }
+    if (META_WEBHOOK_VERIFY_TOKEN) {
+        await setSetting('webhook_verify_token', META_WEBHOOK_VERIFY_TOKEN);
+        console.log('✅ Meta Webhook Verify Token cargado de .env');
+    }
+    if (INSTAGRAM_ACCOUNT_ID) {
+        await setSetting('instagram_account_id', INSTAGRAM_ACCOUNT_ID);
+        console.log('✅ Instagram Account ID cargado de .env');
+    }
+    if (INSTAGRAM_BUSINESS_ACCOUNT_ID) {
+        await setSetting('instagram_business_account_id', INSTAGRAM_BUSINESS_ACCOUNT_ID);
+        console.log('✅ Instagram Business Account ID cargado de .env');
+    }
+}
+
+// Inicializar credenciales al arrancar
+initializeMetaCredentials().catch(err => {
+    console.warn('⚠️ Error inicializando credenciales:', err.message);
+});
+
 // --- HELPERS DE BASE DE DATOS (Supabase) ---
 
 /**
@@ -182,6 +213,46 @@ async function fetchMetaUserProfile(senderScopedId) {
     }
 }
 
+// --- SCHEDULER DE REACTIVACIÓN (23h sin respuesta) ---
+
+/**
+ * Reactivar contacto después de 23h sin respuesta
+ */
+async function checkAndSendReactivation() {
+    console.log('⏰ Verificando contactos para reactivación...');
+
+    try {
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 23 * 60 * 60 * 1000);
+
+        // Obtener contactos que no han respondido en 23h
+        const contacts = await dbAll('contacts', {});
+
+        for (const contact of contacts) {
+            if (!contact.last_message_received_at) continue;
+
+            const lastMessageTime = new Date(contact.last_message_received_at);
+            const timeDiff = now - lastMessageTime;
+            const hoursAgo = timeDiff / (1000 * 60 * 60);
+
+            // Si pasaron más de 23h y menos de 24h
+            if (hoursAgo > 23 && hoursAgo < 24) {
+                const reactivationFlow = await dbGet('flows', { id: 'msg_reactivation' });
+                if (reactivationFlow) {
+                    console.log(`📢 Enviando reactivación a ${contact.name}`);
+                    const messageText = reactivationFlow.message_text.replace('{First Name}', contact.name || 'amiga');
+                    await sendMetaMessage(contact.id, messageText, reactivationFlow.buttons_json);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error en reactivación:', err.message);
+    }
+}
+
+// Ejecutar verificación cada 10 minutos
+setInterval(checkAndSendReactivation, 10 * 60 * 1000);
+
 // --- ENDPOINTS ---
 
 app.get('/', (req, res) => {
@@ -283,41 +354,63 @@ async function processMessagingEvent(messagingEvent) {
         sender_type: 'customer'
     });
 
-    // Procesar lógica del bot
-    await handleBotResponseLogic(senderId, text, quickReplyPayload, contact);
+    // Procesar lógica del bot (pasar referral si viene de anuncio pagado)
+    const referral = messagingEvent.referral || null;
+    await handleBotResponseLogic(senderId, text, quickReplyPayload, contact, referral);
 }
 
-async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact) {
+async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact, referral = null) {
     console.log(`🤖 Procesando: "${text}" de ${contact.name}`);
 
-    // Si es respuesta de botón
-    if (quickReplyPayload) {
-        console.log(`➡️ Payload de botón: ${quickReplyPayload}`);
-        // Aquí iría la lógica de botones
-        return;
+    // ============================================
+    // FASE 1: FLUJO FAROLES GENIUS
+    // ============================================
+
+    // Si viene de anuncio pagado (primer mensaje)
+    if (referral && !contact.flow_step || contact.flow_step === 'start') {
+        console.log('📢 Tráfico de anuncio pagado detectado');
+        const welcomeFlow = await dbGet('flows', { id: 'msg_welcome_from_ad' });
+        if (welcomeFlow) {
+            await sendMetaMessage(senderId, welcomeFlow.message_text, welcomeFlow.buttons_json);
+            await dbUpdate('contacts', { flow_step: 'msg_welcome_from_ad' }, { id: senderId });
+            return;
+        }
     }
 
-    // Si hay texto, intentar clasificar intención
-    if (text) {
-        const triggers = await dbAll('ai_triggers', { is_active: 1 });
-        if (triggers.length > 0) {
-            try {
-                const result = await classifyIntent(text, '', triggers);
-                console.log(`🧠 Intención detectada: ${result.intent} (confianza: ${result.confianza})`);
+    // ============================================
+    // RESPUESTA DE BOTÓN (Quick Reply Payload)
+    // ============================================
+    if (quickReplyPayload) {
+        console.log(`🔘 Botón presionado: ${quickReplyPayload}`);
+        return await handleButtonPayload(senderId, quickReplyPayload, contact);
+    }
 
-                if (result.intent && result.confianza >= 0.6) {
-                    const trigger = triggers.find(t => t.intent_name === result.intent);
-                    if (trigger) {
-                        const flow = await dbGet('flows', { id: trigger.target_flow });
-                        if (flow) {
-                            await sendMetaMessage(senderId, flow.message_text, flow.buttons_json);
-                            await dbUpdate('contacts', { flow_step: trigger.target_flow }, { id: senderId });
-                            return;
+    // ============================================
+    // TEXTO LIBRE - Clasificar intención o continuar flujo
+    // ============================================
+    if (text) {
+        // Si no está en flujo específico, intentar clasificar
+        if (!contact.flow_step || contact.flow_step === 'start') {
+            const triggers = await dbAll('ai_triggers', { is_active: 1 });
+            if (triggers.length > 0) {
+                try {
+                    const result = await classifyIntent(text, '', triggers);
+                    console.log(`🧠 Intención detectada: ${result.intent} (confianza: ${result.confianza})`);
+
+                    if (result.intent && result.confianza >= 0.6) {
+                        const trigger = triggers.find(t => t.intent_name === result.intent);
+                        if (trigger) {
+                            const flow = await dbGet('flows', { id: trigger.target_flow });
+                            if (flow) {
+                                await sendMetaMessage(senderId, flow.message_text, flow.buttons_json);
+                                await dbUpdate('contacts', { flow_step: trigger.target_flow }, { id: senderId });
+                                return;
+                            }
                         }
                     }
+                } catch (err) {
+                    console.warn(`⚠️ Error en clasificación: ${err.message}`);
                 }
-            } catch (err) {
-                console.warn(`⚠️ Error en clasificación: ${err.message}`);
             }
         }
     }
@@ -325,12 +418,72 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
     console.log('✅ Mensaje procesado');
 }
 
+/**
+ * Manejar payloads de botones (Faroles Genius Phase 1)
+ */
+async function handleButtonPayload(senderId, payload, contact) {
+    const flowMap = {
+        // Bienvenida → decisión
+        'FLOW_INDIVIDUAL': 'msg_decision',
+        'FLOW_GROUP': 'msg_decision',
+        'START_FLOW': 'msg_pricing_and_story',
+
+        // Decisión → rama
+        'DECISION_POINT': 'msg_decision',
+
+        // Rama Individual: cantidad → WhatsApp
+        'QTY_1': 'msg_individual_whatsapp',
+        'QTY_2_3': 'msg_individual_whatsapp',
+        'QTY_4_6': 'msg_individual_whatsapp',
+        'QTY_7PLUS': 'msg_individual_whatsapp',
+
+        // Rama Grupo: confirmar → WhatsApp
+        'GROUP_YES': 'msg_group_whatsapp',
+        'GROUP_NO': 'msg_individual_qty',
+
+        // WhatsApp
+        'WHATSAPP_INDIVIDUAL': null, // Ir a WhatsApp
+        'WHATSAPP_GROUP': null, // Ir a WhatsApp
+    };
+
+    const nextFlowId = flowMap[payload];
+
+    // Si necesita ir a WhatsApp
+    if (payload.startsWith('WHATSAPP_')) {
+        const isGroup = payload === 'WHATSAPP_GROUP';
+        await sendMetaMessage(
+            senderId,
+            isGroup
+                ? '📲 Aquí va el link a WhatsApp para coordinar tu grupo'
+                : '📲 Aquí va el link a WhatsApp para confirmar tu pedido',
+            null
+        );
+        await dbUpdate('contacts', { stage: 'Contacted', flow_step: payload }, { id: senderId });
+        return;
+    }
+
+    // Mostrar siguiente flujo
+    if (nextFlowId) {
+        const nextFlow = await dbGet('flows', { id: nextFlowId });
+        if (nextFlow) {
+            await sendMetaMessage(senderId, nextFlow.message_text, nextFlow.buttons_json);
+            await dbUpdate('contacts', { flow_step: nextFlowId }, { id: senderId });
+        }
+    }
+}
+
 // --- SETTINGS API ---
 
 app.get('/api/settings', async (req, res) => {
     try {
         const settings = await dbAll('settings');
-        res.json(settings);
+        // NO EXPONER credenciales sensibles
+        const safe = settings.filter(s =>
+            !s.key.includes('token') &&
+            !s.key.includes('access') &&
+            !s.key.includes('secret')
+        );
+        res.json(safe);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -339,8 +492,33 @@ app.get('/api/settings', async (req, res) => {
 app.post('/api/settings', async (req, res) => {
     try {
         const { key, value } = req.body;
+        // Bloquear cambios de credenciales sensibles por API (deben venir de .env)
+        if (key.includes('token') || key.includes('access') || key.includes('secret')) {
+            return res.status(403).json({ error: 'Las credenciales no pueden cambiar por API. Usa variables de entorno.' });
+        }
         await setSetting(key, value);
         res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- META CONFIGURATION STATUS ---
+app.get('/api/meta/status', async (req, res) => {
+    try {
+        const pageToken = await getSetting('page_access_token');
+        const webhookToken = await getSetting('webhook_verify_token');
+        const igAccountId = await getSetting('instagram_account_id');
+
+        res.json({
+            configured: !!(pageToken && webhookToken && igAccountId),
+            page_access_token_set: !!pageToken,
+            webhook_verify_token_set: !!webhookToken,
+            instagram_account_id_set: !!igAccountId,
+            message: pageToken && webhookToken && igAccountId
+                ? '✅ Meta configurado correctamente'
+                : '❌ Faltan credenciales de Meta'
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
