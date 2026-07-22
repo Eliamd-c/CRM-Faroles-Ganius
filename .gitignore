@@ -18,6 +18,7 @@ env/
 venv/
 ENV/
 .env
+.env.local
 
 # Antigravity/Editor local
 .system_generated/

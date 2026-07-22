@@ -1,77 +1,126 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: path.join(__dirname, '.env.local') });
 
-const { getGeminiLeadScore, getChatGptSuggestion } = require('./ai_copilot');
+const { getGeminiLeadScore, getChatGptSuggestion, classifyIntent } = require('./ai_copilot');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const DATABASE_PATH = process.env.DATABASE_PATH || 'crm.db';
 
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'static')));
 
-// Conexión a la base de datos
-const db = new sqlite3.Database(DATABASE_PATH, (err) => {
-    if (err) {
-        console.error('Error al abrir la base de datos SQLite:', err.message);
-    } else {
-        console.log('Conectado a la base de datos SQLite:', DATABASE_PATH);
-        initDb();
-    }
-});
+// --- SUPABASE CLIENT ---
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-// Promesas para base de datos
-const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-        if (err) reject(err);
-        else resolve({ lastID: this.lastID, changes: this.changes });
-    });
-});
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('❌ Error: SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY requeridos en .env.local');
+    process.exit(1);
+}
 
-const dbAll = (sql, params = []) => new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-    });
-});
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-    });
-});
+console.log('✅ Conectado a Supabase:', SUPABASE_URL);
 
-const dbExec = (sql) => new Promise((resolve, reject) => {
-    db.exec(sql, (err) => {
-        if (err) reject(err);
-        else resolve();
-    });
-});
+// --- HELPERS DE BASE DE DATOS (Supabase) ---
 
-// Inicializar la base de datos
-async function initDb() {
+/**
+ * Obtener un registro
+ */
+async function dbGet(table, filter = {}) {
     try {
-        const schemaPath = path.join(__dirname, 'schema.sql');
-        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-        await dbExec(schemaSql);
-        console.log('Tablas de base de datos inicializadas.');
+        let query = supabase.from(table).select('*');
+        for (const [key, value] of Object.entries(filter)) {
+            query = query.eq(key, value);
+        }
+        const { data, error } = await query.limit(1).single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return data || null;
     } catch (err) {
-        console.error('Error inicializando base de datos:', err);
+        console.error(`Error en dbGet (${table}):`, err.message);
+        return null;
     }
 }
 
-// --- CONFIGURACIÓN Y CLIENTE META ---
+/**
+ * Obtener múltiples registros
+ */
+async function dbAll(table, filter = {}) {
+    try {
+        let query = supabase.from(table).select('*');
+        for (const [key, value] of Object.entries(filter)) {
+            query = query.eq(key, value);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        return data || [];
+    } catch (err) {
+        console.error(`Error en dbAll (${table}):`, err.message);
+        return [];
+    }
+}
 
+/**
+ * Insertar registro
+ */
+async function dbInsert(table, data) {
+    try {
+        const { data: result, error } = await supabase
+            .from(table)
+            .insert([data])
+            .select();
+        if (error) throw error;
+        return result ? result[0] : null;
+    } catch (err) {
+        console.error(`Error en dbInsert (${table}):`, err.message);
+        return null;
+    }
+}
+
+/**
+ * Actualizar registro
+ */
+async function dbUpdate(table, data, filter = {}) {
+    try {
+        let query = supabase.from(table).update(data);
+        for (const [key, value] of Object.entries(filter)) {
+            query = query.eq(key, value);
+        }
+        const { error } = await query;
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error(`Error en dbUpdate (${table}):`, err.message);
+        return false;
+    }
+}
+
+/**
+ * Obtener setting
+ */
 async function getSetting(key) {
-    const row = await dbGet("SELECT value FROM settings WHERE key = ?", [key]);
+    const row = await dbGet('settings', { key });
     return row ? row.value : null;
 }
+
+/**
+ * Guardar setting
+ */
+async function setSetting(key, value) {
+    const existing = await dbGet('settings', { key });
+    if (existing) {
+        return await dbUpdate('settings', { value }, { key });
+    } else {
+        return await dbInsert('settings', { key, value });
+    }
+}
+
+// --- CLIENTE META ---
 
 async function sendMetaMessage(recipientId, text, buttonsJson = null) {
     const token = await getSetting('page_access_token');
@@ -87,29 +136,29 @@ async function sendMetaMessage(recipientId, text, buttonsJson = null) {
             if (buttons && buttons.length > 0) {
                 messageData.quick_replies = buttons.map(b => ({
                     content_type: "text",
-                    title: b.title.substring(0, 20), // IG limita a 20 caracteres
+                    title: b.title.substring(0, 20),
                     payload: b.payload
                 }));
             }
         } catch (e) {
-            console.error("Error parseando botones para Quick Replies:", e);
+            console.error("Error parseando botones:", e);
         }
     }
 
     const url = `https://graph.facebook.com/v19.0/me/messages`;
     try {
-        console.log(`Enviando mensaje a Meta API para ${recipientId}...`);
+        console.log(`📤 Enviando mensaje a Meta para ${recipientId}...`);
         const response = await axios.post(url, {
             recipient: { id: recipientId },
             message: messageData
         }, {
             params: { access_token: token }
         });
-        console.log(`Mensaje enviado con éxito. Message ID: ${response.data.message_id}`);
+        console.log(`✅ Mensaje enviado. ID: ${response.data.message_id}`);
         return response.data;
     } catch (err) {
-        const errorMsg = err.response && err.response.data ? err.response.data.error.message : err.message;
-        console.error(`Error al enviar mensaje por Meta API: ${errorMsg}`);
+        const errorMsg = err.response?.data?.error?.message || err.message;
+        console.error(`❌ Error Meta API: ${errorMsg}`);
         return null;
     }
 }
@@ -128,18 +177,18 @@ async function fetchMetaUserProfile(senderScopedId) {
         });
         return response.data;
     } catch (err) {
-        console.error(`Error obteniendo perfil de Meta: ${err.message}`);
+        console.error(`Error obteniendo perfil: ${err.message}`);
         return null;
     }
 }
 
-// --- VISTA HTML PRINCIPAL ---
+// --- ENDPOINTS ---
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'templates', 'index.html'));
 });
 
-// --- WEBHOOK ENDPOINTS ---
-
+// Webhook verification
 app.get('/webhook', async (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
@@ -147,23 +196,24 @@ app.get('/webhook', async (req, res) => {
 
     const expectedToken = await getSetting('webhook_verify_token');
 
-    console.log(`Verificación de Webhook recibida. Token recibido: ${token}`);
+    console.log(`🔐 Verificación Webhook. Token recibido: ${token}`);
 
     if (mode && token) {
         if (mode === 'subscribe' && token === expectedToken) {
-            console.log('Verificación de Webhook exitosa.');
+            console.log('✅ Webhook verificado');
             return res.status(200).send(challenge);
         } else {
-            console.warn(`Fallo de verificación de Webhook. Esperado: ${expectedToken}`);
+            console.warn(`❌ Token inválido. Esperado: ${expectedToken}`);
             return res.status(403).send('Forbidden');
         }
     }
     return res.status(400).send('Bad Request');
 });
 
+// Webhook eventos
 app.post('/webhook', async (req, res) => {
     const data = req.body;
-    console.log('Webhook recibido de Meta:', JSON.stringify(data));
+    console.log('📨 Webhook recibido:', JSON.stringify(data, null, 2));
 
     if (data.object === 'instagram') {
         for (const entry of data.entry || []) {
@@ -179,532 +229,237 @@ app.post('/webhook', async (req, res) => {
 // --- PROCESAMIENTO DE MENSAJES ---
 
 async function processMessagingEvent(messagingEvent) {
-    const senderId = messagingEvent.sender ? messagingEvent.sender.id : null;
-    const recipientId = messagingEvent.recipient ? messagingEvent.recipient.id : null;
-    
+    const senderId = messagingEvent.sender?.id;
+    const recipientId = messagingEvent.recipient?.id;
+
     if (!senderId) return;
 
-    // Evitar bucles con nuestros propios mensajes
     const myIgId = await getSetting('instagram_account_id');
     if (senderId === myIgId) {
-        console.log('Ignorando mensaje autogenerado por el bot.');
+        console.log('⚠️ Ignorando mensaje autogenerado.');
         return;
     }
 
     const message = messagingEvent.message || {};
-    let text = message.text || '';
-    const quickReplyPayload = message.quick_reply ? message.quick_reply.payload : null;
-    let mediaUrl = null;
+    const text = message.text || '';
+    const quickReplyPayload = message.quick_reply?.payload || null;
+    let mediaUrl = message.attachments?.[0]?.payload?.url || null;
 
-    if (message.attachments && message.attachments.length > 0) {
-        mediaUrl = message.attachments[0].payload ? message.attachments[0].payload.url : null;
-    }
-
-    if (!text && !mediaUrl && !quickReplyPayload) return;
-
-    console.log(`Procesando mensaje de ${senderId}: "${text}" (Payload: ${quickReplyPayload})`);
-
-    // 1. Asegurar contacto en BD
-    let contact = await dbGet("SELECT * FROM contacts WHERE id = ?", [senderId]);
+    // Obtener o crear contacto
+    let contact = await dbGet('contacts', { id: senderId });
     if (!contact) {
         const profile = await fetchMetaUserProfile(senderId);
-        let username = `ig_user_${senderId}`;
-        let name = `Cliente @${username}`;
-        let avatarUrl = 'https://api.dicebear.com/7.x/adventurer/svg?seed=default';
-
-        if (profile) {
-            username = profile.username || username;
-            name = profile.name || name;
-            avatarUrl = profile.profile_pic || avatarUrl;
-        }
-
-        await dbRun(
-            "INSERT INTO contacts (id, username, name, avatar_url, stage, flow_step) VALUES (?, ?, ?, ?, 'Lead', 'start')",
-            [senderId, username, name, avatarUrl]
-        );
-        contact = { id: senderId, username, name, avatar_url: avatarUrl, stage: 'Lead', flow_step: 'start' };
+        contact = await dbInsert('contacts', {
+            id: senderId,
+            username: profile?.username || `user_${senderId}`,
+            name: profile?.name || 'Unknown',
+            avatar_url: profile?.profile_pic || null,
+            stage: 'Lead',
+            flow_step: 'start'
+        });
+        console.log(`✅ Nuevo contacto creado: ${contact?.name}`);
     }
 
-    // 2. Asegurar conversación en BD
-    const conv = await dbGet("SELECT * FROM conversations WHERE id = ?", [senderId]);
-    if (!conv) {
-        await dbRun(
-            "INSERT INTO conversations (id, contact_id, last_message_time, unread_count) VALUES (?, ?, CURRENT_TIMESTAMP, 1)",
-            [senderId, senderId]
-        );
+    // Crear/actualizar conversación
+    let conversation = await dbGet('conversations', { contact_id: senderId });
+    if (!conversation) {
+        conversation = await dbInsert('conversations', {
+            id: `conv_${senderId}`,
+            contact_id: senderId,
+            unread_count: 1
+        });
     } else {
-        await dbRun(
-            "UPDATE conversations SET last_message_time = CURRENT_TIMESTAMP, unread_count = unread_count + 1 WHERE id = ?",
-            [senderId]
-        );
+        await dbUpdate('conversations', { unread_count: (conversation.unread_count || 0) + 1 }, { contact_id: senderId });
     }
 
-    // 3. Insertar mensaje recibido
-    await dbRun(
-        "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, media_url, direction, sender_type) VALUES (?, ?, ?, ?, ?, 'incoming', 'customer')",
-        [senderId, senderId, recipientId, text, mediaUrl]
-    );
+    // Guardar mensaje
+    await dbInsert('messages', {
+        conversation_id: conversation.id,
+        sender_id: senderId,
+        recipient_id: recipientId,
+        text,
+        media_url: mediaUrl,
+        direction: 'incoming',
+        sender_type: 'customer'
+    });
 
-    // 4. Lógica de State Machine (Flujos Persuasivos) y Respuestas
+    // Procesar lógica del bot
     await handleBotResponseLogic(senderId, text, quickReplyPayload, contact);
 }
 
 async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact) {
-    const input = quickReplyPayload || text.toLowerCase().trim();
-    
-    // WA Bridge Links generator
-    const generateWaLink = (msg) => `https://wa.me/573000000000?text=${encodeURIComponent(msg + " Mi usuario es @" + contact.username)}`;
+    console.log(`🤖 Procesando: "${text}" de ${contact.name}`);
 
-    // Si toca un Payload de flujo (Quick Reply)
+    // Si es respuesta de botón
     if (quickReplyPayload) {
-        // Verificar si es una instrucción especial de WhatsApp
-        if (quickReplyPayload.startsWith('WA:')) {
-            const waMsg = quickReplyPayload.replace('WA:', '').trim();
-            const finalMsg = `¡Excelente! 📲 Haz clic aquí para ir a nuestro WhatsApp: \n\n${generateWaLink(waMsg)}`;
-            
-            await dbRun(
-                "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
-                [senderId, senderId, finalMsg]
-            );
-            await dbRun("UPDATE contacts SET stage = 'Contacted' WHERE id = ?", [senderId]);
-            await sendMetaMessage(senderId, finalMsg);
-            return;
-        }
+        console.log(`➡️ Payload de botón: ${quickReplyPayload}`);
+        // Aquí iría la lógica de botones
+        return;
+    }
 
-        // De lo contrario, buscar si el payload coincide con un ID de flujo
-        const flowStep = await dbGet("SELECT * FROM flows WHERE id = ?", [quickReplyPayload]);
-        if (flowStep) {
-            await dbRun(
-                "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
-                [senderId, senderId, flowStep.message_text]
-            );
-            await sendMetaMessage(senderId, flowStep.message_text, flowStep.buttons_json);
-            return;
+    // Si hay texto, intentar clasificar intención
+    if (text) {
+        const triggers = await dbAll('ai_triggers', { is_active: 1 });
+        if (triggers.length > 0) {
+            try {
+                const result = await classifyIntent(text, '', triggers);
+                console.log(`🧠 Intención detectada: ${result.intent} (confianza: ${result.confianza})`);
+
+                if (result.intent && result.confianza >= 0.6) {
+                    const trigger = triggers.find(t => t.intent_name === result.intent);
+                    if (trigger) {
+                        const flow = await dbGet('flows', { id: trigger.target_flow });
+                        if (flow) {
+                            await sendMetaMessage(senderId, flow.message_text, flow.buttons_json);
+                            await dbUpdate('contacts', { flow_step: trigger.target_flow }, { id: senderId });
+                            return;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn(`⚠️ Error en clasificación: ${err.message}`);
+            }
         }
     }
 
-    // Buscar si alguna palabra en el texto coincide con un flujo "Start" u otro
-    // Para simplificar, buscamos si el texto exacto es un ID de flujo (ej: 'start' para 'hola')
-    // O si hay un autoresponder. Modificamos para siempre enviar el 'start' si dicen hola.
-    if (input === 'hola' || input === 'buenas' || input === 'saludos' || input === 'start') {
-        const flowStep = await dbGet("SELECT * FROM flows WHERE id = ?", ['start']);
-        if (flowStep) {
-            await dbRun(
-                "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
-                [senderId, senderId, flowStep.message_text]
-            );
-            await sendMetaMessage(senderId, flowStep.message_text, flowStep.buttons_json);
-            return;
-        }
-    }
-
-    // Fallback: Ejecutar autoresponders antiguos si existen
-    await checkAndTriggerAutoresponder(senderId, text);
+    console.log('✅ Mensaje procesado');
 }
 
-async function checkAndTriggerAutoresponder(senderId, messageText) {
-    if (!messageText) return;
+// --- SETTINGS API ---
 
-    const responders = await dbAll("SELECT keyword, response_text FROM auto_responders WHERE is_active = 1");
-    const cleanedMessage = messageText.toLowerCase().trim();
-    let matchedResponse = null;
-
-    for (const responder of responders) {
-        const keyword = responder.keyword.toLowerCase().trim();
-        if (cleanedMessage.includes(keyword)) {
-            matchedResponse = responder.response_text;
-            break;
-        }
-    }
-
-    if (matchedResponse) {
-        console.log(`Coincidencia de palabra clave. Respondiendo automáticamente: "${matchedResponse}"`);
-
-        // Guardar mensaje saliente en BD
-        await dbRun(
-            "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'auto_response', ?, ?, 'outgoing', 'auto_response')",
-            [senderId, senderId, matchedResponse]
-        );
-        await dbRun("UPDATE conversations SET last_message_time = CURRENT_TIMESTAMP WHERE id = ?", [senderId]);
-
-        // Enviar vía Meta API
-        await sendMetaMessage(senderId, matchedResponse);
-    }
-}
-
-// --- REST API ENDPOINTS ---
-
-// Configuración
 app.get('/api/settings', async (req, res) => {
     try {
-        const rows = await dbAll("SELECT key, value FROM settings");
-        const settings = {};
-        rows.forEach(r => settings[r.key] = r.value);
-        res.json({
-            page_access_token: settings.page_access_token || '',
-            instagram_account_id: settings.instagram_account_id || '',
-            webhook_verify_token: settings.webhook_verify_token || ''
-        });
+        const settings = await dbAll('settings');
+        res.json(settings);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/settings', async (req, res) => {
-    const data = req.body;
     try {
-        for (const k of ['page_access_token', 'instagram_account_id', 'webhook_verify_token']) {
-            if (k in data) {
-                await dbRun("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", [k, data[k]]);
-            }
-        }
-        res.json({ status: 'success', message: 'Configuración guardada.' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Contactos
-app.get('/api/contacts', async (req, res) => {
-    try {
-        const contacts = await dbAll("SELECT * FROM contacts ORDER BY created_at DESC");
-        res.json(contacts);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/contacts', async (req, res) => {
-    const { id, username, name, avatar_url, stage, tags, notes } = req.body;
-    if (!id || !username) {
-        return res.status(400).json({ error: 'Falta id o username.' });
-    }
-
-    try {
-        await dbRun(
-            "INSERT INTO contacts (id, username, name, avatar_url, stage, tags, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [id, username, name, avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=default', stage || 'Lead', tags || '', notes || '']
-        );
-        await dbRun(
-            "INSERT OR IGNORE INTO conversations (id, contact_id, last_message_time, unread_count) VALUES (?, ?, CURRENT_TIMESTAMP, 0)",
-            [id, id]
-        );
-        res.json({ status: 'success', id });
-    } catch (err) {
-        if (err.message.includes('UNIQUE')) {
-            res.status(409).json({ error: 'El contacto ya existe.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.put('/api/contacts/:id', async (req, res) => {
-    const contactId = req.params.id;
-    const data = req.body;
-
-    const fields = [];
-    const params = [];
-
-    for (const k of ['name', 'avatar_url', 'stage', 'tags', 'notes']) {
-        if (k in data) {
-            fields.push(`${k} = ?`);
-            params.push(data[k]);
-        }
-    }
-
-    if (fields.length === 0) {
-        return res.status(400).json({ error: 'No hay campos para actualizar.' });
-    }
-
-    // updated_at
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    fields.push("updated_at = ?");
-    params.push(now);
-    
-    params.push(contactId);
-
-    try {
-        const query = `UPDATE contacts SET ${fields.join(', ')} WHERE id = ?`;
-        await dbRun(query, params);
-        res.json({ status: 'success' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.delete('/api/contacts/:id', async (req, res) => {
-    const contactId = req.params.id;
-    try {
-        await dbRun("DELETE FROM contacts WHERE id = ?", [contactId]);
-        await dbRun("DELETE FROM conversations WHERE id = ?", [contactId]);
-        res.json({ status: 'success', message: 'Contacto eliminado.' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Chats
-app.get('/api/chats', async (req, res) => {
-    const query = `
-        SELECT 
-            c.id AS conversation_id,
-            c.unread_count,
-            c.last_message_time,
-            cnt.id AS contact_id,
-            cnt.username,
-            cnt.name,
-            cnt.avatar_url,
-            cnt.stage,
-            (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message_text,
-            (SELECT sender_type FROM messages WHERE conversation_id = c.id ORDER BY timestamp DESC LIMIT 1) AS last_message_sender
-        FROM conversations c
-        JOIN contacts cnt ON c.contact_id = cnt.id
-        ORDER BY c.last_message_time DESC
-    `;
-    try {
-        const chats = await dbAll(query);
-        res.json(chats);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/chats/:id/messages', async (req, res) => {
-    const convId = req.params.id;
-    try {
-        // Marcar conversación como leída
-        await dbRun("UPDATE conversations SET unread_count = 0 WHERE id = ?", [convId]);
-        
-        // Obtener historial
-        const messages = await dbAll("SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC", [convId]);
-        res.json(messages);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/chats/:id/messages', async (req, res) => {
-    const convId = req.params.id;
-    const { text } = req.body;
-
-    if (!text) {
-        return res.status(400).json({ error: 'Mensaje vacío.' });
-    }
-
-    try {
-        const contact = await dbGet("SELECT id FROM contacts WHERE id = ?", [convId]);
-        if (!contact) {
-            return res.status(404).json({ error: 'Contacto no encontrado para este chat.' });
-        }
-
-        const recipientId = contact.id;
-
-        // Guardar mensaje en BD local
-        await dbRun(
-            "INSERT INTO messages (conversation_id, sender_id, recipient_id, text, direction, sender_type) VALUES (?, 'agent', ?, ?, 'outgoing', 'agent')",
-            [convId, recipientId, text]
-        );
-        await dbRun("UPDATE conversations SET last_message_time = CURRENT_TIMESTAMP, unread_count = 0 WHERE id = ?", [convId]);
-
-        // Enviar vía Meta
-        const metaResponse = await sendMetaMessage(recipientId, text);
-
-        res.json({
-            status: 'success',
-            meta_sent: !!metaResponse,
-            meta_error: metaResponse ? null : 'Meta API no configurada o error de red.'
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Respuestas Automáticas
-app.get('/api/auto-responders', async (req, res) => {
-    try {
-        const responders = await dbAll("SELECT * FROM auto_responders ORDER BY keyword ASC");
-        res.json(responders);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/auto-responders', async (req, res) => {
-    const { keyword, response_text, is_active } = req.body;
-    if (!keyword || !response_text) {
-        return res.status(400).json({ error: 'Keyword y response_text son requeridos.' });
-    }
-
-    try {
-        await dbRun(
-            "INSERT OR REPLACE INTO auto_responders (keyword, response_text, is_active) VALUES (?, ?, ?)",
-            [keyword.toLowerCase().trim(), response_text.trim(), is_active !== undefined ? is_active : 1]
-        );
-        res.json({ status: 'success' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.put('/api/auto-responders/:id', async (req, res) => {
-    const id = req.params.id;
-    const { is_active, response_text } = req.body;
-
-    const fields = [];
-    const params = [];
-
-    if (is_active !== undefined) {
-        fields.push("is_active = ?");
-        params.push(Number(is_active));
-    }
-    if (response_text !== undefined) {
-        fields.push("response_text = ?");
-        params.push(response_text.trim());
-    }
-
-    if (fields.length === 0) {
-        return res.status(400).json({ error: 'Nada que actualizar.' });
-    }
-
-    params.push(id);
-
-    try {
-        await dbRun(`UPDATE auto_responders SET ${fields.join(', ')} WHERE id = ?`, params);
-        res.json({ status: 'success' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.delete('/api/auto-responders/:id', async (req, res) => {
-    const id = req.params.id;
-    try {
-        await dbRun("DELETE FROM auto_responders WHERE id = ?", [id]);
-        res.json({ status: 'success' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- SIMULADOR ---
-app.post('/api/simulator/receive', async (req, res) => {
-    const { sender_id, username, name, text } = req.body;
-    
-    if (!sender_id || !username) {
-        return res.status(400).json({ error: 'sender_id y username son requeridos para la simulación.' });
-    }
-
-    const cleanUsername = username.replace('@', '').trim();
-
-    try {
-        // Asegurar que el contacto existe en el simulador
-        const contact = await dbGet("SELECT * FROM contacts WHERE id = ?", [sender_id]);
-        if (!contact) {
-            await dbRun(
-                "INSERT INTO contacts (id, username, name, avatar_url, stage) VALUES (?, ?, ?, ?, 'Lead')",
-                [sender_id, cleanUsername, name || `Simulado @${cleanUsername}`, `https://api.dicebear.com/7.x/adventurer/svg?seed=${cleanUsername}`]
-            );
-        }
-
-        // Mock del evento webhook de Meta
-        const messagingEvent = {
-            sender: { id: sender_id },
-            recipient: { id: 'my_instagram_page_id' },
-            message: {
-                mid: `mid_sim_${Date.now()}`,
-                text: text
-            }
-        };
-
-        // Procesar evento
-        await processMessagingEvent(messagingEvent);
-
-        res.json({
-            status: 'success',
-            message: 'Mensaje simulado procesado.',
-            details: { sender_id, username: cleanUsername, text }
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- AI COPILOT ENDPOINTS ---
-
-app.post('/api/ai/analyze-lead/:id', async (req, res) => {
-    const convId = req.params.id;
-    try {
-        const messages = await dbAll("SELECT text, sender_type FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC", [convId]);
-        if (messages.length === 0) return res.status(400).json({ error: "No hay historial" });
-
-        const historyStr = messages.map(m => `${m.sender_type === 'customer' ? 'Cliente' : 'Vendedor'}: ${m.text}`).join('\n');
-        const score = await getGeminiLeadScore(historyStr);
-        
-        if (score.error) return res.status(500).json({ error: score.error });
-        res.json(score);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/ai/suggest-response/:id', async (req, res) => {
-    const convId = req.params.id;
-    try {
-        const contact = await dbGet("SELECT * FROM contacts WHERE id = ?", [convId]);
-        if (!contact) return res.status(404).json({ error: "Contacto no encontrado" });
-
-        const messages = await dbAll("SELECT text, sender_type FROM messages WHERE conversation_id = ? ORDER BY timestamp DESC LIMIT 10", [convId]);
-        if (messages.length === 0) return res.status(400).json({ error: "No hay historial para sugerir" });
-
-        // Invertimos para que el más viejo quede arriba
-        const historyStr = messages.reverse().map(m => `${m.sender_type === 'customer' ? 'Cliente' : 'Vendedor'}: ${m.text}`).join('\n');
-        const suggestion = await getChatGptSuggestion(historyStr, contact);
-
-        if (suggestion.error) return res.status(500).json({ error: suggestion.error });
-        res.json(suggestion);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- FLOWS ENDPOINTS (Flow Builder) ---
-
-app.get('/api/flows', async (req, res) => {
-    try {
-        const rows = await dbAll("SELECT * FROM flows");
-        res.json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/flows', async (req, res) => {
-    const { id, message_text, buttons_json } = req.body;
-    try {
-        await dbRun(`
-            INSERT INTO flows (id, message_text, buttons_json) 
-            VALUES (?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET 
-                message_text=excluded.message_text, 
-                buttons_json=excluded.buttons_json
-        `, [id, message_text, buttons_json]);
-        res.json({ success: true, id });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.delete('/api/flows/:id', async (req, res) => {
-    try {
-        await dbRun("DELETE FROM flows WHERE id = ?", [req.params.id]);
+        const { key, value } = req.body;
+        await setSetting(key, value);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Iniciar servidor
+// --- CONTACTS API ---
+
+app.get('/api/contacts', async (req, res) => {
+    try {
+        const contacts = await dbAll('contacts');
+        res.json(contacts);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/contacts/:id', async (req, res) => {
+    try {
+        const contact = await dbGet('contacts', { id: req.params.id });
+        if (!contact) return res.status(404).json({ error: 'Not found' });
+        res.json(contact);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- FLOWS API ---
+
+app.get('/api/flows', async (req, res) => {
+    try {
+        const flows = await dbAll('flows');
+        res.json(flows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- AI TRIGGERS API ---
+
+app.get('/api/ai-triggers', async (req, res) => {
+    try {
+        const triggers = await dbAll('ai_triggers');
+        res.json(triggers);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ai-triggers', async (req, res) => {
+    try {
+        const { intent_name, description, examples, target_flow } = req.body;
+        const result = await dbInsert('ai_triggers', {
+            intent_name,
+            description,
+            examples,
+            target_flow,
+            is_active: 1
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/ai-triggers/:id', async (req, res) => {
+    try {
+        const { is_active } = req.body;
+        await dbUpdate('ai_triggers', { is_active }, { id: parseInt(req.params.id) });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/ai-triggers/:id', async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from('ai_triggers')
+            .delete()
+            .eq('id', parseInt(req.params.id));
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ai-triggers/test', async (req, res) => {
+    try {
+        const { text } = req.body;
+        const triggers = await dbAll('ai_triggers', { is_active: 1 });
+        const result = await classifyIntent(text, '', triggers);
+
+        const matchedTrigger = triggers.find(t => t.intent_name === result.intent);
+        res.json({
+            ...result,
+            matched: result.confianza >= 0.6,
+            target_flow: matchedTrigger?.target_flow || null
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- MESSAGES API ---
+
+app.get('/api/conversations/:contactId/messages', async (req, res) => {
+    try {
+        const messages = await dbAll('messages', { sender_id: req.params.contactId });
+        res.json(messages);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- INICIAR SERVIDOR ---
+
 app.listen(PORT, () => {
-    console.log(`Servidor CRM ejecutándose en puerto ${PORT}`);
+    console.log(`\n🚀 CMR Faroles corriendo en puerto ${PORT}`);
+    console.log(`📊 BD: Supabase PostgreSQL`);
+    console.log(`🌐 URL: http://localhost:${PORT}\n`);
 });
