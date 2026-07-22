@@ -75,7 +75,65 @@ Respuesta sugerida:`;
     }
 }
 
+/**
+ * Clasificar intención del mensaje (Fase 2: Disparadores IA)
+ * Retorna { intent, confianza } con valores 0-1
+ */
+async function classifyIntent(text, contextHistory = '', triggers = []) {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // Si no hay API key, usar fallback simple
+    if (!apiKey) {
+        console.log('⚠️ Gemini API no configurada, usando clasificación simple');
+        return { intent: 'unknown', confianza: 0.3 };
+    }
+
+    // Construir lista de intenciones disponibles
+    const intentList = triggers.map(t => `- ${t.intent_name}: ${t.description || ''}`).join('\n');
+
+    const prompt = `
+Analiza el siguiente mensaje de cliente para una tienda de faroles (Faroles Genius).
+Clasifica la intención en UNA de estas categorías:
+
+${intentList}
+
+Mensaje: "${text}"
+
+${contextHistory ? `Contexto previo:\n${contextHistory}` : ''}
+
+Responde EXACTAMENTE en JSON (sin markdown):
+{
+  "intent": "nombre_de_intension",
+  "confianza": 0.85,
+  "razon": "Porque el cliente mencionó..."
+}
+
+Confianza: 0 = totalmente inseguro, 1 = completamente seguro
+`;
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const response = await axios.post(url, {
+            contents: [{ parts: [{ text: prompt }] }]
+        });
+
+        let text_response = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        text_response = text_response.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        const result = JSON.parse(text_response);
+        return {
+            intent: result.intent || 'unknown',
+            confianza: parseFloat(result.confianza) || 0.3,
+            razon: result.razon
+        };
+    } catch (err) {
+        console.error('⚠️ Error en clasificación IA:', err.message);
+        return { intent: 'error', confianza: 0.2 };
+    }
+}
+
 module.exports = {
     getGeminiLeadScore,
-    getChatGptSuggestion
+    getChatGptSuggestion,
+    classifyIntent
 };

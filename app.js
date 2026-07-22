@@ -14,18 +14,26 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'static')));
 
-// --- SUPABASE CLIENT ---
+// --- SUPABASE CLIENTS ---
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     console.error('❌ Error: SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY requeridos en .env.local');
     process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Cliente público (para queries normales)
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Cliente admin (para operaciones sensibles con RLS)
+const supabaseAdmin = SUPABASE_SERVICE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    : null;
 
 console.log('✅ Conectado a Supabase:', SUPABASE_URL);
+if (supabaseAdmin) console.log('✅ Cliente admin habilitado para operaciones RLS');
 
 // --- CARGAR CREDENCIALES DE ENTORNO (HOSTING) ---
 const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
@@ -61,11 +69,12 @@ initializeMetaCredentials().catch(err => {
 // --- HELPERS DE BASE DE DATOS (Supabase) ---
 
 /**
- * Obtener un registro
+ * Obtener un registro (usa cliente admin para RLS)
  */
 async function dbGet(table, filter = {}) {
     try {
-        let query = supabase.from(table).select('*');
+        const client = supabaseAdmin || supabase;
+        let query = client.from(table).select('*');
         for (const [key, value] of Object.entries(filter)) {
             query = query.eq(key, value);
         }
@@ -79,11 +88,12 @@ async function dbGet(table, filter = {}) {
 }
 
 /**
- * Obtener múltiples registros
+ * Obtener múltiples registros (usa cliente admin para RLS)
  */
 async function dbAll(table, filter = {}) {
     try {
-        let query = supabase.from(table).select('*');
+        const client = supabaseAdmin || supabase;
+        let query = client.from(table).select('*');
         for (const [key, value] of Object.entries(filter)) {
             query = query.eq(key, value);
         }
@@ -97,11 +107,12 @@ async function dbAll(table, filter = {}) {
 }
 
 /**
- * Insertar registro
+ * Insertar registro (usa cliente admin para RLS)
  */
 async function dbInsert(table, data) {
     try {
-        const { data: result, error } = await supabase
+        const client = supabaseAdmin || supabase;
+        const { data: result, error } = await client
             .from(table)
             .insert([data])
             .select();
@@ -114,11 +125,12 @@ async function dbInsert(table, data) {
 }
 
 /**
- * Actualizar registro
+ * Actualizar registro (usa cliente admin para RLS)
  */
 async function dbUpdate(table, data, filter = {}) {
     try {
-        let query = supabase.from(table).update(data);
+        const client = supabaseAdmin || supabase;
+        let query = client.from(table).update(data);
         for (const [key, value] of Object.entries(filter)) {
             query = query.eq(key, value);
         }
@@ -140,14 +152,30 @@ async function getSetting(key) {
 }
 
 /**
- * Guardar setting
+ * Guardar setting (usar cliente admin para RLS)
  */
 async function setSetting(key, value) {
-    const existing = await dbGet('settings', { key });
-    if (existing) {
-        return await dbUpdate('settings', { value }, { key });
-    } else {
-        return await dbInsert('settings', { key, value });
+    try {
+        const client = supabaseAdmin || supabase;
+        const existing = await dbGet('settings', { key });
+
+        if (existing) {
+            const { error } = await client
+                .from('settings')
+                .update({ value })
+                .eq('key', key);
+            if (error) throw error;
+            return true;
+        } else {
+            const { error } = await client
+                .from('settings')
+                .insert({ key, value });
+            if (error) throw error;
+            return true;
+        }
+    } catch (err) {
+        console.error(`Error en setSetting (${key}):`, err.message);
+        return false;
     }
 }
 
