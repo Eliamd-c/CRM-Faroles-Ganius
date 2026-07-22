@@ -213,6 +213,85 @@ async function fetchMetaUserProfile(senderScopedId) {
     }
 }
 
+// --- FASE 2: DISPARADORES (Anuncio + IA + Fast-Path) ---
+
+/**
+ * Palabras clave de ALTA confianza (fast-path, sin IA)
+ * Evita latencia de LLM para preguntas obvias
+ */
+const FAST_PATH_KEYWORDS = {
+  'precio|costo|cuánto cuesta|tarifa|valor': 'msg_pricing_and_story',
+  'hola|buenos|buenas|hey|qué tal|buenos días|buenas noches': 'msg_welcome_organic',
+  'información|info|catálogo|qué venden|que ofrecen|producto|productos': 'msg_pricing_and_story',
+  'comprar|quiero|me interesa|envío|envíos|cómo compro': 'msg_pricing_and_story',
+  'gracias|ok|bueno|listo|dale|perfecto|gracias de verdad': null // Sin respuesta (usuario confirmó)
+};
+
+/**
+ * Detectar tipo de disparador: anuncio, fast-path, IA alta/baja confianza
+ * Retorna { type, flowId, confianza, intent }
+ */
+async function detectDispatcher(text, referral, contact, conversationId) {
+  // 1. PRIORIDAD MAX: Anuncio pagado (referral)
+  if (referral && (!contact.flow_step || contact.flow_step === 'start')) {
+    console.log('🎯 Disparador: ANUNCIO PAGADO (referral detectado)');
+    return { type: 'ad_referral', flowId: 'msg_welcome_from_ad' };
+  }
+
+  // 2. Fast-Path: Palabras clave sin IA (90% más rápido)
+  for (const [pattern, flowId] of Object.entries(FAST_PATH_KEYWORDS)) {
+    if (new RegExp(pattern, 'i').test(text)) {
+      if (flowId === null) {
+        console.log('⏭️ Disparador: CONFIRMACIÓN (sin respuesta necesaria)');
+        return { type: 'confirmation', flowId: null };
+      }
+      console.log(`⚡ Disparador: FAST-PATH (${pattern.split('|')[0]})`);
+      return { type: 'fast_path', flowId };
+    }
+  }
+
+  // 3. Clasificador IA (orgánico, confianza variable)
+  try {
+    const triggers = await dbAll('ai_triggers', { is_active: 1 });
+    if (triggers.length === 0) {
+      console.log('ℹ️ Sin triggers IA configurados');
+      return { type: 'no_dispatch', reason: 'no_triggers' };
+    }
+
+    // Obtener últimos 6 mensajes para contexto
+    const messages = await dbAll('messages', { conversation_id: conversationId });
+    const historyStr = messages
+      .slice(-6)
+      .map(m => `${m.sender_type === 'customer' ? 'Usuario' : 'Bot'}: ${m.text}`)
+      .join('\n');
+
+    const result = await classifyIntent(text, historyStr, triggers);
+    console.log(`🧠 Intención: ${result.intent} (confianza: ${(result.confianza * 100).toFixed(0)}%)`);
+
+    // 3A. Alta confianza (>= 70%): Disparar automáticamente
+    if (result.confianza >= 0.7) {
+      const trigger = triggers.find(t => t.intent_name === result.intent);
+      if (trigger) {
+        console.log(`✅ Disparador: IA ALTA CONFIANZA → ${trigger.target_flow}`);
+        return { type: 'ia_high_confidence', flowId: trigger.target_flow, intent: result.intent, confianza: result.confianza };
+      }
+    }
+
+    // 3B. Confianza media (50-70%): Mostrar fallback genérico
+    if (result.confianza >= 0.5) {
+      console.log('⚠️ Disparador: FALLBACK GENÉRICO (confianza 50-70%)');
+      return { type: 'fallback_generic', flowId: 'msg_fallback' };
+    }
+
+    // 3C. Baja confianza (< 50%): No disparar
+    console.log('❌ Disparador: NO DISPATCH (confianza < 50%, dejar para humano)');
+    return { type: 'no_dispatch', reason: 'low_confidence', confianza: result.confianza };
+  } catch (err) {
+    console.warn(`⚠️ Error en clasificación IA: ${err.message}`);
+    return { type: 'no_dispatch', reason: 'ia_error' };
+  }
+}
+
 // --- SCHEDULER DE REACTIVACIÓN (23h sin respuesta) ---
 
 /**
@@ -363,22 +442,7 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
     console.log(`🤖 Procesando: "${text}" de ${contact.name}`);
 
     // ============================================
-    // FASE 1: FLUJO FAROLES GENIUS
-    // ============================================
-
-    // Si viene de anuncio pagado (primer mensaje)
-    if (referral && !contact.flow_step || contact.flow_step === 'start') {
-        console.log('📢 Tráfico de anuncio pagado detectado');
-        const welcomeFlow = await dbGet('flows', { id: 'msg_welcome_from_ad' });
-        if (welcomeFlow) {
-            await sendMetaMessage(senderId, welcomeFlow.message_text, welcomeFlow.buttons_json);
-            await dbUpdate('contacts', { flow_step: 'msg_welcome_from_ad' }, { id: senderId });
-            return;
-        }
-    }
-
-    // ============================================
-    // RESPUESTA DE BOTÓN (Quick Reply Payload)
+    // RESPUESTA DE BOTÓN (Quick Reply Payload) - SIEMPRE PRIMERO
     // ============================================
     if (quickReplyPayload) {
         console.log(`🔘 Botón presionado: ${quickReplyPayload}`);
@@ -386,31 +450,49 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
     }
 
     // ============================================
-    // TEXTO LIBRE - Clasificar intención o continuar flujo
+    // TEXTO LIBRE - FASE 2: DISPARADORES INTELIGENTES
     // ============================================
     if (text) {
-        // Si no está en flujo específico, intentar clasificar
-        if (!contact.flow_step || contact.flow_step === 'start') {
-            const triggers = await dbAll('ai_triggers', { is_active: 1 });
-            if (triggers.length > 0) {
-                try {
-                    const result = await classifyIntent(text, '', triggers);
-                    console.log(`🧠 Intención detectada: ${result.intent} (confianza: ${result.confianza})`);
+        // Obtener conversación para contexto
+        const conversation = await dbGet('conversations', { contact_id: senderId });
+        const conversationId = conversation?.id || `conv_${senderId}`;
 
-                    if (result.intent && result.confianza >= 0.6) {
-                        const trigger = triggers.find(t => t.intent_name === result.intent);
-                        if (trigger) {
-                            const flow = await dbGet('flows', { id: trigger.target_flow });
-                            if (flow) {
-                                await sendMetaMessage(senderId, flow.message_text, flow.buttons_json);
-                                await dbUpdate('contacts', { flow_step: trigger.target_flow }, { id: senderId });
-                                return;
-                            }
-                        }
+        // Si no está en flujo específico, detectar disparador
+        if (!contact.flow_step || contact.flow_step === 'start') {
+            const dispatch = await detectDispatcher(text, referral, contact, conversationId);
+
+            // Manejar cada tipo de disparador
+            switch (dispatch.type) {
+                case 'ad_referral':
+                case 'fast_path':
+                case 'ia_high_confidence':
+                    // Mostrar flow específico
+                    const flow = await dbGet('flows', { id: dispatch.flowId });
+                    if (flow) {
+                        await sendMetaMessage(senderId, flow.message_text, flow.buttons_json);
+                        await dbUpdate('contacts', { flow_step: dispatch.flowId }, { id: senderId });
                     }
-                } catch (err) {
-                    console.warn(`⚠️ Error en clasificación: ${err.message}`);
-                }
+                    return;
+
+                case 'fallback_generic':
+                    // Mostrar fallback con botones de elección
+                    const fallbackFlow = await dbGet('flows', { id: 'msg_fallback' });
+                    if (fallbackFlow) {
+                        const msg = fallbackFlow.message_text.replace('{First Name}', contact.name || 'amiga');
+                        await sendMetaMessage(senderId, msg, fallbackFlow.buttons_json);
+                        await dbUpdate('contacts', { flow_step: 'msg_fallback' }, { id: senderId });
+                    }
+                    return;
+
+                case 'confirmation':
+                    // Usuario confirmó, no se necesita respuesta
+                    return;
+
+                case 'no_dispatch':
+                default:
+                    // No hay suficiente confianza, dejar para humano
+                    console.log(`📞 Mensaje derivado a agente humano (${dispatch.reason})`);
+                    return;
             }
         }
     }
@@ -419,7 +501,7 @@ async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact
 }
 
 /**
- * Manejar payloads de botones (Faroles Genius Phase 1)
+ * Manejar payloads de botones (Faroles Genius Phase 1 + 2)
  */
 async function handleButtonPayload(senderId, payload, contact) {
     const flowMap = {
@@ -444,20 +526,25 @@ async function handleButtonPayload(senderId, payload, contact) {
         // WhatsApp
         'WHATSAPP_INDIVIDUAL': null, // Ir a WhatsApp
         'WHATSAPP_GROUP': null, // Ir a WhatsApp
+
+        // Fallback (Fase 2): Usuario elige nuevamente
+        'FALLBACK_HUMAN': null, // Derivar a agente
     };
 
     const nextFlowId = flowMap[payload];
 
-    // Si necesita ir a WhatsApp
-    if (payload.startsWith('WHATSAPP_')) {
-        const isGroup = payload === 'WHATSAPP_GROUP';
-        await sendMetaMessage(
-            senderId,
-            isGroup
-                ? '📲 Aquí va el link a WhatsApp para coordinar tu grupo'
-                : '📲 Aquí va el link a WhatsApp para confirmar tu pedido',
-            null
-        );
+    // Si necesita ir a WhatsApp o hablar con humano
+    if (payload.startsWith('WHATSAPP_') || payload === 'FALLBACK_HUMAN') {
+        let message;
+        if (payload === 'WHATSAPP_INDIVIDUAL') {
+            message = '📲 Aquí va el link a WhatsApp para confirmar tu pedido';
+        } else if (payload === 'WHATSAPP_GROUP') {
+            message = '📲 Aquí va el link a WhatsApp para coordinar tu grupo';
+        } else if (payload === 'FALLBACK_HUMAN') {
+            message = '📞 Perfecto, un agente te contactará pronto para ayudarte 💬';
+        }
+
+        await sendMetaMessage(senderId, message, null);
         await dbUpdate('contacts', { stage: 'Contacted', flow_step: payload }, { id: senderId });
         return;
     }
