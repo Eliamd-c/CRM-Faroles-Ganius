@@ -747,6 +747,41 @@ app.post('/api/contacts/:id/sync-meta', async (req, res) => {
     }
 });
 
+app.post('/api/contacts/sync-all-meta', async (req, res) => {
+    try {
+        const contacts = await dbAll('contacts');
+        let updatedCount = 0;
+        let errorsCount = 0;
+
+        for (const contact of contacts) {
+            if (contact.id && !contact.id.startsWith('sim_')) {
+                const profile = await fetchMetaUserProfile(contact.id);
+                if (profile && (profile.name || profile.username || profile.profile_pic)) {
+                    const updates = sanitizeContactData({
+                        name: profile.name && profile.name !== 'Unknown' ? profile.name : contact.name,
+                        username: profile.username || contact.username,
+                        avatar_url: profile.profile_pic || contact.avatar_url
+                    });
+                    await dbUpdate('contacts', updates, { id: contact.id });
+                    updatedCount++;
+                } else {
+                    errorsCount++;
+                }
+            }
+        }
+
+        res.json({
+            status: 'success',
+            success: true,
+            message: `Sincronización completada. ${updatedCount} contactos actualizados desde Meta.`,
+            updated_count: updatedCount,
+            errors_count: errorsCount
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Chats / Conversations API
 app.get('/api/chats', async (req, res) => {
     try {

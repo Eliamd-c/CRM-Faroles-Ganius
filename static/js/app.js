@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cNotes:             document.getElementById('contact-detail-notes'),
         saveContactBtn:     document.getElementById('save-contact-btn'),
         btnSyncMetaProfile: document.getElementById('btn-sync-meta-profile'),
+        btnSyncAllContacts: document.getElementById('btn-sync-all-contacts'),
 
         // Kanban columns
         kanbanCols: {
@@ -160,6 +161,7 @@ function wireEvents() {
     if(el.btnAiSuggest) el.btnAiSuggest.addEventListener('click', handleAiSuggest);
     if(el.btnAiAnalyze) el.btnAiAnalyze.addEventListener('click', handleAiAnalyze);
     if(el.btnSyncMetaProfile) el.btnSyncMetaProfile.addEventListener('click', handleSyncMetaProfile);
+    if(el.btnSyncAllContacts) el.btnSyncAllContacts.addEventListener('click', handleSyncAllContacts);
 }
 
 // ============================================================
@@ -548,6 +550,30 @@ async function handleSyncMetaProfile() {
         if (el.btnSyncMetaProfile) {
             el.btnSyncMetaProfile.textContent = '🔄 Sincronizar Perfil Meta';
             el.btnSyncMetaProfile.disabled = false;
+        }
+    }
+}
+
+async function handleSyncAllContacts() {
+    if (el.btnSyncAllContacts) {
+        el.btnSyncAllContacts.textContent = '⏳ Sincronizando todos...';
+        el.btnSyncAllContacts.disabled = true;
+    }
+    try {
+        const res = await fetch('/api/contacts/sync-all-meta', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success' || data.success) {
+            showToast(`✅ ${data.message || 'Sincronización de contactos realizada.'}`);
+            await loadChats();
+        } else {
+            showToast('❌ ' + (data.error || 'Error sincronizando contactos'), 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error de red sincronizando contactos', 'error');
+    } finally {
+        if (el.btnSyncAllContacts) {
+            el.btnSyncAllContacts.textContent = '🔄 Sincronizar Todos';
+            el.btnSyncAllContacts.disabled = false;
         }
     }
 }

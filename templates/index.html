@@ -99,12 +99,15 @@
                 <div class="inbox-wrap">
                     <!-- Chat list -->
                     <div class="chat-list-col" id="chat-list-col">
-                        <div class="col-header">
+                        <div class="col-header" style="display:flex; justify-content:space-between; align-items:center;">
                             <h2 class="col-title">Mensajes</h2>
-                            <div class="search-wrap">
-                                <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                <input type="text" id="chat-search" placeholder="Buscar conversación..." class="search-input">
-                            </div>
+                            <button id="btn-sync-all-contacts" class="chip chip--ai" title="Sincronizar nombres y fotos de todos desde Meta" style="font-size:0.7rem; padding:4px 8px; border:1px solid var(--purple);">
+                                🔄 Sincronizar Todos
+                            </button>
+                        </div>
+                        <div class="search-wrap" style="padding: 0 16px 12px;">
+                            <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="chat-search" placeholder="Buscar conversación..." class="search-input">
                         </div>
                         <div class="chat-list" id="chats-list-container">
                             <div class="empty-state">
