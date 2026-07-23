@@ -44,16 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
         btnAiAnalyze:   document.getElementById('btn-ai-analyze'),
 
         // Contact panel
-        contactPanel:   document.getElementById('contact-details-panel'),
-        cAvatar:        document.getElementById('contact-detail-avatar'),
-        cName:          document.getElementById('contact-detail-name'),
-        cEditName:      document.getElementById('contact-detail-edit-name'),
-        cUsername:      document.getElementById('contact-detail-username'),
-        cStage:         document.getElementById('contact-detail-stage'),
-        cTags:          document.getElementById('contact-detail-tags'),
-        cTagsPreview:   document.getElementById('tags-preview-container'),
-        cNotes:         document.getElementById('contact-detail-notes'),
-        saveContactBtn: document.getElementById('save-contact-btn'),
+        contactPanel:       document.getElementById('contact-details-panel'),
+        cAvatar:            document.getElementById('contact-detail-avatar'),
+        cName:              document.getElementById('contact-detail-name'),
+        cEditName:          document.getElementById('contact-detail-edit-name'),
+        cUsername:          document.getElementById('contact-detail-username'),
+        cStage:             document.getElementById('contact-detail-stage'),
+        cTags:              document.getElementById('contact-detail-tags'),
+        cTagsPreview:       document.getElementById('tags-preview-container'),
+        cNotes:             document.getElementById('contact-detail-notes'),
+        saveContactBtn:     document.getElementById('save-contact-btn'),
+        btnSyncMetaProfile: document.getElementById('btn-sync-meta-profile'),
 
         // Kanban columns
         kanbanCols: {
@@ -158,6 +159,7 @@ function wireEvents() {
     
     if(el.btnAiSuggest) el.btnAiSuggest.addEventListener('click', handleAiSuggest);
     if(el.btnAiAnalyze) el.btnAiAnalyze.addEventListener('click', handleAiAnalyze);
+    if(el.btnSyncMetaProfile) el.btnSyncMetaProfile.addEventListener('click', handleSyncMetaProfile);
 }
 
 // ============================================================
@@ -517,6 +519,37 @@ async function saveContactDetails() {
             showToast('❌ ' + (result.error || 'Error al guardar'), 'error');
         }
     } catch (err) { console.error(err); }
+}
+
+async function handleSyncMetaProfile() {
+    if (!state.activeContact) return;
+    const cid = state.activeContact.contact_id;
+    if (el.btnSyncMetaProfile) {
+        el.btnSyncMetaProfile.textContent = '⏳ Sincronizando...';
+        el.btnSyncMetaProfile.disabled = true;
+    }
+    try {
+        const res = await fetch(`/api/contacts/${cid}/sync-meta`, { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success' || data.success) {
+            const updated = data.contact;
+            if (updated) {
+                Object.assign(state.activeContact, updated);
+                renderContactPanel(state.activeContact);
+            }
+            showToast('✅ Perfil de Instagram actualizado desde Meta.');
+            loadChats();
+        } else {
+            showToast('❌ ' + (data.error || 'Error obteniendo perfil'), 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error de conexión con el servidor', 'error');
+    } finally {
+        if (el.btnSyncMetaProfile) {
+            el.btnSyncMetaProfile.textContent = '🔄 Sincronizar Perfil Meta';
+            el.btnSyncMetaProfile.disabled = false;
+        }
+    }
 }
 
 // ============================================================

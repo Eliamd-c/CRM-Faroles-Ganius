@@ -177,15 +177,23 @@ async function sendMetaMessage(recipientId, text, buttonsJson = null) {
     }
 }
 
+// --- META API ---
 async function fetchMetaUserProfile(senderScopedId) {
     const token = await getSetting('page_access_token');
-    if (!token) return null;
+    if (!token) {
+        console.log('ℹ️ Page Access Token no configurado aún para obtener perfil de Meta.');
+        return null;
+    }
     try {
+        console.log(`🔍 Obteniendo perfil Meta para IGSID: ${senderScopedId}...`);
         const response = await axios.get(`https://graph.facebook.com/v19.0/${senderScopedId}`, {
             params: { fields: 'name,profile_pic,username', access_token: token }
         });
+        console.log(`✅ Perfil obtenido de Meta:`, response.data.name || response.data.username);
         return response.data;
     } catch (err) {
+        const errorMsg = err.response?.data?.error?.message || err.message;
+        console.warn(`⚠️ Error obteniendo perfil de Meta para ${senderScopedId}: ${errorMsg}`);
         return null;
     }
 }
@@ -219,7 +227,7 @@ async function getOrCreateContact(senderId) {
         const newContactData = sanitizeContactData({
             id: senderId,
             username: profile?.username || `user_${senderId}`,
-            name: profile?.name || 'Cliente',
+            name: profile?.name && profile.name !== 'Unknown' ? profile.name : `Cliente ${senderId.substring(0, 6)}`,
             avatar_url: profile?.profile_pic || null,
             stage: 'Lead',
             flow_step: 'start'
@@ -228,8 +236,24 @@ async function getOrCreateContact(senderId) {
         if (!contact) {
             contact = { ...newContactData, profile: null };
         }
-        console.log(`➕ Nuevo contacto: ${senderId}`);
+        console.log(`➕ Nuevo contacto creado: ${contact.name} (${senderId})`);
+    } else {
+        const isGenericName = !contact.name || contact.name === 'Unknown' || contact.name.startsWith('Cliente ') || !contact.avatar_url;
+        if (isGenericName && !senderId.startsWith('sim_') && !senderId.startsWith('test_')) {
+            const profile = await fetchMetaUserProfile(senderId);
+            if (profile && (profile.name || profile.username || profile.profile_pic)) {
+                const updates = sanitizeContactData({
+                    name: profile.name || contact.name,
+                    username: profile.username || contact.username,
+                    avatar_url: profile.profile_pic || contact.avatar_url
+                });
+                await dbUpdate('contacts', updates, { id: senderId });
+                contact = { ...contact, ...updates };
+                console.log(`🔄 Perfil actualizado automáticamente de Meta para ${senderId}: ${contact.name}`);
+            }
+        }
     }
+
     if (!contact.profile) {
         if (contact.tags?.includes('vendedor')) contact.profile = 'vendedor';
         else if (contact.tags?.includes('iglesia')) contact.profile = 'iglesia';
@@ -694,6 +718,30 @@ app.put('/api/contacts/:id', async (req, res) => {
         await dbUpdate('contacts', sanitized, { id: req.params.id });
         const updated = await dbGet('contacts', { id: req.params.id });
         res.json({ status: 'success', success: true, contact: updated });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/contacts/:id/sync-meta', async (req, res) => {
+    try {
+        const contactId = req.params.id;
+        const profile = await fetchMetaUserProfile(contactId);
+        if (!profile) {
+            return res.status(400).json({
+                error: 'No se pudo obtener el perfil de Meta. Verifica que el Page Access Token esté guardado en Configuración Meta.'
+            });
+        }
+
+        const updates = sanitizeContactData({
+            name: profile.name || undefined,
+            username: profile.username || undefined,
+            avatar_url: profile.profile_pic || undefined
+        });
+
+        await dbUpdate('contacts', updates, { id: contactId });
+        const updated = await dbGet('contacts', { id: contactId });
+        res.json({ status: 'success', success: true, contact: updated, meta_profile: profile });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
