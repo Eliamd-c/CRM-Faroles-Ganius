@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveContactBtn:     document.getElementById('save-contact-btn'),
         btnSyncMetaProfile: document.getElementById('btn-sync-meta-profile'),
         btnSyncAllContacts: document.getElementById('btn-sync-all-contacts'),
+        btnSyncHistory:     document.getElementById('btn-sync-history'),
 
         // Kanban columns
         kanbanCols: {
@@ -162,6 +163,7 @@ function wireEvents() {
     if(el.btnAiAnalyze) el.btnAiAnalyze.addEventListener('click', handleAiAnalyze);
     if(el.btnSyncMetaProfile) el.btnSyncMetaProfile.addEventListener('click', handleSyncMetaProfile);
     if(el.btnSyncAllContacts) el.btnSyncAllContacts.addEventListener('click', handleSyncAllContacts);
+    if(el.btnSyncHistory) el.btnSyncHistory.addEventListener('click', handleSyncHistory);
 }
 
 // ============================================================
@@ -574,6 +576,30 @@ async function handleSyncAllContacts() {
         if (el.btnSyncAllContacts) {
             el.btnSyncAllContacts.textContent = '🔄 Sincronizar Todos';
             el.btnSyncAllContacts.disabled = false;
+        }
+    }
+}
+
+async function handleSyncHistory() {
+    if (el.btnSyncHistory) {
+        el.btnSyncHistory.textContent = '⏳ Importando...';
+        el.btnSyncHistory.disabled = true;
+    }
+    try {
+        const res = await fetch('/api/chats/sync-history', { method: 'POST' });
+        const data = await res.json();
+        if (data.success || data.status === 'success') {
+            showToast(`✅ ${data.message || 'Historial sincronizado.'}`);
+            await loadChats();
+        } else {
+            showToast('❌ ' + (data.error || 'Error importando historial'), 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error de red importando historial', 'error');
+    } finally {
+        if (el.btnSyncHistory) {
+            el.btnSyncHistory.textContent = '📥 Importar Historial';
+            el.btnSyncHistory.disabled = false;
         }
     }
 }

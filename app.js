@@ -791,6 +791,104 @@ app.post('/api/contacts/sync-all-meta', async (req, res) => {
     }
 });
 
+// Sync Historical Messages
+app.post('/api/chats/sync-history', async (req, res) => {
+    try {
+        const token = await getSetting('page_access_token');
+        const igId = await getSetting('instagram_account_id');
+        if (!token || !igId || token.includes('your_page_access_token')) {
+            return res.status(400).json({ error: 'Configura tu Page Access Token e Instagram Account ID reales en Configuración Meta.' });
+        }
+
+        const convUrl = `https://graph.facebook.com/v19.0/${igId}/conversations?platform=instagram&access_token=${token}&limit=45`;
+        const convRes = await axios.get(convUrl);
+        const conversationsData = convRes.data.data || [];
+
+        let newMessages = 0;
+        let newContacts = 0;
+
+        for (const conv of conversationsData) {
+            const msgUrl = `https://graph.facebook.com/v19.0/${conv.id}?fields=messages{id,created_time,message,from,to}&access_token=${token}`;
+            const msgRes = await axios.get(msgUrl);
+            const messagesData = msgRes.data.messages?.data || [];
+
+            if (messagesData.length > 0) {
+                // Encontrar al participante (el cliente)
+                const sampleMsg = messagesData[0];
+                let participant = null;
+                if (sampleMsg.from && sampleMsg.from.id !== igId) participant = sampleMsg.from;
+                else if (sampleMsg.to && sampleMsg.to.data && sampleMsg.to.data[0] && sampleMsg.to.data[0].id !== igId) participant = sampleMsg.to.data[0];
+                else if (sampleMsg.to && sampleMsg.to.id !== igId) participant = sampleMsg.to; // Just in case it's not an array
+
+                const contactId = participant?.id;
+                if (!contactId) continue;
+
+                let contact = await dbGet('contacts', { id: contactId });
+                if (!contact) {
+                    // Obtener perfil detallado si es posible
+                    let profileName = participant.username || 'Usuario IG';
+                    let profileAvatar = '';
+                    try {
+                        const profUrl = `https://graph.facebook.com/v19.0/${contactId}?fields=name,username,profile_pic&access_token=${token}`;
+                        const profRes = await axios.get(profUrl);
+                        if (profRes.data.name) profileName = profRes.data.name;
+                        if (profRes.data.profile_pic) profileAvatar = profRes.data.profile_pic;
+                    } catch (e) {
+                        // Ignore
+                    }
+
+                    await dbInsert('contacts', {
+                        id: contactId,
+                        username: participant.username || '',
+                        name: profileName,
+                        avatar_url: profileAvatar,
+                        stage: 'Lead',
+                        created_at: new Date(sampleMsg.created_time).toISOString()
+                    });
+                    newContacts++;
+                }
+
+                let localConv = await dbGet('conversations', { contact_id: contactId });
+                if (!localConv) {
+                    await dbInsert('conversations', {
+                        id: `conv_${contactId}`,
+                        contact_id: contactId,
+                        last_message_time: new Date(sampleMsg.created_time).toISOString()
+                    });
+                }
+
+                // Insert messages backwards so older messages are inserted first if order matters
+                for (let i = messagesData.length - 1; i >= 0; i--) {
+                    const m = messagesData[i];
+                    if (!m.message) continue;
+                    const exists = await dbGet('messages', {
+                        conversation_id: `conv_${contactId}`,
+                        text: m.message
+                    });
+                    
+                    if (!exists) {
+                        await dbInsert('messages', {
+                            conversation_id: `conv_${contactId}`,
+                            sender_id: m.from?.id || 'unknown',
+                            recipient_id: 'unknown',
+                            text: m.message,
+                            direction: m.from?.id === igId ? 'outgoing' : 'incoming',
+                            sender_type: m.from?.id === igId ? 'agent' : 'customer',
+                            timestamp: new Date(m.created_time).toISOString()
+                        });
+                        newMessages++;
+                    }
+                }
+            }
+        }
+
+        res.json({ success: true, message: `Historial sincronizado: ${newContacts} contactos nuevos y ${newMessages} mensajes descargados.` });
+    } catch (err) {
+        console.error('Error in sync-history:', err.response?.data || err.message);
+        res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+});
+
 // Chats / Conversations API
 app.get('/api/chats', async (req, res) => {
     try {
