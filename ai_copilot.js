@@ -132,8 +132,66 @@ Confianza: 0 = totalmente inseguro, 1 = completamente seguro
     }
 }
 
+async function getGeminiCommentSuggestion(commentText, postCaption = '') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+        let publicReply = "¡Hola! 👋 Gracias por escribirnos. Te acabamos de enviar un mensaje directo con toda la información. 📩";
+        let privateDm = "¡Hola! Gracias por comentar en nuestra publicación sobre faroles. 🕯️✨ ¿Te gustaría recibir la información de precios para tu hogar o para venta al por mayor?";
+        
+        const lower = (commentText || '').toLowerCase();
+        if (lower.includes('precio') || lower.includes('costo') || lower.includes('cuanto') || lower.includes('valen')) {
+            publicReply = "¡Hola! 🌟 Te enviamos un mensaje privado con el catálogo y la lista de precios completa. 📥";
+            privateDm = "¡Hola! ✨ Con gusto te compartimos nuestra lista de precios. Manejamos precios especiales al por mayor si compras desde 12 unidades. ¿Cuántos faroles te gustaría cotizar?";
+        } else if (lower.includes('envio') || lower.includes('ciudad') || lower.includes('donde') || lower.includes('ubicacion')) {
+            publicReply = "¡Hola! 🚚 Realizamos envíos a todo el país. Revisa tus mensajes directos para coordinar los detalles. 📩";
+            privateDm = "¡Hola! 🚚 Hacemos envíos seguros a toda Colombia. ¿A qué ciudad o municipio te gustaría recibir tu pedido de faroles?";
+        }
+        return { publicReply, privateDm, intent: 'consultar_precio' };
+    }
+
+    const prompt = `
+Eres la IA de atención al cliente de "Faroles Genius", una marca líder en faroles artesanales y navideños.
+Analiza el siguiente comentario de Instagram realizado por un usuario en nuestra publicación:
+
+Publicación/Caption: "${postCaption || 'Faroles de alta calidad para el Día de Velitas y decoración'}"
+Comentario del cliente: "${commentText}"
+
+Genera dos respuestas:
+1. "publicReply": Una respuesta pública amigable, empática y profesional para responder al comentario (máximo 150 caracteres, usar 1 o 2 emojis).
+2. "privateDm": Un mensaje privado persuasivo (DM) para enviar al inbox del cliente iniciando la conversación de ventas o dando la info solicitada (máximo 250 caracteres, súper empático).
+3. "intent": Clasifica la intención del usuario ("precio", "envio", "mayorista", "felicitacion", "otro").
+
+Responde ÚNICAMENTE en formato JSON estricto:
+{
+  "intent": "precio",
+  "publicReply": "¡Hola! 🌟 Te acabamos de enviar un mensaje directo con la lista de precios completa. 📥",
+  "privateDm": "¡Hola! ✨ Gracias por tu interés en nuestros faroles. Manejamos paquetes individuales y descuentos especiales al por mayor. ¿Te gustaría cotizar para hogar o negocio?"
+}`;
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const response = await axios.post(url, {
+            contents: [{ parts: [{ text: prompt }] }]
+        });
+        
+        let text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(text);
+    } catch (err) {
+        console.error("Error en Gemini Comment AI:", err.message);
+        return {
+            intent: "consulta",
+            publicReply: "¡Hola! 👋 Gracias por tu comentario. Te enviamos la información completa por mensaje directo. 📥",
+            privateDm: "¡Hola! Gracias por contactar a Faroles Genius 🕯️✨ ¿En qué ciudad te encuentras para ayudarte con tu cotización?"
+        };
+    }
+}
+
 module.exports = {
     getGeminiLeadScore,
     getChatGptSuggestion,
-    classifyIntent
+    classifyIntent,
+    getGeminiCommentSuggestion
 };
+

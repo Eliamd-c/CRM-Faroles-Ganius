@@ -84,7 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
         simUsername:    document.getElementById('sim-username'),
         simName:        document.getElementById('sim-name'),
         simText:        document.getElementById('sim-text'),
-        simConsole:     document.getElementById('sim-logs-console')
+        simConsole:     document.getElementById('sim-logs-console'),
+
+        // Comments
+        simCommentForm:      document.getElementById('sim-comment-form'),
+        btnToggleAiComments: document.getElementById('btn-toggle-ai-comments')
     };
 
     initNavigation();
@@ -142,6 +146,7 @@ function switchTab(tab, clickedBtn) {
         loadFlows();
     }
     if (tab === 'inbox')      loadChats();
+    if (tab === 'comments')   loadComments();
 }
 
 // ============================================================
@@ -164,6 +169,8 @@ function wireEvents() {
     if(el.btnSyncMetaProfile) el.btnSyncMetaProfile.addEventListener('click', handleSyncMetaProfile);
     if(el.btnSyncAllContacts) el.btnSyncAllContacts.addEventListener('click', handleSyncAllContacts);
     if(el.btnSyncHistory) el.btnSyncHistory.addEventListener('click', handleSyncHistory);
+    if(el.simCommentForm) el.simCommentForm.addEventListener('submit', handleSimCommentSubmit);
+    if(el.btnToggleAiComments) el.btnToggleAiComments.addEventListener('click', handleToggleAiComments);
 }
 
 // ============================================================
@@ -1117,3 +1124,200 @@ style.textContent = `
         to   { opacity: 1; transform: translateX(0); }
     }`;
 document.head.appendChild(style);
+
+// ============================================================
+//  COMMENTS & AI PILOT
+// ============================================================
+let commentsState = {
+    aiAutoReply: false,
+    list: []
+};
+
+async function loadComments() {
+    try {
+        const res = await fetch('/api/comments');
+        const comments = await res.json();
+        commentsState.list = comments || [];
+        renderComments();
+    } catch (err) {
+        console.error('Error cargando comentarios:', err);
+    }
+}
+
+function renderComments() {
+    const container = document.getElementById('comments-container');
+    if (!container) return;
+
+    if (!commentsState.list || commentsState.list.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>No hay comentarios aún. Usa el simulador para probar.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = commentsState.list.map(c => {
+        const timeStr = c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const isReplied = c.status === 'replied';
+
+        return `
+            <div class="glass-card" style="padding:14px; border-left: 3px solid ${isReplied ? '#31A24C' : '#bc1888'}; background: rgba(255,255,255,0.03);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                    <div>
+                        <strong style="color:var(--text-primary); font-size:0.9rem;">@${c.username}</strong>
+                        <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px;">${timeStr}</span>
+                    </div>
+                    <span class="chip" style="font-size:0.7rem; background:${isReplied ? 'rgba(49, 162, 76, 0.2)' : 'rgba(188, 24, 136, 0.2)'}; color:${isReplied ? '#31A24C' : '#f09433'};">
+                        ${isReplied ? '✅ Respondido' : '⏳ Pendiente'}
+                    </span>
+                </div>
+                <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:8px; font-style:italic; background:rgba(0,0,0,0.2); padding:6px 10px; border-radius:4px;">
+                    📌 ${c.post_caption || 'Publicación en Instagram'}
+                </div>
+                <p style="font-size:0.95rem; margin-bottom:12px; font-weight:500;">
+                    "${c.text}"
+                </p>
+
+                ${c.ai_public_reply ? `
+                    <div style="font-size:0.8rem; background:rgba(125,116,255,0.1); border:1px solid rgba(125,116,255,0.3); padding:8px; border-radius:6px; margin-bottom:8px;">
+                        <strong>💬 Respuesta Pública:</strong> ${c.ai_public_reply}
+                    </div>
+                ` : ''}
+
+                ${c.ai_private_dm ? `
+                    <div style="font-size:0.8rem; background:rgba(24,119,242,0.1); border:1px solid rgba(24,119,242,0.3); padding:8px; border-radius:6px; margin-bottom:8px;">
+                        <strong>📩 Mensaje Privado (DM):</strong> ${c.ai_private_dm}
+                    </div>
+                ` : ''}
+
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                    <button class="chip chip--ai" onclick="handleAiSuggestComment('${c.id}')" style="cursor:pointer; font-size:0.75rem;">
+                        🪄 Sugerir con IA (Gemini)
+                    </button>
+                    <button class="chip" onclick="handleQuickReplyComment('${c.id}')" style="cursor:pointer; font-size:0.75rem; background:rgba(255,255,255,0.1);">
+                        💬 Responder Público
+                    </button>
+                    <button class="chip" onclick="handleQuickPrivateReplyComment('${c.id}')" style="cursor:pointer; font-size:0.75rem; background:rgba(24,119,242,0.2); color:#47A5FA;">
+                        📩 Enviar DM Privado
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function handleAiSuggestComment(commentId) {
+    try {
+        showToast('🪄 IA analizando comentario y generando respuesta...');
+        const res = await fetch(`/api/comments/${commentId}/ai-suggest`, { method: 'POST' });
+        const suggestion = await res.json();
+        
+        if (suggestion.publicReply) {
+            const confirmReply = confirm(`AI Sugiere esta Respuesta Pública:\n\n"${suggestion.publicReply}"\n\n¿Deseas enviarla ahora?`);
+            if (confirmReply) {
+                await fetch(`/api/comments/${commentId}/reply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: suggestion.publicReply })
+                });
+
+                if (suggestion.privateDm) {
+                    const confirmDm = confirm(`AI Sugiere este Mensaje Privado (DM):\n\n"${suggestion.privateDm}"\n\n¿Deseas enviarlo también al inbox?`);
+                    if (confirmDm) {
+                        await fetch(`/api/comments/${commentId}/private-reply`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: suggestion.privateDm })
+                        });
+                    }
+                }
+                showToast('✅ Comentario respondido exitosamente con IA.');
+                await loadComments();
+            }
+        }
+    } catch (err) {
+        showToast('❌ Error al consultar IA para comentario', 'error');
+    }
+}
+
+async function handleQuickReplyComment(commentId) {
+    const text = prompt('Escribe tu respuesta pública para el comentario:');
+    if (!text) return;
+    try {
+        const res = await fetch(`/api/comments/${commentId}/reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ Respuesta pública enviada.');
+            await loadComments();
+        }
+    } catch (err) {
+        showToast('❌ Error enviando respuesta pública', 'error');
+    }
+}
+
+async function handleQuickPrivateReplyComment(commentId) {
+    const text = prompt('Escribe el Mensaje Privado (DM) para enviar al inbox del usuario:');
+    if (!text) return;
+    try {
+        const res = await fetch(`/api/comments/${commentId}/private-reply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('✅ Mensaje privado enviado al DM.');
+            await loadComments();
+        }
+    } catch (err) {
+        showToast('❌ Error enviando mensaje privado', 'error');
+    }
+}
+
+async function handleSimCommentSubmit(e) {
+    e.preventDefault();
+    const username = document.getElementById('sim-comment-username').value;
+    const text = document.getElementById('sim-comment-text').value;
+
+    try {
+        const res = await fetch('/api/simulator/comment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, text })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('🧪 Comentario simulado recibido correctamente.');
+            await loadComments();
+        }
+    } catch (err) {
+        showToast('❌ Error en simulación de comentario', 'error');
+    }
+}
+
+async function handleToggleAiComments() {
+    commentsState.aiAutoReply = !commentsState.aiAutoReply;
+    const btn = document.getElementById('btn-toggle-ai-comments');
+    if (btn) {
+        if (commentsState.aiAutoReply) {
+            btn.textContent = '🤖 Piloto IA: ACTIVO (Auto-Respuesta ON)';
+            btn.style.background = 'rgba(49, 162, 76, 0.3)';
+            btn.style.borderColor = '#31A24C';
+        } else {
+            btn.textContent = '🤖 Piloto IA: INACTIVO';
+            btn.style.background = '';
+            btn.style.borderColor = '';
+        }
+    }
+    await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment_ai_auto_reply: commentsState.aiAutoReply ? 'true' : 'false' })
+    });
+    showToast(`🤖 Piloto IA de comentarios ${commentsState.aiAutoReply ? 'ACTIVADO' : 'DESACTIVADO'}.`);
+}
+
