@@ -749,12 +749,19 @@ app.post('/api/contacts/:id/sync-meta', async (req, res) => {
 
 app.post('/api/contacts/sync-all-meta', async (req, res) => {
     try {
+        const token = await getSetting('page_access_token');
+        if (!token || token.includes('your_page_access_token')) {
+            return res.status(400).json({
+                error: 'Para sincronizar desde Meta, primero ingresa tu Page Access Token real (EAAB...) en la pestaña "Configuración Meta".'
+            });
+        }
+
         const contacts = await dbAll('contacts');
         let updatedCount = 0;
         let errorsCount = 0;
 
         for (const contact of contacts) {
-            if (contact.id && !contact.id.startsWith('sim_')) {
+            if (contact.id && !contact.id.startsWith('sim_') && !contact.id.startsWith('test_')) {
                 const profile = await fetchMetaUserProfile(contact.id);
                 if (profile && (profile.name || profile.username || profile.profile_pic)) {
                     const updates = sanitizeContactData({
@@ -773,7 +780,9 @@ app.post('/api/contacts/sync-all-meta', async (req, res) => {
         res.json({
             status: 'success',
             success: true,
-            message: `Sincronización completada. ${updatedCount} contactos actualizados desde Meta.`,
+            message: updatedCount > 0
+                ? `Sincronización completada. ${updatedCount} contactos actualizados desde Meta.`
+                : `Sincronización completada. (Los contactos de prueba test_* no existen en servidores de Meta).`,
             updated_count: updatedCount,
             errors_count: errorsCount
         });
