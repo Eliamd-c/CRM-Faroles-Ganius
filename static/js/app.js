@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         contactPanel:   document.getElementById('contact-details-panel'),
         cAvatar:        document.getElementById('contact-detail-avatar'),
         cName:          document.getElementById('contact-detail-name'),
+        cEditName:      document.getElementById('contact-detail-edit-name'),
         cUsername:      document.getElementById('contact-detail-username'),
         cStage:         document.getElementById('contact-detail-stage'),
         cTags:          document.getElementById('contact-detail-tags'),
@@ -473,8 +474,9 @@ async function sendMessage() {
 // ============================================================
 function renderContactPanel(contact) {
     el.cAvatar.src       = contact.avatar_url || avatarUrl(contact.username);
-    el.cName.textContent  = contact.name;
-    el.cUsername.textContent = `@${contact.username}`;
+    el.cName.textContent  = contact.name || 'Cliente';
+    if (el.cEditName) el.cEditName.value = contact.name || '';
+    el.cUsername.textContent = `@${contact.username || contact.contact_id}`;
     el.cStage.value       = contact.stage || 'Lead';
     el.cTags.value        = contact.tags || '';
     el.cNotes.value       = contact.notes || '';
@@ -494,7 +496,9 @@ function renderTagsPreview(tagsStr) {
 
 async function saveContactDetails() {
     if (!state.activeContact) return;
+    const newName = el.cEditName ? el.cEditName.value.trim() : state.activeContact.name;
     const data = {
+        name:  newName,
         stage: el.cStage.value,
         tags:  el.cTags.value.trim(),
         notes: el.cNotes.value.trim()
@@ -504,12 +508,13 @@ async function saveContactDetails() {
             method: 'PUT', headers: jsonHeaders(), body: JSON.stringify(data)
         });
         const result = await res.json();
-        if (result.status === 'success') {
+        if (result.success || result.status === 'success') {
             Object.assign(state.activeContact, data);
+            el.cName.textContent = newName || 'Cliente';
             showToast('✅ Ficha guardada correctamente.');
             loadChats();
         } else {
-            showToast('❌ ' + result.error, 'error');
+            showToast('❌ ' + (result.error || 'Error al guardar'), 'error');
         }
     } catch (err) { console.error(err); }
 }

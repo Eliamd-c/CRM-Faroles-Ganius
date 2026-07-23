@@ -690,9 +690,10 @@ app.get('/api/contacts/:id', async (req, res) => {
 app.put('/api/contacts/:id', async (req, res) => {
     try {
         const updates = req.body;
-        await dbUpdate('contacts', updates, { id: req.params.id });
+        const sanitized = sanitizeContactData(updates);
+        await dbUpdate('contacts', sanitized, { id: req.params.id });
         const updated = await dbGet('contacts', { id: req.params.id });
-        res.json(updated);
+        res.json({ status: 'success', success: true, contact: updated });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -708,19 +709,27 @@ app.get('/api/chats', async (req, res) => {
         const chats = contacts.map(c => {
             const conv = conversations.find(cv => cv.contact_id === c.id);
             const convId = conv?.id || `conv_${c.id}`;
-            const contactMsgs = messages.filter(m => m.conversation_id === convId || m.sender_id === c.id);
+            const contactMsgs = messages.filter(m => m.conversation_id === convId || m.sender_id === c.id || m.recipient_id === c.id);
             const lastMsg = contactMsgs[contactMsgs.length - 1];
+
+            const displayName = c.name && c.name !== 'Unknown'
+                ? c.name
+                : (c.username && !c.username.startsWith('user_') ? `@${c.username}` : `Cliente ${c.id.substring(0, 8)}`);
 
             return {
                 conversation_id: convId,
                 contact_id: c.id,
-                name: c.name || c.username || 'Cliente',
+                name: displayName,
                 username: c.username || c.id,
                 avatar_url: c.avatar_url,
                 stage: c.stage || 'Lead',
+                tags: c.tags || '',
+                notes: c.notes || '',
                 unread_count: conv?.unread_count || 0,
                 last_message: lastMsg?.text || '',
-                last_message_time: lastMsg?.created_at || c.last_message_received_at || new Date().toISOString()
+                last_message_text: lastMsg?.text || '',
+                last_message_sender: lastMsg?.sender_type || (lastMsg?.direction === 'outgoing' ? 'agent' : 'customer'),
+                last_message_time: lastMsg?.timestamp || lastMsg?.created_at || c.last_message_received_at || new Date().toISOString()
             };
         });
 
@@ -762,9 +771,16 @@ app.post('/api/chats/:convId/messages', async (req, res) => {
             sender_type: 'agent'
         });
 
-        await sendMetaMessage(contactId, text);
+        let metaSent = false;
+        let metaError = null;
+        const metaRes = await sendMetaMessage(contactId, text);
+        if (metaRes && metaRes.message_id) {
+            metaSent = true;
+        } else if (metaRes && metaRes.error) {
+            metaError = metaRes.error;
+        }
 
-        res.json(newMsg);
+        res.json({ status: 'success', success: true, message: newMsg, meta_sent: metaSent, meta_error: metaError });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
