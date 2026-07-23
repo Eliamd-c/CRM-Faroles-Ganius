@@ -804,7 +804,7 @@ app.post('/api/chats/sync-history', async (req, res) => {
         const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?access_token=${token}`);
         const pageId = meRes.data.id;
 
-        const convUrl = `https://graph.facebook.com/v19.0/${pageId}/conversations?platform=instagram&access_token=${token}&limit=45`;
+        const convUrl = `https://graph.facebook.com/v19.0/${pageId}/conversations?access_token=${token}&limit=45`;
         const convRes = await axios.get(convUrl);
         const conversationsData = convRes.data.data || [];
 
