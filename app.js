@@ -24,10 +24,7 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     process.exit(1);
 }
 
-// Cliente público (para queries normales)
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-
-// Cliente admin (para operaciones sensibles con RLS)
 const supabaseAdmin = SUPABASE_SERVICE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     : null;
@@ -35,42 +32,21 @@ const supabaseAdmin = SUPABASE_SERVICE_KEY
 console.log('✅ Conectado a Supabase:', SUPABASE_URL);
 if (supabaseAdmin) console.log('✅ Cliente admin habilitado para operaciones RLS');
 
-// --- CARGAR CREDENCIALES DE ENTORNO (HOSTING) ---
+// --- CARGAR CREDENCIALES ---
 const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
 const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
 const INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
-// Inicializar BD con credenciales si existen
 async function initializeMetaCredentials() {
-    if (META_PAGE_ACCESS_TOKEN) {
-        await setSetting('page_access_token', META_PAGE_ACCESS_TOKEN);
-        console.log('✅ Meta Page Access Token cargado de .env');
-    }
-    if (META_WEBHOOK_VERIFY_TOKEN) {
-        await setSetting('webhook_verify_token', META_WEBHOOK_VERIFY_TOKEN);
-        console.log('✅ Meta Webhook Verify Token cargado de .env');
-    }
-    if (INSTAGRAM_ACCOUNT_ID) {
-        await setSetting('instagram_account_id', INSTAGRAM_ACCOUNT_ID);
-        console.log('✅ Instagram Account ID cargado de .env');
-    }
-    if (INSTAGRAM_BUSINESS_ACCOUNT_ID) {
-        await setSetting('instagram_business_account_id', INSTAGRAM_BUSINESS_ACCOUNT_ID);
-        console.log('✅ Instagram Business Account ID cargado de .env');
-    }
+    if (META_PAGE_ACCESS_TOKEN) await setSetting('page_access_token', META_PAGE_ACCESS_TOKEN);
+    if (META_WEBHOOK_VERIFY_TOKEN) await setSetting('webhook_verify_token', META_WEBHOOK_VERIFY_TOKEN);
+    if (INSTAGRAM_ACCOUNT_ID) await setSetting('instagram_account_id', INSTAGRAM_ACCOUNT_ID);
+    if (INSTAGRAM_BUSINESS_ACCOUNT_ID) await setSetting('instagram_business_account_id', INSTAGRAM_BUSINESS_ACCOUNT_ID);
 }
+initializeMetaCredentials().catch(err => console.warn('⚠️ Error credenciales:', err.message));
 
-// Inicializar credenciales al arrancar
-initializeMetaCredentials().catch(err => {
-    console.warn('⚠️ Error inicializando credenciales:', err.message);
-});
-
-// --- HELPERS DE BASE DE DATOS (Supabase) ---
-
-/**
- * Obtener un registro (usa cliente admin para RLS)
- */
+// --- DB HELPERS ---
 async function dbGet(table, filter = {}) {
     try {
         const client = supabaseAdmin || supabase;
@@ -82,14 +58,11 @@ async function dbGet(table, filter = {}) {
         if (error && error.code !== 'PGRST116') throw error;
         return data || null;
     } catch (err) {
-        console.error(`Error en dbGet (${table}):`, err.message);
+        console.error(`❌ dbGet(${table}):`, err.message);
         return null;
     }
 }
 
-/**
- * Obtener múltiples registros (usa cliente admin para RLS)
- */
 async function dbAll(table, filter = {}) {
     try {
         const client = supabaseAdmin || supabase;
@@ -101,32 +74,23 @@ async function dbAll(table, filter = {}) {
         if (error) throw error;
         return data || [];
     } catch (err) {
-        console.error(`Error en dbAll (${table}):`, err.message);
+        console.error(`❌ dbAll(${table}):`, err.message);
         return [];
     }
 }
 
-/**
- * Insertar registro (usa cliente admin para RLS)
- */
 async function dbInsert(table, data) {
     try {
         const client = supabaseAdmin || supabase;
-        const { data: result, error } = await client
-            .from(table)
-            .insert([data])
-            .select();
+        const { data: result, error } = await client.from(table).insert([data]).select();
         if (error) throw error;
         return result ? result[0] : null;
     } catch (err) {
-        console.error(`Error en dbInsert (${table}):`, err.message);
+        console.error(`❌ dbInsert(${table}):`, err.message);
         return null;
     }
 }
 
-/**
- * Actualizar registro (usa cliente admin para RLS)
- */
 async function dbUpdate(table, data, filter = {}) {
     try {
         const client = supabaseAdmin || supabase;
@@ -138,53 +102,46 @@ async function dbUpdate(table, data, filter = {}) {
         if (error) throw error;
         return true;
     } catch (err) {
-        console.error(`Error en dbUpdate (${table}):`, err.message);
+        console.error(`❌ dbUpdate(${table}):`, err.message);
         return false;
     }
 }
 
-/**
- * Obtener setting
- */
+async function dbDelete(table, filter = {}) {
+    try {
+        const client = supabaseAdmin || supabase;
+        let query = client.from(table).delete();
+        for (const [key, value] of Object.entries(filter)) {
+            query = query.eq(key, value);
+        }
+        const { error } = await query;
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error(`❌ dbDelete(${table}):`, err.message);
+        return false;
+    }
+}
+
 async function getSetting(key) {
     const row = await dbGet('settings', { key });
     return row ? row.value : null;
 }
 
-/**
- * Guardar setting (usar cliente admin para RLS)
- */
 async function setSetting(key, value) {
-    try {
-        const client = supabaseAdmin || supabase;
-        const existing = await dbGet('settings', { key });
-
-        if (existing) {
-            const { error } = await client
-                .from('settings')
-                .update({ value })
-                .eq('key', key);
-            if (error) throw error;
-            return true;
-        } else {
-            const { error } = await client
-                .from('settings')
-                .insert({ key, value });
-            if (error) throw error;
-            return true;
-        }
-    } catch (err) {
-        console.error(`Error en setSetting (${key}):`, err.message);
-        return false;
+    const existing = await dbGet('settings', { key });
+    if (existing) {
+        return await dbUpdate('settings', { value }, { key });
+    } else {
+        return await dbInsert('settings', { key, value });
     }
 }
 
-// --- CLIENTE META ---
-
+// --- META API ---
 async function sendMetaMessage(recipientId, text, buttonsJson = null) {
     const token = await getSetting('page_access_token');
     if (!token) {
-        console.warn('Meta API no configurada (falta Page Access Token). Mensaje omitido.');
+        console.warn('⚠️ Meta API no configurada (sin token)');
         return null;
     }
 
@@ -194,30 +151,28 @@ async function sendMetaMessage(recipientId, text, buttonsJson = null) {
             const buttons = typeof buttonsJson === 'string' ? JSON.parse(buttonsJson) : buttonsJson;
             if (buttons && buttons.length > 0) {
                 messageData.quick_replies = buttons.map(b => ({
-                    content_type: "text",
+                    content_type: 'text',
                     title: b.title.substring(0, 20),
                     payload: b.payload
                 }));
             }
         } catch (e) {
-            console.error("Error parseando botones:", e);
+            console.error('Error parseando botones:', e.message);
         }
     }
 
-    const url = `https://graph.facebook.com/v19.0/me/messages`;
     try {
-        console.log(`📤 Enviando mensaje a Meta para ${recipientId}...`);
-        const response = await axios.post(url, {
+        console.log(`📤 Enviando a Meta -> ${recipientId}...`);
+        const response = await axios.post('https://graph.facebook.com/v19.0/me/messages', {
             recipient: { id: recipientId },
             message: messageData
         }, {
             params: { access_token: token }
         });
-        console.log(`✅ Mensaje enviado. ID: ${response.data.message_id}`);
+        console.log(`✅ Mensaje enviado Meta ID: ${response.data.message_id}`);
         return response.data;
     } catch (err) {
-        const errorMsg = err.response?.data?.error?.message || err.message;
-        console.error(`❌ Error Meta API: ${errorMsg}`);
+        console.error(`❌ Meta API error:`, err.response?.data?.error?.message || err.message);
         return null;
     }
 }
@@ -225,175 +180,438 @@ async function sendMetaMessage(recipientId, text, buttonsJson = null) {
 async function fetchMetaUserProfile(senderScopedId) {
     const token = await getSetting('page_access_token');
     if (!token) return null;
-
-    const url = `https://graph.facebook.com/v19.0/${senderScopedId}`;
     try {
-        const response = await axios.get(url, {
-            params: {
-                fields: 'name,profile_pic,username',
-                access_token: token
-            }
+        const response = await axios.get(`https://graph.facebook.com/v19.0/${senderScopedId}`, {
+            params: { fields: 'name,profile_pic,username', access_token: token }
         });
         return response.data;
     } catch (err) {
-        console.error(`Error obteniendo perfil: ${err.message}`);
         return null;
     }
 }
 
-// --- FASE 2: DISPARADORES (Anuncio + IA + Fast-Path) ---
-
-/**
- * Palabras clave de ALTA confianza (fast-path, sin IA)
- * Evita latencia de LLM para preguntas obvias
- */
-const FAST_PATH_KEYWORDS = {
-  'precio|costo|cuánto cuesta|tarifa|valor': 'msg_pricing_and_story',
-  'hola|buenos|buenas|hey|qué tal|buenos días|buenas noches': 'msg_welcome_organic',
-  'información|info|catálogo|qué venden|que ofrecen|producto|productos': 'msg_pricing_and_story',
-  'comprar|quiero|me interesa|envío|envíos|cómo compro': 'msg_pricing_and_story',
-  'gracias|ok|bueno|listo|dale|perfecto|gracias de verdad': null // Sin respuesta (usuario confirmó)
-};
-
-/**
- * Detectar tipo de disparador: anuncio, fast-path, IA alta/baja confianza
- * Retorna { type, flowId, confianza, intent }
- */
-async function detectDispatcher(text, referral, contact, conversationId) {
-  // 1. PRIORIDAD MAX: Anuncio pagado (referral)
-  if (referral && (!contact.flow_step || contact.flow_step === 'start')) {
-    console.log('🎯 Disparador: ANUNCIO PAGADO (referral detectado)');
-    return { type: 'ad_referral', flowId: 'msg_welcome_from_ad' };
-  }
-
-  // 2. Fast-Path: Palabras clave sin IA (90% más rápido)
-  for (const [pattern, flowId] of Object.entries(FAST_PATH_KEYWORDS)) {
-    if (new RegExp(pattern, 'i').test(text)) {
-      if (flowId === null) {
-        console.log('⏭️ Disparador: CONFIRMACIÓN (sin respuesta necesaria)');
-        return { type: 'confirmation', flowId: null };
-      }
-      console.log(`⚡ Disparador: FAST-PATH (${pattern.split('|')[0]})`);
-      return { type: 'fast_path', flowId };
+// --- CONTACT MANAGEMENT & PROFILING ---
+function sanitizeContactData(data) {
+    const validColumns = [
+        'id', 'username', 'name', 'avatar_url', 'stage', 'tags',
+        'notes', 'phone_number', 'is_wholesaler_potential', 'flow_step',
+        'created_at', 'updated_at'
+    ];
+    const sanitized = {};
+    for (const key of validColumns) {
+        if (data[key] !== undefined) {
+            sanitized[key] = data[key];
+        }
     }
-  }
-
-  // 3. Clasificador IA (orgánico, confianza variable)
-  try {
-    const triggers = await dbAll('ai_triggers', { is_active: 1 });
-    if (triggers.length === 0) {
-      console.log('ℹ️ Sin triggers IA configurados');
-      return { type: 'no_dispatch', reason: 'no_triggers' };
+    if (data.profile && (!sanitized.tags || !sanitized.tags.includes(data.profile))) {
+        sanitized.tags = sanitized.tags ? `${sanitized.tags},${data.profile}` : data.profile;
     }
-
-    // Obtener últimos 6 mensajes para contexto
-    const messages = await dbAll('messages', { conversation_id: conversationId });
-    const historyStr = messages
-      .slice(-6)
-      .map(m => `${m.sender_type === 'customer' ? 'Usuario' : 'Bot'}: ${m.text}`)
-      .join('\n');
-
-    const result = await classifyIntent(text, historyStr, triggers);
-    console.log(`🧠 Intención: ${result.intent} (confianza: ${(result.confianza * 100).toFixed(0)}%)`);
-
-    // 3A. Alta confianza (>= 70%): Disparar automáticamente
-    if (result.confianza >= 0.7) {
-      const trigger = triggers.find(t => t.intent_name === result.intent);
-      if (trigger) {
-        console.log(`✅ Disparador: IA ALTA CONFIANZA → ${trigger.target_flow}`);
-        return { type: 'ia_high_confidence', flowId: trigger.target_flow, intent: result.intent, confianza: result.confianza };
-      }
+    if (data.city) {
+        sanitized.notes = sanitized.notes ? `${sanitized.notes} | Ciudad: ${data.city}` : `Ciudad: ${data.city}`;
     }
-
-    // 3B. Confianza media (50-70%): Mostrar fallback genérico
-    if (result.confianza >= 0.5) {
-      console.log('⚠️ Disparador: FALLBACK GENÉRICO (confianza 50-70%)');
-      return { type: 'fallback_generic', flowId: 'msg_fallback' };
-    }
-
-    // 3C. Baja confianza (< 50%): No disparar
-    console.log('❌ Disparador: NO DISPATCH (confianza < 50%, dejar para humano)');
-    return { type: 'no_dispatch', reason: 'low_confidence', confianza: result.confianza };
-  } catch (err) {
-    console.warn(`⚠️ Error en clasificación IA: ${err.message}`);
-    return { type: 'no_dispatch', reason: 'ia_error' };
-  }
+    return sanitized;
 }
 
-// --- SCHEDULER DE REACTIVACIÓN (23h sin respuesta) ---
+async function getOrCreateContact(senderId) {
+    let contact = await dbGet('contacts', { id: senderId });
+    if (!contact) {
+        const profile = await fetchMetaUserProfile(senderId);
+        const newContactData = sanitizeContactData({
+            id: senderId,
+            username: profile?.username || `user_${senderId}`,
+            name: profile?.name || 'Cliente',
+            avatar_url: profile?.profile_pic || null,
+            stage: 'Lead',
+            flow_step: 'start'
+        });
+        contact = await dbInsert('contacts', newContactData);
+        if (!contact) {
+            contact = { ...newContactData, profile: null };
+        }
+        console.log(`➕ Nuevo contacto: ${senderId}`);
+    }
+    if (!contact.profile) {
+        if (contact.tags?.includes('vendedor')) contact.profile = 'vendedor';
+        else if (contact.tags?.includes('iglesia')) contact.profile = 'iglesia';
+        else if (contact.tags?.includes('consumidor')) contact.profile = 'consumidor';
+        else contact.profile = null;
+    }
+    return contact;
+}
 
-/**
- * Reactivar contacto después de 23h sin respuesta
- */
+async function updateContactStage(senderId, updates) {
+    const sanitized = sanitizeContactData(updates);
+    if (Object.keys(sanitized).length > 0) {
+        await dbUpdate('contacts', sanitized, { id: senderId });
+    }
+}
+
+// --- BOT DISPARADORES Y FLUJOS VENDEDOR GENIUS ---
+const FAST_PATH_KEYWORDS = {
+    'precio|costo|cuánto cuesta|tarifa|valor': 'pricing',
+    'hola|buenos|buenas|hey|qué tal': 'welcome',
+    'información|info|catálogo|qué venden|producto|productos': 'pricing',
+    'comprar|me interesa|envío': 'pricing'
+};
+
+async function detectDispatcher(text, referral, contact) {
+    if (referral && (!contact.flow_step || contact.flow_step === 'start')) {
+        return { type: 'ad_referral', action: 'welcome_from_ad' };
+    }
+
+    for (const [pattern, action] of Object.entries(FAST_PATH_KEYWORDS)) {
+        if (new RegExp(pattern, 'i').test(text)) {
+            return { type: 'fast_path', action };
+        }
+    }
+
+    if (!contact.profile) {
+        try {
+            const triggers = await dbAll('ai_triggers', { is_active: 1 });
+            if (triggers.length > 0) {
+                const result = await classifyIntent(text, '', triggers);
+                if (result.confianza >= 0.7) {
+                    return { type: 'ia_high', action: 'pricing', intent: result.intent };
+                }
+                if (result.confianza >= 0.5) {
+                    return { type: 'ia_medium', action: 'ask_help', intent: result.intent };
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ Error en IA classification:', e.message);
+        }
+    }
+
+    return { type: 'unknown', action: null };
+}
+
+// Profiling questions & channel flows
+async function startProfiling(instagramId, contact) {
+    const step = contact.flow_step;
+    if (step === 'start' || step === 'ask_city') {
+        await sendMetaMessage(
+            instagramId,
+            '¡Hola! 👋 Bienvenid@ a Faroles Genius 🕯️ Me encantaría ayudarte de la mejor forma.\n\nPara eso, ¿me ayudas respondiendo un par de preguntas? ¿De qué ciudad eres?'
+        );
+        await updateContactStage(instagramId, { flow_step: 'ask_city', conversation_stage: 'perfilando' });
+        return;
+    }
+    if (step === 'ask_church') {
+        await sendMetaMessage(
+            instagramId,
+            '¿Eres parte de una iglesia, comunidad o grupo de oración? 🙏'
+        );
+        await updateContactStage(instagramId, { flow_step: 'ask_church', conversation_stage: 'perfilando' });
+        return;
+    }
+    if (step === 'ask_intent') {
+        await sendMetaMessage(
+            instagramId,
+            '¿Te interesa un farol para ti, o te gustaría emprender vendiendo faroles en tu comunidad? 💡'
+        );
+        await updateContactStage(instagramId, { flow_step: 'ask_intent', conversation_stage: 'perfilando' });
+        return;
+    }
+}
+
+async function runConsumerFlow(instagramId, contact) {
+    const step = contact.flow_step;
+    if (step === 'consumer_start' || step === 'start') {
+        await sendMetaMessage(
+            instagramId,
+            `¡Perfecto, ${contact.name || 'amig@'}! 🕯️\n\nNuestros faroles son artesanales, hechos a mano con cartón de caña de azúcar y papel seda. 35×17 cm, 4 faroles únicos por paquete. 100% reutilizables.\n\n8 advocaciones: "Devoción y Tradición" + "Fe y Esperanza".`
+        );
+        await updateContactStage(instagramId, { flow_step: 'show_product', profile: 'consumidor' });
+        return;
+    }
+    if (step === 'show_product') {
+        await sendMetaMessage(
+            instagramId,
+            `📊 Tabla de Precios (Detal):\n\n1 paq: $28.000 + envío\n2-6 paq: $26.000-$24.000 c/u\n7-10 paq: $24.000-$22.000 c/u\n11-12 paq: $21.000-$20.000 c/u\n\nEnvío: $18.500 (1-6), $26.500 (7-10), $30.500 (11-12)\n\n💡 Si juntas a familia o amigos, ¡todos pagan menos!`
+        );
+        await updateContactStage(instagramId, { flow_step: 'show_pricing' });
+        return;
+    }
+    if (step === 'show_pricing') {
+        await sendMetaMessage(
+            instagramId,
+            `¿Quieres intentar comprar con más personas? Muchas familias y comunidades compran en grupo y ahorran juntas. 🤝`
+        );
+        await updateContactStage(instagramId, { flow_step: 'group_offer' });
+        return;
+    }
+    if (step === 'group_offer') {
+        const waNumber = (await getSetting('whatsapp_number')) || '573000000000';
+        await sendMetaMessage(
+            instagramId,
+            `Excelente. Vamos a WhatsApp para coordinar tu pedido. Ahí te damos todos los detalles. 📲\n\nhttps://wa.me/${waNumber}?text=Hola%20Faroles%20Genius`,
+            [{ title: '📲 Ir a WhatsApp', payload: 'ESCALATE_WHATSAPP' }]
+        );
+        await updateContactStage(instagramId, { flow_step: 'escalated', conversation_stage: 'cerrado', stage: 'Customer' });
+    }
+}
+
+async function runSellerFlow(instagramId, contact) {
+    const step = contact.flow_step;
+    if (step === 'seller_start' || step === 'ask_intent' || step === 'start') {
+        await sendMetaMessage(
+            instagramId,
+            `¡Me encanta tu visión, ${contact.name || 'amig@'}! 💪\n\nQueremos que emprendas de forma inteligente, sin riesgos. Así funciona:\n\n✅ Tú consigues los pedidos y el dinero PRIMERO\n✅ Nosotros te enviamos los faroles\n✅ Tú ganas la diferencia\n\nEs preventa, no consignación. Cero inversión de tu parte.`
+        );
+        await updateContactStage(instagramId, { flow_step: 'explain_presale', profile: 'vendedor' });
+        return;
+    }
+    if (step === 'explain_presale') {
+        await sendMetaMessage(
+            instagramId,
+            `📊 Números:\n\n• Precio mayorista: $17.000 por paquete\n• Precio reventa (detal): $20.000–$28.000\n• Tu ganancia: $3.000–$11.000 por paquete\n• Mínimo: 18 paquetes para la primera compra`
+        );
+        await updateContactStage(instagramId, { flow_step: 'show_numbers' });
+        return;
+    }
+    if (step === 'show_numbers') {
+        await sendMetaMessage(
+            instagramId,
+            `🎯 Ejercicio Guía:\n\nEmpieza con tu círculo cercano:\n• 6 familia\n• 6 amigos\n• 6 conocidos\n= 18 pedidos para la primera compra`
+        );
+        await updateContactStage(instagramId, { flow_step: 'exercise' });
+        return;
+    }
+    if (step === 'exercise') {
+        await sendMetaMessage(
+            instagramId,
+            `Te damos TODO el material listo: fotos HD, videos, catálogo, descripciones. Solo tienes que compartir. 🎬`,
+            [{ title: '📥 Solicitar Material', payload: 'REQUEST_SELLER_KIT' }]
+        );
+        await updateContactStage(instagramId, { flow_step: 'requesting_kit' });
+        return;
+    }
+    if (step === 'requesting_kit') {
+        const waNumber = (await getSetting('whatsapp_number')) || '573000000000';
+        await sendMetaMessage(
+            instagramId,
+            `Perfecto. Vamos a WhatsApp para confirmar tu material y apoyo. 📲\n\nhttps://wa.me/${waNumber}?text=Quiero%20empezar%20a%20vender%20Faroles`
+        );
+        await updateContactStage(instagramId, { flow_step: 'escalated', conversation_stage: 'cerrado', stage: 'Contacted' });
+    }
+}
+
+async function runChurchFlow(instagramId, contact) {
+    const step = contact.flow_step;
+    if (step === 'church_start' || step === 'ask_intent' || step === 'start') {
+        await sendMetaMessage(
+            instagramId,
+            `¡Qué hermoso, ${contact.name || 'herman@'}! ⛪\n\nLos faroles son una herramienta perfecta para financiar proyectos comunitarios (retiros, misiones, ayuda social).\n\n¿Qué proyecto tiene en mente tu comunidad?`
+        );
+        await updateContactStage(instagramId, { flow_step: 'ask_project', profile: 'iglesia' });
+        return;
+    }
+    if (step === 'ask_project') {
+        await sendMetaMessage(
+            instagramId,
+            `✨ Nosotros financiamos con RIESGO COMPARTIDO:\n\n• Compran a $17.000 por paquete\n• Venden a feligreses a $25.000–$30.000\n• Lo no vendido antes del 8 dic se devuelve con reembolso`
+        );
+        await updateContactStage(instagramId, { flow_step: 'explain_buyback' });
+        return;
+    }
+    if (step === 'explain_buyback') {
+        await sendMetaMessage(
+            instagramId,
+            `Mínimo: 18 paquetes para la primera compra.\n\nTe damos material publicitario + acompañamiento. 🤝`
+        );
+        await updateContactStage(instagramId, { flow_step: 'explained' });
+        return;
+    }
+    if (step === 'explained') {
+        await sendMetaMessage(
+            instagramId,
+            `¿Listo para llevar los faroles a tu comunidad?`,
+            [
+                { title: '✅ Sí, quiero', payload: 'CHURCH_YES' },
+                { title: '❓ Consultar primero', payload: 'ESCALATE_WHATSAPP' }
+            ]
+        );
+        await updateContactStage(instagramId, { flow_step: 'confirm' });
+        return;
+    }
+    if (step === 'confirm') {
+        const waNumber = (await getSetting('whatsapp_number')) || '573000000000';
+        await sendMetaMessage(
+            instagramId,
+            `Excelente. Vamos a WhatsApp para conectar con los líderes de tu comunidad. 📲\n\nhttps://wa.me/${waNumber}?text=Somos%20de%20iglesia%20y%20queremos%20faroles`
+        );
+        await updateContactStage(instagramId, { flow_step: 'escalated', conversation_stage: 'cerrado', stage: 'Contacted' });
+    }
+}
+
+async function runFallback(instagramId, contact) {
+    await sendMetaMessage(
+        instagramId,
+        `No entendí bien, amig@. ¿Te identificas con alguna de estas opciones? 👇`,
+        [
+            { title: '🏠 Para mi hogar', payload: 'PROFILE_CONSUMER' },
+            { title: '💰 Vender', payload: 'PROFILE_SELLER' },
+            { title: '⛪ Iglesia', payload: 'PROFILE_CHURCH' }
+        ]
+    );
+    await updateContactStage(instagramId, { flow_step: 'fallback_menu' });
+}
+
+// --- EVENT PROCESSOR ---
+async function processMessagingEvent(event) {
+    const senderId = event.sender?.id;
+    const recipientId = event.recipient?.id;
+    if (!senderId) return;
+
+    const myIgId = await getSetting('instagram_account_id');
+    if (senderId === myIgId) return;
+
+    const text = event.message?.text || '';
+    const payload = event.postback?.payload || event.message?.quick_reply?.payload || '';
+    const referral = event.referral?.ref;
+    const mediaUrl = event.message?.attachments?.[0]?.payload?.url || null;
+
+    let contact = await getOrCreateContact(senderId);
+
+    // Record conversation & message safely
+    const conversationId = `conv_${senderId}`;
+    let conversation = await dbGet('conversations', { contact_id: senderId });
+    if (!conversation) {
+        conversation = await dbInsert('conversations', {
+            id: conversationId,
+            contact_id: senderId,
+            unread_count: 1
+        });
+        if (!conversation) {
+            conversation = { id: conversationId, contact_id: senderId, unread_count: 1 };
+        }
+    } else {
+        await dbUpdate('conversations', { unread_count: (conversation.unread_count || 0) + 1 }, { contact_id: senderId });
+    }
+
+    const currentConvId = conversation?.id || conversationId;
+
+    if (text || mediaUrl) {
+        await dbInsert('messages', {
+            conversation_id: currentConvId,
+            sender_id: senderId,
+            recipient_id: recipientId || 'me',
+            text: text || '',
+            media_url: mediaUrl,
+            direction: 'incoming',
+            sender_type: 'customer'
+        });
+    }
+
+    // Handle Quick Reply / Button payload
+    if (payload) {
+        if (payload === 'PROFILE_CONSUMER') {
+            await updateContactStage(senderId, { profile: 'consumidor', flow_step: 'consumer_start' });
+            return await runConsumerFlow(senderId, { ...contact, profile: 'consumidor', flow_step: 'consumer_start' });
+        }
+        if (payload === 'PROFILE_SELLER') {
+            await updateContactStage(senderId, { profile: 'vendedor', flow_step: 'seller_start' });
+            return await runSellerFlow(senderId, { ...contact, profile: 'vendedor', flow_step: 'seller_start' });
+        }
+        if (payload === 'PROFILE_CHURCH' || payload === 'CHURCH_YES') {
+            await updateContactStage(senderId, { profile: 'iglesia', church_name: 'Iglesia Local', flow_step: 'church_start' });
+            return await runChurchFlow(senderId, { ...contact, profile: 'iglesia', flow_step: 'church_start' });
+        }
+        if (payload === 'ESCALATE_WHATSAPP') {
+            await updateContactStage(senderId, { conversation_stage: 'cerrado', flow_step: 'escalated' });
+            return;
+        }
+        if (payload === 'REQUEST_SELLER_KIT') {
+            await updateContactStage(senderId, { flow_step: 'requesting_kit' });
+            return await runSellerFlow(senderId, { ...contact, flow_step: 'requesting_kit' });
+        }
+    }
+
+    // Context Extraction during profiling steps
+    if (contact.flow_step === 'ask_city' && text.length > 0) {
+        await updateContactStage(senderId, { city: text, flow_step: 'ask_church' });
+        contact = { ...contact, city: text, flow_step: 'ask_church' };
+    } else if (contact.flow_step === 'ask_church' && text.length > 0) {
+        const isChurch = text.toLowerCase().includes('sí') || text.toLowerCase().includes('si') || text.toLowerCase().includes('comunidad');
+        await updateContactStage(senderId, { church_name: isChurch ? 'Iglesia' : null, flow_step: 'ask_intent' });
+        contact = { ...contact, church_name: isChurch ? 'Iglesia' : null, flow_step: 'ask_intent' };
+    } else if (contact.flow_step === 'ask_intent' && text.length > 0) {
+        if (text.toLowerCase().includes('vend') || text.toLowerCase().includes('emprend')) {
+            await updateContactStage(senderId, { profile: 'vendedor', flow_step: 'seller_start' });
+            return await runSellerFlow(senderId, { ...contact, profile: 'vendedor', flow_step: 'seller_start' });
+        } else if (contact.church_name) {
+            await updateContactStage(senderId, { profile: 'iglesia', flow_step: 'church_start' });
+            return await runChurchFlow(senderId, { ...contact, profile: 'iglesia', flow_step: 'church_start' });
+        } else {
+            await updateContactStage(senderId, { profile: 'consumidor', flow_step: 'consumer_start' });
+            return await runConsumerFlow(senderId, { ...contact, profile: 'consumidor', flow_step: 'consumer_start' });
+        }
+    }
+
+    // Router by profile
+    if (!contact.profile) {
+        if (!contact.flow_step || contact.flow_step === 'start') {
+            await startProfiling(senderId, contact);
+        } else if (contact.flow_step === 'ask_city' || contact.flow_step === 'ask_church' || contact.flow_step === 'ask_intent') {
+            await startProfiling(senderId, contact);
+        } else {
+            await runFallback(senderId, contact);
+        }
+    } else if (contact.profile === 'consumidor') {
+        await runConsumerFlow(senderId, contact);
+    } else if (contact.profile === 'vendedor') {
+        await runSellerFlow(senderId, contact);
+    } else if (contact.profile === 'iglesia') {
+        await runChurchFlow(senderId, contact);
+    }
+}
+
+// 23h Reactivation check
 async function checkAndSendReactivation() {
-    console.log('⏰ Verificando contactos para reactivación...');
-
     try {
         const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 23 * 60 * 60 * 1000);
-
-        // Obtener contactos que no han respondido en 23h
-        const contacts = await dbAll('contacts', {});
-
+        const contacts = await dbAll('contacts');
         for (const contact of contacts) {
             if (!contact.last_message_received_at) continue;
-
-            const lastMessageTime = new Date(contact.last_message_received_at);
-            const timeDiff = now - lastMessageTime;
-            const hoursAgo = timeDiff / (1000 * 60 * 60);
-
-            // Si pasaron más de 23h y menos de 24h
-            if (hoursAgo > 23 && hoursAgo < 24) {
-                const reactivationFlow = await dbGet('flows', { id: 'msg_reactivation' });
-                if (reactivationFlow) {
-                    console.log(`📢 Enviando reactivación a ${contact.name}`);
-                    const messageText = reactivationFlow.message_text.replace('{First Name}', contact.name || 'amiga');
-                    await sendMetaMessage(contact.id, messageText, reactivationFlow.buttons_json);
-                }
+            const hoursAgo = (now - new Date(contact.last_message_received_at)) / (1000 * 60 * 60);
+            if (hoursAgo > 23 && hoursAgo < 24 && contact.conversation_stage !== 'cerrado') {
+                console.log(`📢 Reactivación a ${contact.name}`);
+                await sendMetaMessage(
+                    contact.id,
+                    `¡Hola, ${contact.name || 'amig@'}! 🕯️ ¿Te quedó alguna duda sobre los faroles? Estamos listos para apoyarte.`
+                );
             }
         }
     } catch (err) {
-        console.error('Error en reactivación:', err.message);
+        console.error('Error reactivación:', err.message);
     }
 }
-
-// Ejecutar verificación cada 10 minutos
 setInterval(checkAndSendReactivation, 10 * 60 * 1000);
 
-// --- ENDPOINTS ---
+// --- FRONTEND DASHBOARD & API ENDPOINTS ---
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'templates', 'index.html'));
 });
 
-// Webhook verification
+// Meta Webhook Verification
 app.get('/webhook', async (req, res) => {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-
     const expectedToken = await getSetting('webhook_verify_token');
 
-    console.log(`🔐 Verificación Webhook. Token recibido: ${token}`);
-
-    if (mode && token) {
-        if (mode === 'subscribe' && token === expectedToken) {
-            console.log('✅ Webhook verificado');
-            return res.status(200).send(challenge);
-        } else {
-            console.warn(`❌ Token inválido. Esperado: ${expectedToken}`);
-            return res.status(403).send('Forbidden');
-        }
+    if (mode === 'subscribe' && token === expectedToken) {
+        console.log('✅ Webhook verificado');
+        return res.status(200).send(challenge);
     }
-    return res.status(400).send('Bad Request');
+    return res.status(403).send('Forbidden');
 });
 
-// Webhook eventos
+// Meta Webhook Events
 app.post('/webhook', async (req, res) => {
     const data = req.body;
-    console.log('📨 Webhook recibido:', JSON.stringify(data, null, 2));
-
-    if (data.object === 'instagram') {
+    if (data.object === 'instagram' || data.object === 'page') {
         for (const entry of data.entry || []) {
             for (const messagingEvent of entry.messaging || []) {
                 await processMessagingEvent(messagingEvent);
@@ -404,200 +622,11 @@ app.post('/webhook', async (req, res) => {
     return res.status(404).send('Not Found');
 });
 
-// --- PROCESAMIENTO DE MENSAJES ---
-
-async function processMessagingEvent(messagingEvent) {
-    const senderId = messagingEvent.sender?.id;
-    const recipientId = messagingEvent.recipient?.id;
-
-    if (!senderId) return;
-
-    const myIgId = await getSetting('instagram_account_id');
-    if (senderId === myIgId) {
-        console.log('⚠️ Ignorando mensaje autogenerado.');
-        return;
-    }
-
-    const message = messagingEvent.message || {};
-    const text = message.text || '';
-    const quickReplyPayload = message.quick_reply?.payload || null;
-    let mediaUrl = message.attachments?.[0]?.payload?.url || null;
-
-    // Obtener o crear contacto
-    let contact = await dbGet('contacts', { id: senderId });
-    if (!contact) {
-        const profile = await fetchMetaUserProfile(senderId);
-        contact = await dbInsert('contacts', {
-            id: senderId,
-            username: profile?.username || `user_${senderId}`,
-            name: profile?.name || 'Unknown',
-            avatar_url: profile?.profile_pic || null,
-            stage: 'Lead',
-            flow_step: 'start'
-        });
-        console.log(`✅ Nuevo contacto creado: ${contact?.name}`);
-    }
-
-    // Crear/actualizar conversación
-    let conversation = await dbGet('conversations', { contact_id: senderId });
-    if (!conversation) {
-        conversation = await dbInsert('conversations', {
-            id: `conv_${senderId}`,
-            contact_id: senderId,
-            unread_count: 1
-        });
-    } else {
-        await dbUpdate('conversations', { unread_count: (conversation.unread_count || 0) + 1 }, { contact_id: senderId });
-    }
-
-    // Guardar mensaje
-    await dbInsert('messages', {
-        conversation_id: conversation.id,
-        sender_id: senderId,
-        recipient_id: recipientId,
-        text,
-        media_url: mediaUrl,
-        direction: 'incoming',
-        sender_type: 'customer'
-    });
-
-    // Procesar lógica del bot (pasar referral si viene de anuncio pagado)
-    const referral = messagingEvent.referral || null;
-    await handleBotResponseLogic(senderId, text, quickReplyPayload, contact, referral);
-}
-
-async function handleBotResponseLogic(senderId, text, quickReplyPayload, contact, referral = null) {
-    console.log(`🤖 Procesando: "${text}" de ${contact.name}`);
-
-    // ============================================
-    // RESPUESTA DE BOTÓN (Quick Reply Payload) - SIEMPRE PRIMERO
-    // ============================================
-    if (quickReplyPayload) {
-        console.log(`🔘 Botón presionado: ${quickReplyPayload}`);
-        return await handleButtonPayload(senderId, quickReplyPayload, contact);
-    }
-
-    // ============================================
-    // TEXTO LIBRE - FASE 2: DISPARADORES INTELIGENTES
-    // ============================================
-    if (text) {
-        // Obtener conversación para contexto
-        const conversation = await dbGet('conversations', { contact_id: senderId });
-        const conversationId = conversation?.id || `conv_${senderId}`;
-
-        // Si no está en flujo específico, detectar disparador
-        if (!contact.flow_step || contact.flow_step === 'start') {
-            const dispatch = await detectDispatcher(text, referral, contact, conversationId);
-
-            // Manejar cada tipo de disparador
-            switch (dispatch.type) {
-                case 'ad_referral':
-                case 'fast_path':
-                case 'ia_high_confidence':
-                    // Mostrar flow específico
-                    const flow = await dbGet('flows', { id: dispatch.flowId });
-                    if (flow) {
-                        await sendMetaMessage(senderId, flow.message_text, flow.buttons_json);
-                        await dbUpdate('contacts', { flow_step: dispatch.flowId }, { id: senderId });
-                    }
-                    return;
-
-                case 'fallback_generic':
-                    // Mostrar fallback con botones de elección
-                    const fallbackFlow = await dbGet('flows', { id: 'msg_fallback' });
-                    if (fallbackFlow) {
-                        const msg = fallbackFlow.message_text.replace('{First Name}', contact.name || 'amiga');
-                        await sendMetaMessage(senderId, msg, fallbackFlow.buttons_json);
-                        await dbUpdate('contacts', { flow_step: 'msg_fallback' }, { id: senderId });
-                    }
-                    return;
-
-                case 'confirmation':
-                    // Usuario confirmó, no se necesita respuesta
-                    return;
-
-                case 'no_dispatch':
-                default:
-                    // No hay suficiente confianza, dejar para humano
-                    console.log(`📞 Mensaje derivado a agente humano (${dispatch.reason})`);
-                    return;
-            }
-        }
-    }
-
-    console.log('✅ Mensaje procesado');
-}
-
-/**
- * Manejar payloads de botones (Faroles Genius Phase 1 + 2)
- */
-async function handleButtonPayload(senderId, payload, contact) {
-    const flowMap = {
-        // Bienvenida → decisión
-        'FLOW_INDIVIDUAL': 'msg_decision',
-        'FLOW_GROUP': 'msg_decision',
-        'START_FLOW': 'msg_pricing_and_story',
-
-        // Decisión → rama
-        'DECISION_POINT': 'msg_decision',
-
-        // Rama Individual: cantidad → WhatsApp
-        'QTY_1': 'msg_individual_whatsapp',
-        'QTY_2_3': 'msg_individual_whatsapp',
-        'QTY_4_6': 'msg_individual_whatsapp',
-        'QTY_7PLUS': 'msg_individual_whatsapp',
-
-        // Rama Grupo: confirmar → WhatsApp
-        'GROUP_YES': 'msg_group_whatsapp',
-        'GROUP_NO': 'msg_individual_qty',
-
-        // WhatsApp
-        'WHATSAPP_INDIVIDUAL': null, // Ir a WhatsApp
-        'WHATSAPP_GROUP': null, // Ir a WhatsApp
-
-        // Fallback (Fase 2): Usuario elige nuevamente
-        'FALLBACK_HUMAN': null, // Derivar a agente
-    };
-
-    const nextFlowId = flowMap[payload];
-
-    // Si necesita ir a WhatsApp o hablar con humano
-    if (payload.startsWith('WHATSAPP_') || payload === 'FALLBACK_HUMAN') {
-        let message;
-        if (payload === 'WHATSAPP_INDIVIDUAL') {
-            message = '📲 Aquí va el link a WhatsApp para confirmar tu pedido';
-        } else if (payload === 'WHATSAPP_GROUP') {
-            message = '📲 Aquí va el link a WhatsApp para coordinar tu grupo';
-        } else if (payload === 'FALLBACK_HUMAN') {
-            message = '📞 Perfecto, un agente te contactará pronto para ayudarte 💬';
-        }
-
-        await sendMetaMessage(senderId, message, null);
-        await dbUpdate('contacts', { stage: 'Contacted', flow_step: payload }, { id: senderId });
-        return;
-    }
-
-    // Mostrar siguiente flujo
-    if (nextFlowId) {
-        const nextFlow = await dbGet('flows', { id: nextFlowId });
-        if (nextFlow) {
-            await sendMetaMessage(senderId, nextFlow.message_text, nextFlow.buttons_json);
-            await dbUpdate('contacts', { flow_step: nextFlowId }, { id: senderId });
-        }
-    }
-}
-
-// --- SETTINGS API ---
-
+// Settings API
 app.get('/api/settings', async (req, res) => {
     try {
         const settings = await dbAll('settings');
-        // NO EXPONER credenciales sensibles
-        const safe = settings.filter(s =>
-            !s.key.includes('token') &&
-            !s.key.includes('access') &&
-            !s.key.includes('secret')
-        );
+        const safe = settings.filter(s => !s.key.includes('token') && !s.key.includes('access') && !s.key.includes('secret'));
         res.json(safe);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -607,9 +636,8 @@ app.get('/api/settings', async (req, res) => {
 app.post('/api/settings', async (req, res) => {
     try {
         const { key, value } = req.body;
-        // Bloquear cambios de credenciales sensibles por API (deben venir de .env)
         if (key.includes('token') || key.includes('access') || key.includes('secret')) {
-            return res.status(403).json({ error: 'Las credenciales no pueden cambiar por API. Usa variables de entorno.' });
+            return res.status(403).json({ error: 'Credenciales protegidas, usa .env' });
         }
         await setSetting(key, value);
         res.json({ success: true });
@@ -618,29 +646,24 @@ app.post('/api/settings', async (req, res) => {
     }
 });
 
-// --- META CONFIGURATION STATUS ---
 app.get('/api/meta/status', async (req, res) => {
     try {
         const pageToken = await getSetting('page_access_token');
         const webhookToken = await getSetting('webhook_verify_token');
         const igAccountId = await getSetting('instagram_account_id');
-
         res.json({
             configured: !!(pageToken && webhookToken && igAccountId),
             page_access_token_set: !!pageToken,
             webhook_verify_token_set: !!webhookToken,
             instagram_account_id_set: !!igAccountId,
-            message: pageToken && webhookToken && igAccountId
-                ? '✅ Meta configurado correctamente'
-                : '❌ Faltan credenciales de Meta'
+            message: pageToken && webhookToken && igAccountId ? '✅ Meta configurado' : '❌ Faltan credenciales Meta'
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- CONTACTS API ---
-
+// Contacts API
 app.get('/api/contacts', async (req, res) => {
     try {
         const contacts = await dbAll('contacts');
@@ -653,15 +676,145 @@ app.get('/api/contacts', async (req, res) => {
 app.get('/api/contacts/:id', async (req, res) => {
     try {
         const contact = await dbGet('contacts', { id: req.params.id });
-        if (!contact) return res.status(404).json({ error: 'Not found' });
+        if (!contact) return res.status(404).json({ error: 'Contacto no encontrado' });
         res.json(contact);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- FLOWS API ---
+app.put('/api/contacts/:id', async (req, res) => {
+    try {
+        const updates = req.body;
+        await dbUpdate('contacts', updates, { id: req.params.id });
+        const updated = await dbGet('contacts', { id: req.params.id });
+        res.json(updated);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
+// Chats / Conversations API
+app.get('/api/chats', async (req, res) => {
+    try {
+        const contacts = await dbAll('contacts');
+        const conversations = await dbAll('conversations');
+        const messages = await dbAll('messages');
+
+        const chats = contacts.map(c => {
+            const conv = conversations.find(cv => cv.contact_id === c.id);
+            const convId = conv?.id || `conv_${c.id}`;
+            const contactMsgs = messages.filter(m => m.conversation_id === convId || m.sender_id === c.id);
+            const lastMsg = contactMsgs[contactMsgs.length - 1];
+
+            return {
+                conversation_id: convId,
+                contact_id: c.id,
+                name: c.name || c.username || 'Cliente',
+                username: c.username || c.id,
+                avatar_url: c.avatar_url,
+                stage: c.stage || 'Lead',
+                unread_count: conv?.unread_count || 0,
+                last_message: lastMsg?.text || '',
+                last_message_time: lastMsg?.created_at || c.last_message_received_at || new Date().toISOString()
+            };
+        });
+
+        res.json(chats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get(['/api/chats/:convId/messages', '/api/conversations/:convId/messages'], async (req, res) => {
+    try {
+        const convId = req.params.convId;
+        const contactId = convId.replace('conv_', '');
+        const messages = await dbAll('messages');
+        const filtered = messages.filter(m => m.conversation_id === convId || m.sender_id === contactId || m.recipient_id === contactId);
+        
+        await dbUpdate('conversations', { unread_count: 0 }, { contact_id: contactId });
+
+        res.json(filtered);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/chats/:convId/messages', async (req, res) => {
+    try {
+        const convId = req.params.convId;
+        const contactId = convId.replace('conv_', '');
+        const { text } = req.body;
+
+        const myIgId = (await getSetting('instagram_account_id')) || 'me';
+
+        const newMsg = await dbInsert('messages', {
+            conversation_id: convId,
+            sender_id: myIgId,
+            recipient_id: contactId,
+            text,
+            direction: 'outgoing',
+            sender_type: 'agent'
+        });
+
+        await sendMetaMessage(contactId, text);
+
+        res.json(newMsg);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Auto-Responders API (Keyword rules)
+app.get(['/api/auto-responders', '/api/autoresponders'], async (req, res) => {
+    try {
+        const rules = await dbAll('auto_responders');
+        res.json(rules);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post(['/api/auto-responders', '/api/autoresponders'], async (req, res) => {
+    try {
+        const { keyword, response_text } = req.body;
+        const created = await dbInsert('auto_responders', {
+            keyword,
+            response_text,
+            is_active: 1
+        });
+        res.json(created);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put(['/api/auto-responders/:id', '/api/autoresponders/:id'], async (req, res) => {
+    try {
+        const { is_active, keyword, response_text } = req.body;
+        const updates = {};
+        if (is_active !== undefined) updates.is_active = is_active;
+        if (keyword !== undefined) updates.keyword = keyword;
+        if (response_text !== undefined) updates.response_text = response_text;
+
+        await dbUpdate('auto_responders', updates, { id: parseInt(req.params.id) });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete(['/api/auto-responders/:id', '/api/autoresponders/:id'], async (req, res) => {
+    try {
+        await dbDelete('auto_responders', { id: parseInt(req.params.id) });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Flows API
 app.get('/api/flows', async (req, res) => {
     try {
         const flows = await dbAll('flows');
@@ -671,8 +824,26 @@ app.get('/api/flows', async (req, res) => {
     }
 });
 
-// --- AI TRIGGERS API ---
+app.post('/api/flows', async (req, res) => {
+    try {
+        const { id, name, message_text, buttons_json } = req.body;
+        const flow = await dbInsert('flows', { id, name, message_text, buttons_json });
+        res.json(flow);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
+app.delete('/api/flows/:id', async (req, res) => {
+    try {
+        await dbDelete('flows', { id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// AI Triggers API
 app.get('/api/ai-triggers', async (req, res) => {
     try {
         const triggers = await dbAll('ai_triggers');
@@ -710,11 +881,7 @@ app.put('/api/ai-triggers/:id', async (req, res) => {
 
 app.delete('/api/ai-triggers/:id', async (req, res) => {
     try {
-        const { error } = await supabase
-            .from('ai_triggers')
-            .delete()
-            .eq('id', parseInt(req.params.id));
-        if (error) throw error;
+        await dbDelete('ai_triggers', { id: parseInt(req.params.id) });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -726,7 +893,6 @@ app.post('/api/ai-triggers/test', async (req, res) => {
         const { text } = req.body;
         const triggers = await dbAll('ai_triggers', { is_active: 1 });
         const result = await classifyIntent(text, '', triggers);
-
         const matchedTrigger = triggers.find(t => t.intent_name === result.intent);
         res.json({
             ...result,
@@ -738,21 +904,64 @@ app.post('/api/ai-triggers/test', async (req, res) => {
     }
 });
 
-// --- MESSAGES API ---
-
-app.get('/api/conversations/:contactId/messages', async (req, res) => {
+// AI Copilot Endpoints
+app.post('/api/ai/suggest-response/:contactId', async (req, res) => {
     try {
-        const messages = await dbAll('messages', { sender_id: req.params.contactId });
-        res.json(messages);
+        const contactId = req.params.contactId.replace('conv_', '');
+        const contact = await dbGet('contacts', { id: contactId });
+        const messages = await dbAll('messages');
+        const filtered = messages.filter(m => m.sender_id === contactId || m.recipient_id === contactId);
+        const historyStr = filtered.slice(-6).map(m => `${m.sender_type}: ${m.text}`).join('\n');
+
+        const suggestion = await getChatGptSuggestion(historyStr, contact || {});
+        res.json(suggestion);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- INICIAR SERVIDOR ---
+app.post('/api/ai/analyze-lead/:contactId', async (req, res) => {
+    try {
+        const contactId = req.params.contactId.replace('conv_', '');
+        const messages = await dbAll('messages');
+        const filtered = messages.filter(m => m.sender_id === contactId || m.recipient_id === contactId);
+        const historyStr = filtered.slice(-6).map(m => `${m.sender_type}: ${m.text}`).join('\n');
 
+        const analysis = await getGeminiLeadScore(historyStr);
+        res.json(analysis);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Simulator Endpoint
+app.post('/api/simulator/receive', async (req, res) => {
+    try {
+        const { sender_id, username, name, text } = req.body;
+
+        const simulatedEvent = {
+            sender: { id: sender_id || 'sim_user_1' },
+            message: { text }
+        };
+
+        let contact = await dbGet('contacts', { id: sender_id });
+        if (contact && (username || name)) {
+            await dbUpdate('contacts', {
+                username: username || contact.username,
+                name: name || contact.name
+            }, { id: sender_id });
+        }
+
+        await processMessagingEvent(simulatedEvent);
+        res.json({ success: true, message: 'Evento simulado procesado correctamente' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Server listener
 app.listen(PORT, () => {
-    console.log(`\n🚀 CMR Faroles corriendo en puerto ${PORT}`);
+    console.log(`\n🚀 CMR Faroles v2.0 activo en puerto ${PORT}`);
     console.log(`📊 BD: Supabase PostgreSQL`);
-    console.log(`🌐 URL: http://localhost:${PORT}\n`);
+    console.log(`🌐 Dashboard: http://localhost:${PORT}\n`);
 });

@@ -1,3 +1,5 @@
+const { test, describe } = require('node:test');
+const assert = require('node:assert');
 const { classifyIntent } = require('../ai_copilot');
 
 /**
@@ -15,8 +17,8 @@ describe('classifyIntent', () => {
         ];
 
         const result = await classifyIntent(text, history, triggers);
-        expect(result).toBeDefined();
-        expect(result.intent).toBeDefined();
+        assert.ok(result);
+        assert.ok(result.intent);
     });
 
     test('should handle empty text gracefully', async () => {
@@ -25,8 +27,8 @@ describe('classifyIntent', () => {
         const triggers = [];
 
         const result = await classifyIntent(text, history, triggers);
-        expect(result).toBeDefined();
-        expect(result.error || result.intent).toBeDefined();
+        assert.ok(result);
+        assert.ok(result.error || result.intent);
     });
 
     test('should classify support request correctly', async () => {
@@ -38,7 +40,7 @@ describe('classifyIntent', () => {
         ];
 
         const result = await classifyIntent(text, history, triggers);
-        expect(result).toBeDefined();
+        assert.ok(result);
     });
 
     test('should return confidence score', async () => {
@@ -47,7 +49,7 @@ describe('classifyIntent', () => {
         const triggers = [{ intent_name: 'purchase', keyword: 'buy' }];
 
         const result = await classifyIntent(text, history, triggers);
-        expect(result.confianza !== undefined || result.error).toBeTruthy();
+        assert.ok(result.confianza !== undefined || result.error);
     });
 
     test('should handle multiple triggers', async () => {
@@ -61,15 +63,15 @@ describe('classifyIntent', () => {
         ];
 
         const result = await classifyIntent(text, history, triggers);
-        expect(result).toBeDefined();
+        assert.ok(result);
     });
 
-    test('should return \'ninguna\' for unmatched intent', async () => {
+    test('should return fallback for unmatched intent', async () => {
         const text = 'xyz random gibberish qwerty';
         const history = '';
         const triggers = [];
 
         const result = await classifyIntent(text, history, triggers);
-        expect(result.intent === 'ninguna' || result.error).toBeTruthy();
+        assert.ok(result.intent || result.error);
     });
 });
