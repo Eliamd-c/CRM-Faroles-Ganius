@@ -800,7 +800,11 @@ app.post('/api/chats/sync-history', async (req, res) => {
             return res.status(400).json({ error: 'Configura tu Page Access Token e Instagram Account ID reales en Configuración Meta.' });
         }
 
-        const convUrl = `https://graph.facebook.com/v19.0/${igId}/conversations?platform=instagram&access_token=${token}&limit=45`;
+        // Obtener el ID de la Página de Facebook asociada al token
+        const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?access_token=${token}`);
+        const pageId = meRes.data.id;
+
+        const convUrl = `https://graph.facebook.com/v19.0/${pageId}/conversations?platform=instagram&access_token=${token}&limit=45`;
         const convRes = await axios.get(convUrl);
         const conversationsData = convRes.data.data || [];
 
