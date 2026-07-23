@@ -296,8 +296,12 @@
             <section class="view" id="view-settings">
                 <div class="view-page-header">
                     <div>
-                        <h1 class="page-title">Configuración de Meta</h1>
-                        <p class="page-subtitle">Conecta tu cuenta de Instagram Business para activar mensajes en tiempo real</p>
+                        <h1 class="page-title">Configuración de Meta (Instagram Graph API)</h1>
+                        <p class="page-subtitle">Conecta tu cuenta de Instagram Business para recibir y responder mensajes en tiempo real</p>
+                    </div>
+                    <div id="meta-status-badge" class="test-badge">
+                        <span class="status-indicator" id="settings-status-dot"></span>
+                        <span id="settings-status-text">Cargando estado...</span>
                     </div>
                 </div>
                 <div class="two-col-layout">
@@ -308,23 +312,26 @@
                             </div>
                             <div>
                                 <h3 class="card-title">Credenciales de API</h3>
-                                <p class="card-subtitle">Tus tokens de acceso de Meta</p>
+                                <p class="card-subtitle">Ingresa tus tokens de acceso de Meta</p>
                             </div>
                         </div>
                         <form id="settings-form" class="form-stack">
                             <div class="field-group">
-                                <label class="field-label">Page Access Token</label>
-                                <input type="password" id="set-token" placeholder="EAAB..." class="field-input">
+                                <label class="field-label">Page Access Token (Token de Página)</label>
+                                <input type="password" id="set-token" placeholder="EAAB..." class="field-input" autocomplete="off">
+                                <span class="field-help" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Obtenido en Meta developers → Tu App → Messenger / Instagram.</span>
                             </div>
                             <div class="field-group">
                                 <label class="field-label">Instagram Business Account ID</label>
                                 <input type="text" id="set-ig-id" placeholder="17841401234567890" class="field-input">
+                                <span class="field-help" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">ID numérico de tu cuenta de Instagram Business o Creador.</span>
                             </div>
                             <div class="field-group">
                                 <label class="field-label">Webhook Verify Token</label>
                                 <input type="text" id="set-verify-token" placeholder="mi_secreto_crm_123" class="field-input">
+                                <span class="field-help" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Token de seguridad para validar la recepción de webhooks de Meta.</span>
                             </div>
-                            <button type="submit" class="btn-primary">Guardar y Conectar</button>
+                            <button type="submit" class="btn-primary w-full">💾 Guardar Credenciales y Conectar</button>
                         </form>
                     </div>
                     <div class="glass-card">
@@ -333,36 +340,38 @@
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                             </div>
                             <div>
-                                <h3 class="card-title">Configurar Webhook</h3>
-                                <p class="card-subtitle">Pasos para producción</p>
+                                <h3 class="card-title">Guía de Conexión Meta</h3>
+                                <p class="card-subtitle">Pasos para conectar tu Instagram real</p>
                             </div>
                         </div>
                         <div class="steps-list">
                             <div class="step-item">
                                 <div class="step-num">1</div>
                                 <div class="step-body">
-                                    <strong>Abre un túnel HTTPS local</strong>
-                                    <code class="code-block">ngrok http 5000</code>
+                                    <strong>Crea una App en Meta Developers</strong>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">Entra a <a href="https://developers.facebook.com" target="_blank" style="color:var(--purple); text-decoration:underline;">developers.facebook.com</a> y crea una app tipo Negocios.</p>
                                 </div>
                             </div>
                             <div class="step-item">
                                 <div class="step-num">2</div>
                                 <div class="step-body">
-                                    <strong>Copia la URL pública de ngrok</strong>
-                                    <code class="code-block">https://xxxx.ngrok-free.app</code>
+                                    <strong>Conecta tu página de FB e Instagram</strong>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">Asegúrate de que tu cuenta de IG sea tipo Empresa o Creador y esté vinculada a la página de FB.</p>
                                 </div>
                             </div>
                             <div class="step-item">
                                 <div class="step-num">3</div>
                                 <div class="step-body">
-                                    <strong>Pégala en Meta Developers → Webhooks</strong>
-                                    <code class="code-block">https://tu-url.ngrok-free.app/webhook</code>
+                                    <strong>Ingresa los Tokens a la izquierda</strong>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">Guarda el Page Token, Instagram ID y el Verify Token en este formulario.</p>
                                 </div>
                             </div>
                             <div class="step-item">
                                 <div class="step-num">4</div>
                                 <div class="step-body">
-                                    <strong>Suscríbete a <em>messages</em> y <em>comments</em></strong>
+                                    <strong>Configura la URL del Webhook</strong>
+                                    <code class="code-block" style="display:block; margin-top:4px;">https://tu-dominio.com/webhook</code>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Suscríbete a los eventos <code>messages</code> y <code>messaging_postbacks</code>.</p>
                                 </div>
                             </div>
                         </div>

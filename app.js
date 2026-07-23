@@ -626,8 +626,7 @@ app.post('/webhook', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
     try {
         const settings = await dbAll('settings');
-        const safe = settings.filter(s => !s.key.includes('token') && !s.key.includes('access') && !s.key.includes('secret'));
-        res.json(safe);
+        res.json(settings);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -635,12 +634,17 @@ app.get('/api/settings', async (req, res) => {
 
 app.post('/api/settings', async (req, res) => {
     try {
-        const { key, value } = req.body;
-        if (key.includes('token') || key.includes('access') || key.includes('secret')) {
-            return res.status(403).json({ error: 'Credenciales protegidas, usa .env' });
+        const body = req.body;
+        if (body.key && body.value !== undefined) {
+            await setSetting(body.key, body.value);
+        } else {
+            for (const [k, v] of Object.entries(body)) {
+                if (v !== undefined && v !== null) {
+                    await setSetting(k, v);
+                }
+            }
         }
-        await setSetting(key, value);
-        res.json({ success: true });
+        res.json({ success: true, status: 'success' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

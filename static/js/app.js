@@ -191,12 +191,28 @@ function startPolling() {
 // ============================================================
 async function loadSettings() {
     try {
-        const res = await fetch('/api/settings');
-        const cfg = await res.json();
-        el.setToken.value       = cfg.page_access_token || '';
-        el.setIgId.value        = cfg.instagram_account_id || '';
-        el.setVerifyToken.value = cfg.webhook_verify_token || '';
-        setStatus(!!(cfg.page_access_token && cfg.instagram_account_id));
+        const [statusRes, settingsRes] = await Promise.all([
+            fetch('/api/meta/status').then(r => r.json()).catch(() => ({})),
+            fetch('/api/settings').then(r => r.json()).catch(() => ([]))
+        ]);
+
+        const settingsMap = {};
+        if (Array.isArray(settingsRes)) {
+            settingsRes.forEach(s => settingsMap[s.key] = s.value);
+        }
+
+        if (el.setToken) el.setToken.value = settingsMap.page_access_token || '';
+        if (el.setIgId) el.setIgId.value = settingsMap.instagram_account_id || '';
+        if (el.setVerifyToken) el.setVerifyToken.value = settingsMap.webhook_verify_token || '';
+
+        setStatus(!!statusRes.configured);
+
+        const statusDot = document.getElementById('settings-status-dot');
+        const statusText = document.getElementById('settings-status-text');
+        if (statusDot && statusText) {
+            statusDot.className = statusRes.configured ? 'status-indicator connected' : 'status-indicator';
+            statusText.textContent = statusRes.configured ? 'Meta API Conectada' : 'No Conectado (Modo Simulador)';
+        }
     } catch (err) {
         console.error('loadSettings:', err);
     }
@@ -204,21 +220,31 @@ async function loadSettings() {
 
 async function handleSettingsSubmit(e) {
     e.preventDefault();
-    const data = {
-        page_access_token:    el.setToken.value.trim(),
-        instagram_account_id: el.setIgId.value.trim(),
-        webhook_verify_token: el.setVerifyToken.value.trim()
-    };
+    const token = el.setToken ? el.setToken.value.trim() : '';
+    const igId = el.setIgId ? el.setIgId.value.trim() : '';
+    const verifyToken = el.setVerifyToken ? el.setVerifyToken.value.trim() : '';
+
     try {
-        const res    = await fetch('/api/settings', { method: 'POST', headers: jsonHeaders(), body: JSON.stringify(data) });
+        const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: jsonHeaders(),
+            body: JSON.stringify({
+                page_access_token: token,
+                instagram_account_id: igId,
+                webhook_verify_token: verifyToken
+            })
+        });
         const result = await res.json();
-        if (result.status === 'success') {
-            setStatus(!!(data.page_access_token && data.instagram_account_id));
-            showToast('✅ Configuración guardada correctamente.');
+        if (result.success || result.status === 'success') {
+            await loadSettings();
+            showToast('✅ Credenciales guardadas y conexión actualizada.');
         } else {
-            showToast('❌ Error: ' + result.error, 'error');
+            showToast('❌ Error: ' + (result.error || 'No se pudo guardar'), 'error');
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error('handleSettingsSubmit:', err);
+        showToast('❌ Error de red guardando configuración', 'error');
+    }
 }
 
 // ============================================================

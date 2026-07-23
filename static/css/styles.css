@@ -294,10 +294,12 @@ html, body {
     display: flex;
     flex-direction: column;
     background: transparent;
+    height: 100%;
+    min-height: 0;
 }
 
-.view { display: none; flex: 1; overflow: hidden; }
-.view.active { display: flex; flex-direction: column; animation: slideIn 0.3s ease; }
+.view { display: none; flex: 1; height: 100%; min-height: 0; overflow: hidden; }
+.view.active { display: flex; flex-direction: column; height: 100%; min-height: 0; animation: slideIn 0.3s ease; }
 
 @keyframes slideIn {
     from { opacity: 0; transform: translateX(10px); }
