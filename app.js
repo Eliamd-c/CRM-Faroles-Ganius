@@ -38,6 +38,20 @@ const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
 const INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
+async function subscribePageToWebhooks(token) {
+    if (!token || token.includes('your_page_access_token')) return;
+    try {
+        const meRes = await axios.get(`https://graph.facebook.com/v19.0/me?access_token=${token}`);
+        const pageId = meRes.data.id;
+        const fields = 'messages,messaging_postbacks,message_deliveries,message_reads,message_echoes,conversations';
+        const res = await axios.post(`https://graph.facebook.com/v19.0/${pageId}/subscribed_apps?subscribed_fields=${fields}&access_token=${token}`);
+        console.log('✅ Página de Facebook suscrita exitosamente a Webhooks:', pageId, res.data);
+        return res.data;
+    } catch (err) {
+        console.warn('⚠️ No se pudo suscribir la página a Webhooks:', err.response?.data || err.message);
+    }
+}
+
 async function initializeMetaCredentials() {
     const isPlaceholder = (val) => !val || val.includes('your_') || val.includes('_here');
 
@@ -52,6 +66,11 @@ async function initializeMetaCredentials() {
     }
     if (!isPlaceholder(INSTAGRAM_BUSINESS_ACCOUNT_ID) && !(await getSetting('instagram_business_account_id'))) {
         await setSetting('instagram_business_account_id', INSTAGRAM_BUSINESS_ACCOUNT_ID);
+    }
+
+    const currentToken = await getSetting('page_access_token');
+    if (currentToken) {
+        subscribePageToWebhooks(currentToken).catch(() => {});
     }
 }
 initializeMetaCredentials().catch(err => console.warn('⚠️ Error credenciales:', err.message));
@@ -712,6 +731,10 @@ app.post('/api/settings', async (req, res) => {
                     await setSetting(k, v);
                 }
             }
+        }
+        const tokenToSub = await getSetting('page_access_token');
+        if (tokenToSub) {
+            subscribePageToWebhooks(tokenToSub).catch(e => console.warn('Sub error:', e.message));
         }
         res.json({ success: true, status: 'success' });
     } catch (err) {
