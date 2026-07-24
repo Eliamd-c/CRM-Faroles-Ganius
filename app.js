@@ -39,10 +39,20 @@ const INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
 async function initializeMetaCredentials() {
-    if (META_PAGE_ACCESS_TOKEN) await setSetting('page_access_token', META_PAGE_ACCESS_TOKEN);
-    if (META_WEBHOOK_VERIFY_TOKEN) await setSetting('webhook_verify_token', META_WEBHOOK_VERIFY_TOKEN);
-    if (INSTAGRAM_ACCOUNT_ID) await setSetting('instagram_account_id', INSTAGRAM_ACCOUNT_ID);
-    if (INSTAGRAM_BUSINESS_ACCOUNT_ID) await setSetting('instagram_business_account_id', INSTAGRAM_BUSINESS_ACCOUNT_ID);
+    const isPlaceholder = (val) => !val || val.includes('your_') || val.includes('_here');
+
+    if (!isPlaceholder(META_PAGE_ACCESS_TOKEN) && !(await getSetting('page_access_token'))) {
+        await setSetting('page_access_token', META_PAGE_ACCESS_TOKEN);
+    }
+    if (!isPlaceholder(META_WEBHOOK_VERIFY_TOKEN) && !(await getSetting('webhook_verify_token'))) {
+        await setSetting('webhook_verify_token', META_WEBHOOK_VERIFY_TOKEN);
+    }
+    if (!isPlaceholder(INSTAGRAM_ACCOUNT_ID) && !(await getSetting('instagram_account_id'))) {
+        await setSetting('instagram_account_id', INSTAGRAM_ACCOUNT_ID);
+    }
+    if (!isPlaceholder(INSTAGRAM_BUSINESS_ACCOUNT_ID) && !(await getSetting('instagram_business_account_id'))) {
+        await setSetting('instagram_business_account_id', INSTAGRAM_BUSINESS_ACCOUNT_ID);
+    }
 }
 initializeMetaCredentials().catch(err => console.warn('⚠️ Error credenciales:', err.message));
 
@@ -90,7 +100,11 @@ async function dbAll(table, filter = {}) {
 
 async function dbInsert(table, data) {
     if (!memoryStore[table]) memoryStore[table] = [];
-    const idx = memoryStore[table].findIndex(i => i.id && data.id && i.id === data.id);
+    const idx = memoryStore[table].findIndex(i => {
+        if (data.id && i.id) return i.id === data.id;
+        if (data.key && i.key) return i.key === data.key;
+        return false;
+    });
     if (idx >= 0) memoryStore[table][idx] = { ...memoryStore[table][idx], ...data };
     else memoryStore[table].push(data);
 
@@ -148,11 +162,17 @@ async function getSetting(key) {
 
 async function setSetting(key, value) {
     const existing = await dbGet('settings', { key });
+    let res;
     if (existing) {
-        return await dbUpdate('settings', { value }, { key });
+        res = await dbUpdate('settings', { value }, { key });
     } else {
-        return await dbInsert('settings', { key, value });
+        res = await dbInsert('settings', { key, value });
     }
+    if (!memoryStore['settings']) memoryStore['settings'] = [];
+    const idx = memoryStore['settings'].findIndex(i => i.key === key);
+    if (idx >= 0) memoryStore['settings'][idx].value = value;
+    else memoryStore['settings'].push({ key, value });
+    return res;
 }
 
 // --- META API ---
