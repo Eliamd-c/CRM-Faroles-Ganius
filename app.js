@@ -4,6 +4,7 @@ const path = require('path');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: path.join(__dirname, '.env.local') });
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const { getGeminiLeadScore, getChatGptSuggestion, classifyIntent, getGeminiCommentSuggestion } = require('./ai_copilot');
 
@@ -33,8 +34,8 @@ console.log('✅ Conectado a Supabase:', SUPABASE_URL);
 if (supabaseAdmin) console.log('✅ Cliente admin habilitado para operaciones RLS');
 
 // --- CARGAR CREDENCIALES ---
-const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN;
-const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN;
+const META_PAGE_ACCESS_TOKEN = process.env.META_PAGE_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN;
+const META_WEBHOOK_VERIFY_TOKEN = process.env.META_WEBHOOK_VERIFY_TOKEN || process.env.WEBHOOK_VERIFY_TOKEN;
 const INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 const INSTAGRAM_BUSINESS_ACCOUNT_ID = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
@@ -117,6 +118,22 @@ async function dbAll(table, filter = {}) {
     });
 }
 
+function filterDbColumns(table, data) {
+    if (table !== 'contacts') return data;
+    const dbCols = [
+        'id', 'username', 'name', 'avatar_url', 'stage', 'tags',
+        'notes', 'phone_number', 'is_wholesaler_potential', 'flow_step',
+        'created_at', 'updated_at',
+        'last_message_received_at', 'last_message_sent_at',
+        'message_count', 'response_rate', 'is_active', 'days_since_last_message'
+    ];
+    const filtered = {};
+    for (const key of dbCols) {
+        if (data[key] !== undefined) filtered[key] = data[key];
+    }
+    return filtered;
+}
+
 async function dbInsert(table, data) {
     if (!memoryStore[table]) memoryStore[table] = [];
     const idx = memoryStore[table].findIndex(i => {
@@ -129,7 +146,8 @@ async function dbInsert(table, data) {
 
     try {
         const client = supabaseAdmin || supabase;
-        const { data: result, error } = await client.from(table).insert([data]).select();
+        const dbData = filterDbColumns(table, data);
+        const { data: result, error } = await client.from(table).insert([dbData]).select();
         if (error) throw error;
         return result ? result[0] : data;
     } catch (err) {
@@ -146,7 +164,8 @@ async function dbUpdate(table, data, filter = {}) {
     }
     try {
         const client = supabaseAdmin || supabase;
-        let query = client.from(table).update(data);
+        const dbData = filterDbColumns(table, data);
+        let query = client.from(table).update(dbData);
         for (const [key, value] of Object.entries(filter)) {
             query = query.eq(key, value);
         }
@@ -260,7 +279,10 @@ function sanitizeContactData(data) {
     const validColumns = [
         'id', 'username', 'name', 'avatar_url', 'stage', 'tags',
         'notes', 'phone_number', 'is_wholesaler_potential', 'flow_step',
-        'created_at', 'updated_at'
+        'created_at', 'updated_at',
+        'last_message_received_at', 'last_message_sent_at',
+        'message_count', 'response_rate', 'is_active', 'days_since_last_message',
+        'profile', 'city', 'church_name', 'conversation_stage'
     ];
     const sanitized = {};
     for (const key of validColumns) {
@@ -271,8 +293,11 @@ function sanitizeContactData(data) {
     if (data.profile && (!sanitized.tags || !sanitized.tags.includes(data.profile))) {
         sanitized.tags = sanitized.tags ? `${sanitized.tags},${data.profile}` : data.profile;
     }
-    if (data.city) {
+    if (data.city && (!sanitized.notes || !sanitized.notes.includes(data.city))) {
         sanitized.notes = sanitized.notes ? `${sanitized.notes} | Ciudad: ${data.city}` : `Ciudad: ${data.city}`;
+    }
+    if (data.church_name && (!sanitized.notes || !sanitized.notes.includes(data.church_name))) {
+        sanitized.notes = sanitized.notes ? `${sanitized.notes} | Iglesia: ${data.church_name}` : `Iglesia: ${data.church_name}`;
     }
     return sanitized;
 }
@@ -351,11 +376,12 @@ async function detectDispatcher(text, referral, contact) {
             const triggers = await dbAll('ai_triggers', { is_active: 1 });
             if (triggers.length > 0) {
                 const result = await classifyIntent(text, '', triggers);
+                const matchedTrigger = triggers.find(t => t.intent_name === result.intent);
                 if (result.confianza >= 0.7) {
-                    return { type: 'ia_high', action: 'pricing', intent: result.intent };
+                    return { type: 'ia_high', action: 'pricing', intent: result.intent, target_flow: matchedTrigger?.target_flow };
                 }
                 if (result.confianza >= 0.5) {
-                    return { type: 'ia_medium', action: 'ask_help', intent: result.intent };
+                    return { type: 'ia_medium', action: 'ask_help', intent: result.intent, target_flow: matchedTrigger?.target_flow };
                 }
             }
         } catch (e) {
@@ -553,6 +579,9 @@ async function processMessagingEvent(event) {
     const mediaUrl = event.message?.attachments?.[0]?.payload?.url || null;
 
     let contact = await getOrCreateContact(senderId);
+    const nowIso = new Date().toISOString();
+    await updateContactStage(senderId, { last_message_received_at: nowIso });
+    contact = { ...contact, last_message_received_at: nowIso };
 
     // Record conversation & message safely
     const conversationId = `conv_${senderId}`;
@@ -605,6 +634,23 @@ async function processMessagingEvent(event) {
         if (payload === 'REQUEST_SELLER_KIT') {
             await updateContactStage(senderId, { flow_step: 'requesting_kit' });
             return await runSellerFlow(senderId, { ...contact, flow_step: 'requesting_kit' });
+        }
+    }
+
+    // Check detectDispatcher if no quick reply button payload was clicked
+    if (!payload && text.length > 0 && (!contact.flow_step || contact.flow_step === 'start' || contact.flow_step === 'fallback_menu')) {
+        const dispatcher = await detectDispatcher(text, referral, contact);
+        if (dispatcher && dispatcher.type !== 'unknown') {
+            if (dispatcher.action === 'welcome' || dispatcher.action === 'welcome_from_ad' || dispatcher.target_flow === 'start') {
+                await startProfiling(senderId, contact);
+                return;
+            } else if (dispatcher.action === 'pricing' || dispatcher.intent === 'interes_hogar' || dispatcher.target_flow === 'FLOW_HOME') {
+                await updateContactStage(senderId, { profile: 'consumidor', flow_step: 'consumer_start' });
+                return await runConsumerFlow(senderId, { ...contact, profile: 'consumidor', flow_step: 'consumer_start' });
+            } else if (dispatcher.intent === 'interes_negocio' || dispatcher.target_flow === 'FLOW_BUSINESS') {
+                await updateContactStage(senderId, { profile: 'vendedor', flow_step: 'seller_start' });
+                return await runSellerFlow(senderId, { ...contact, profile: 'vendedor', flow_step: 'seller_start' });
+            }
         }
     }
 
@@ -1032,6 +1078,8 @@ app.post('/api/chats/:convId/messages', async (req, res) => {
             direction: 'outgoing',
             sender_type: 'agent'
         });
+
+        await updateContactStage(contactId, { last_message_sent_at: new Date().toISOString() });
 
         let metaSent = false;
         let metaError = null;

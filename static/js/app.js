@@ -190,14 +190,16 @@ function setStatus(connected) {
 //  POLLING
 // ============================================================
 function startPolling() {
+    if (state.pollingInterval) clearInterval(state.pollingInterval);
     state.pollingInterval = setInterval(() => {
+        if (document.hidden) return;
         if (state.activeTab === 'inbox') {
             pollChatsSilent();
             if (state.activeChatId) pollMsgsSilent(state.activeChatId);
         } else if (state.activeTab === 'pipeline') {
             pollPipelineSilent();
         }
-    }, 3000);
+    }, 5000);
 }
 
 // ============================================================
@@ -473,9 +475,15 @@ async function sendMessage() {
         if (result.status === 'success') {
             loadMessages(state.activeChatId);
             loadChats();
-            if (result.meta_sent)  addLog(`[META API] Enviado a IGSID ${state.activeChatId}: "${text}"`, 'success');
-            else if (result.meta_error) addLog(`[META ERROR] ${result.meta_error}`, 'error');
-            else addLog(`[LOCAL] Mensaje guardado en BD local.`, 'info');
+            if (result.meta_sent) {
+                addLog(`[META API] Enviado a IGSID ${state.activeChatId}: "${text}"`, 'success');
+            } else if (result.meta_error) {
+                const errText = typeof result.meta_error === 'object' ? (result.meta_error.message || JSON.stringify(result.meta_error)) : result.meta_error;
+                addLog(`[META ERROR] ${errText}`, 'error');
+                showToast(`⚠️ Error en Meta API: ${errText}`, 'error');
+            } else {
+                addLog(`[LOCAL] Mensaje guardado en BD local.`, 'info');
+            }
         } else {
             showToast('❌ ' + result.error, 'error');
         }

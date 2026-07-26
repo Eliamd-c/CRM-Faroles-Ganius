@@ -1,5 +1,24 @@
 const axios = require('axios');
 
+function extractAndParseJson(text) {
+    if (!text) return {};
+    let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    try {
+        return JSON.parse(cleaned);
+    } catch (e) {
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            try {
+                return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+            } catch (e2) {
+                // Ignore and fall through to throw
+            }
+        }
+        throw e;
+    }
+}
+
 async function getGeminiLeadScore(chatHistory) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return { error: "Gemini API Key no configurada" };
@@ -26,9 +45,7 @@ Responde SOLO en formato JSON válido con esta estructura:
         });
         
         let text = response.data.candidates[0].content.parts[0].text;
-        // Limpiar backticks de markdown si vienen en la respuesta
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(text);
+        return extractAndParseJson(text);
     } catch (err) {
         console.error("Error en Gemini API:", err.message);
         return { error: "Error analizando lead" };
@@ -118,9 +135,7 @@ Confianza: 0 = totalmente inseguro, 1 = completamente seguro
         });
 
         let text_response = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        text_response = text_response.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const result = JSON.parse(text_response);
+        const result = extractAndParseJson(text_response);
         return {
             intent: result.intent || 'unknown',
             confianza: parseFloat(result.confianza) || 0.3,
@@ -176,8 +191,7 @@ Responde ÚNICAMENTE en formato JSON estricto:
         });
         
         let text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(text);
+        return extractAndParseJson(text);
     } catch (err) {
         console.error("Error en Gemini Comment AI:", err.message);
         return {
