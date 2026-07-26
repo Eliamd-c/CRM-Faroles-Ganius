@@ -36,7 +36,7 @@ async function fixAllNamesAndChats() {
         let allConvs = [];
         let pagesFetched = 0;
 
-        while (url && pagesFetched < 4) {
+        while (url && pagesFetched < 10) {
             const res = await axios.get(url);
             if (res.data.data) allConvs.push(...res.data.data);
             url = res.data.paging?.next || null;
@@ -124,18 +124,17 @@ async function fixAllNamesAndChats() {
                 const convId = `conv_${contactId}`;
                 const lastMsgText = sampleMsg.message || (sampleMsg.attachments ? '📎 Archivo adjunto' : 'Mensaje');
                 
-                const { data: existingConv } = await s.from('conversations').select('id').eq('id', convId).single();
-                if (!existingConv) {
-                    await s.from('conversations').insert([{
+                const { data: existingConv } = await s.from('conversations').select('id').eq('id', convId).limit(1);
+                if (!existingConv || existingConv.length === 0) {
+                    const resConv = await s.from('conversations').insert([{
                         id: convId,
                         contact_id: contactId,
-                        last_message: lastMsgText,
                         last_message_time: new Date(sampleMsg.created_time).toISOString(),
                         unread_count: 0
                     }]);
+                    if (resConv.error) console.error(`❌ Error insert conv ${convId}:`, resConv.error.message);
                 } else {
                     await s.from('conversations').update({
-                        last_message: lastMsgText,
                         last_message_time: new Date(sampleMsg.created_time).toISOString()
                     }).eq('id', convId);
                 }
@@ -146,15 +145,19 @@ async function fixAllNamesAndChats() {
                     const msgText = m.message || (m.attachments ? '📎 Archivo adjunto' : 'Mensaje');
                     const { data: exists } = await s.from('messages').select('id').eq('conversation_id', convId).eq('timestamp', new Date(m.created_time).toISOString()).limit(1);
                     if (!exists || exists.length === 0) {
-                        await s.from('messages').insert([{
+                        const isBot = (m.from?.id === pageId || m.from?.name === meRes.data.name);
+                        const resMsg = await s.from('messages').insert([{
                             conversation_id: convId,
-                            sender_id: (m.from?.id === pageId || m.from?.name === meRes.data.name) ? pageId : contactId,
-                            sender_type: (m.from?.id === pageId || m.from?.name === meRes.data.name) ? 'bot' : 'customer',
+                            sender_id: isBot ? pageId : contactId,
+                            recipient_id: isBot ? contactId : pageId,
+                            sender_type: isBot ? 'bot' : 'customer',
+                            direction: isBot ? 'outgoing' : 'incoming',
                             text: msgText,
                             timestamp: new Date(m.created_time).toISOString(),
                             created_at: new Date(m.created_time).toISOString()
                         }]);
-                        msgsInserted++;
+                        if (resMsg.error) console.error(`❌ Error insert msj en ${convId}:`, resMsg.error.message);
+                        else msgsInserted++;
                     }
                 }
 
