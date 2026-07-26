@@ -991,29 +991,39 @@ app.post('/api/chats/sync-history', async (req, res) => {
                 if (!contactId) continue;
 
                 let contact = await dbGet('contacts', { id: contactId });
-                if (!contact) {
-                    // Obtener perfil detallado si es posible
-                    let profileName = participant.username ? `@${participant.username}` : `Cliente ${contactId.substring(0, 6)}`;
-                    let profileAvatar = '';
+                let profileName = (participant && participant.name && participant.name !== 'Unknown')
+                    ? participant.name
+                    : (participant && participant.username ? `@${participant.username}` : `Cliente ${contactId.substring(0, 6)}`);
+                let profileAvatar = contact?.avatar_url || '';
+
+                if (!contact || contact.name?.startsWith('Cliente ') || !contact.name || contact.name === 'Unknown') {
                     try {
                         const profUrl = `https://graph.facebook.com/v19.0/${contactId}?fields=name,username,profile_pic&access_token=${token}`;
                         const profRes = await axios.get(profUrl);
                         if (profRes.data.name && profRes.data.name !== 'Unknown') profileName = profRes.data.name;
-                        else if (profRes.data.username) profileName = `@${profRes.data.username}`;
+                        else if (profRes.data.username && profileName.startsWith('Cliente ')) profileName = `@${profRes.data.username}`;
                         if (profRes.data.profile_pic) profileAvatar = profRes.data.profile_pic;
                     } catch (e) {
                         // Ignore
                     }
+                }
 
+                if (!contact) {
                     await dbInsert('contacts', {
                         id: contactId,
-                        username: participant.username || '',
+                        username: participant?.username || '',
                         name: profileName,
                         avatar_url: profileAvatar,
                         stage: 'Lead',
                         created_at: new Date(sampleMsg.created_time).toISOString()
                     });
                     newContacts++;
+                } else if (contact.name?.startsWith('Cliente ') || !contact.name || contact.name === 'Unknown') {
+                    await dbUpdate('contacts', {
+                        name: profileName,
+                        username: participant?.username || contact.username || '',
+                        avatar_url: profileAvatar || contact.avatar_url
+                    }, { id: contactId });
                 }
 
                 let localConv = await dbGet('conversations', { contact_id: contactId });
