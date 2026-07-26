@@ -203,6 +203,11 @@ async function dbDelete(table, filter = {}) {
 
 async function getSetting(key) {
     const row = await dbGet('settings', { key });
+    if (row && row.value && !row.value.includes('your_') && !row.value.includes('_here')) return row.value;
+    if (key === 'page_access_token') return META_PAGE_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN || null;
+    if (key === 'webhook_verify_token') return META_WEBHOOK_VERIFY_TOKEN || process.env.WEBHOOK_VERIFY_TOKEN || null;
+    if (key === 'instagram_account_id') return INSTAGRAM_ACCOUNT_ID || null;
+    if (key === 'instagram_business_account_id') return INSTAGRAM_BUSINESS_ACCOUNT_ID || null;
     return row ? row.value : null;
 }
 
@@ -220,6 +225,24 @@ async function setSetting(key, value) {
     else memoryStore['settings'].push({ key, value });
     return res;
 }
+
+async function cleanGenericContactNames() {
+    try {
+        const contacts = await dbAll('contacts');
+        for (const contact of contacts) {
+            if (!contact || !contact.id || contact.id.startsWith('sim_') || contact.id.startsWith('test_')) continue;
+            const isGeneric = !contact.name || contact.name === 'Unknown' || contact.name.startsWith('Cliente ') || contact.name.startsWith('user_') || contact.name.startsWith('@user_');
+            if (isGeneric && contact.username && !contact.username.startsWith('user_')) {
+                const newName = `@${contact.username}`;
+                await dbUpdate('contacts', { name: newName }, { id: contact.id });
+                console.log(`🧹 Nombre genérico corregido para ${contact.id}: -> ${newName}`);
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️ Error en limpieza de nombres genéricos:', err.message);
+    }
+}
+setTimeout(() => cleanGenericContactNames().catch(() => {}), 2000);
 
 // --- META API ---
 async function sendMetaMessage(recipientId, text, buttonsJson = null) {
@@ -314,10 +337,12 @@ async function getOrCreateContact(senderId) {
     let contact = await dbGet('contacts', { id: senderId });
     if (!contact) {
         const profile = await fetchMetaUserProfile(senderId);
+        const resolvedUsername = profile?.username || `user_${senderId}`;
+        const resolvedName = (profile?.name && profile.name !== 'Unknown') ? profile.name : (profile?.username ? `@${profile.username}` : `Cliente ${senderId.substring(0, 6)}`);
         const newContactData = sanitizeContactData({
             id: senderId,
-            username: profile?.username || `user_${senderId}`,
-            name: profile?.name && profile.name !== 'Unknown' ? profile.name : `Cliente ${senderId.substring(0, 6)}`,
+            username: resolvedUsername,
+            name: resolvedName,
             avatar_url: profile?.profile_pic || null,
             stage: 'Lead',
             flow_step: 'start'
@@ -328,18 +353,23 @@ async function getOrCreateContact(senderId) {
         }
         console.log(`➕ Nuevo contacto creado: ${contact.name} (${senderId})`);
     } else {
-        const isGenericName = !contact.name || contact.name === 'Unknown' || contact.name.startsWith('Cliente ') || !contact.avatar_url;
+        const isGenericName = !contact.name || contact.name === 'Unknown' || contact.name.startsWith('Cliente ') || contact.name.startsWith('user_') || contact.name.startsWith('@user_') || !contact.avatar_url || (contact.username && contact.username.startsWith('user_'));
         if (isGenericName && !senderId.startsWith('sim_') && !senderId.startsWith('test_')) {
             const profile = await fetchMetaUserProfile(senderId);
             if (profile && (profile.name || profile.username || profile.profile_pic)) {
+                const resolvedName = (profile.name && profile.name !== 'Unknown') ? profile.name : (profile.username ? `@${profile.username}` : contact.name);
                 const updates = sanitizeContactData({
-                    name: profile.name || contact.name,
+                    name: resolvedName,
                     username: profile.username || contact.username,
                     avatar_url: profile.profile_pic || contact.avatar_url
                 });
                 await dbUpdate('contacts', updates, { id: senderId });
                 contact = { ...contact, ...updates };
                 console.log(`🔄 Perfil actualizado automáticamente de Meta para ${senderId}: ${contact.name}`);
+            } else if (contact.username && !contact.username.startsWith('user_') && contact.name.startsWith('Cliente ')) {
+                const updates = sanitizeContactData({ name: `@${contact.username}` });
+                await dbUpdate('contacts', updates, { id: senderId });
+                contact = { ...contact, ...updates };
             }
         }
     }
@@ -817,7 +847,13 @@ app.get('/api/meta/status', async (req, res) => {
 app.get('/api/contacts', async (req, res) => {
     try {
         const contacts = await dbAll('contacts');
-        res.json(contacts);
+        const formatted = contacts.map(c => ({
+            ...c,
+            name: c.name && c.name !== 'Unknown' && !c.name.startsWith('Cliente ') && !c.name.startsWith('user_')
+                ? c.name
+                : (c.username && !c.username.startsWith('user_') ? `@${c.username}` : (c.name || `Cliente ${c.id.substring(0, 8)}`))
+        }));
+        res.json(formatted);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -886,11 +922,16 @@ app.post('/api/contacts/sync-all-meta', async (req, res) => {
             if (contact.id && !contact.id.startsWith('sim_') && !contact.id.startsWith('test_')) {
                 const profile = await fetchMetaUserProfile(contact.id);
                 if (profile && (profile.name || profile.username || profile.profile_pic)) {
+                    const resolvedName = (profile.name && profile.name !== 'Unknown') ? profile.name : (profile.username ? `@${profile.username}` : contact.name);
                     const updates = sanitizeContactData({
-                        name: profile.name && profile.name !== 'Unknown' ? profile.name : contact.name,
+                        name: resolvedName,
                         username: profile.username || contact.username,
                         avatar_url: profile.profile_pic || contact.avatar_url
                     });
+                    await dbUpdate('contacts', updates, { id: contact.id });
+                    updatedCount++;
+                } else if (contact.username && !contact.username.startsWith('user_') && contact.name.startsWith('Cliente ')) {
+                    const updates = sanitizeContactData({ name: `@${contact.username}` });
                     await dbUpdate('contacts', updates, { id: contact.id });
                     updatedCount++;
                 } else {
@@ -952,12 +993,13 @@ app.post('/api/chats/sync-history', async (req, res) => {
                 let contact = await dbGet('contacts', { id: contactId });
                 if (!contact) {
                     // Obtener perfil detallado si es posible
-                    let profileName = participant.username || 'Usuario IG';
+                    let profileName = participant.username ? `@${participant.username}` : `Cliente ${contactId.substring(0, 6)}`;
                     let profileAvatar = '';
                     try {
                         const profUrl = `https://graph.facebook.com/v19.0/${contactId}?fields=name,username,profile_pic&access_token=${token}`;
                         const profRes = await axios.get(profUrl);
-                        if (profRes.data.name) profileName = profRes.data.name;
+                        if (profRes.data.name && profRes.data.name !== 'Unknown') profileName = profRes.data.name;
+                        else if (profRes.data.username) profileName = `@${profRes.data.username}`;
                         if (profRes.data.profile_pic) profileAvatar = profRes.data.profile_pic;
                     } catch (e) {
                         // Ignore
@@ -1028,9 +1070,9 @@ app.get('/api/chats', async (req, res) => {
             const contactMsgs = messages.filter(m => m.conversation_id === convId || m.sender_id === c.id || m.recipient_id === c.id);
             const lastMsg = contactMsgs[contactMsgs.length - 1];
 
-            const displayName = c.name && c.name !== 'Unknown'
+            const displayName = c.name && c.name !== 'Unknown' && !c.name.startsWith('Cliente ') && !c.name.startsWith('user_')
                 ? c.name
-                : (c.username && !c.username.startsWith('user_') ? `@${c.username}` : `Cliente ${c.id.substring(0, 8)}`);
+                : (c.username && !c.username.startsWith('user_') ? `@${c.username}` : (c.name || `Cliente ${c.id.substring(0, 8)}`));
 
             return {
                 conversation_id: convId,

@@ -495,8 +495,11 @@ async function sendMessage() {
 // ============================================================
 function renderContactPanel(contact) {
     el.cAvatar.src       = contact.avatar_url || avatarUrl(contact.username);
-    el.cName.textContent  = contact.name || 'Cliente';
-    if (el.cEditName) el.cEditName.value = contact.name || '';
+    const displayName = (contact.name && contact.name !== 'Unknown' && !contact.name.startsWith('Cliente ') && !contact.name.startsWith('user_'))
+        ? contact.name
+        : (contact.username && !contact.username.startsWith('user_') ? `@${contact.username}` : (contact.name || 'Cliente'));
+    el.cName.textContent  = displayName;
+    if (el.cEditName) el.cEditName.value = contact.name && !contact.name.startsWith('Cliente ') ? contact.name : displayName;
     el.cUsername.textContent = `@${contact.username || contact.contact_id}`;
     el.cStage.value       = contact.stage || 'Lead';
     el.cTags.value        = contact.tags || '';
