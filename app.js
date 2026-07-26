@@ -21,7 +21,7 @@ const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KE
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    console.error('❌ Error: SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY requeridos en .env.local');
+    console.error('❌ Error: SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY requeridos en .env o .env.local');
     process.exit(1);
 }
 
@@ -147,6 +147,7 @@ async function dbInsert(table, data) {
     try {
         const client = supabaseAdmin || supabase;
         const dbData = filterDbColumns(table, data);
+        if (Object.keys(dbData).length === 0) return data;
         const { data: result, error } = await client.from(table).insert([dbData]).select();
         if (error) throw error;
         return result ? result[0] : data;
@@ -165,6 +166,7 @@ async function dbUpdate(table, data, filter = {}) {
     try {
         const client = supabaseAdmin || supabase;
         const dbData = filterDbColumns(table, data);
+        if (Object.keys(dbData).length === 0) return true;
         let query = client.from(table).update(dbData);
         for (const [key, value] of Object.entries(filter)) {
             query = query.eq(key, value);
@@ -178,6 +180,12 @@ async function dbUpdate(table, data, filter = {}) {
 }
 
 async function dbDelete(table, filter = {}) {
+    const items = memoryStore[table] || [];
+    if (items.length > 0) {
+        memoryStore[table] = items.filter(item => {
+            return !Object.entries(filter).every(([k, v]) => item[k] == v);
+        });
+    }
     try {
         const client = supabaseAdmin || supabase;
         let query = client.from(table).delete();
