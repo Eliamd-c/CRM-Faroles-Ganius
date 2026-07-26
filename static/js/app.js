@@ -450,8 +450,44 @@ function renderMessages(msgs) {
         wrap.className = `msg-wrap ${dir === 'incoming' ? 'incoming' : 'outgoing'}`;
 
         const bubbleCls = dir === 'incoming' ? 'bubble incoming' : (isAuto ? 'bubble auto-resp' : 'bubble outgoing');
+        
+        let contentHtml = '';
+        let rawText = msg.text || '';
+        const hasMedia = !!msg.media_url;
+        const isStoryReply = rawText.includes('[STORY_REPLY]') || rawText.includes('Respondió a tu historia');
+        const isStoryMention = rawText.includes('[STORY_MENTION]') || rawText.includes('mencionó en su historia');
+        let cleanText = rawText.replace(/\[STORY_REPLY\]|\[STORY_MENTION\]|\[ATTACHMENT\]/g, '').trim();
+
+        if (isStoryReply || isStoryMention) {
+            const title = isStoryReply ? '📸 Respondió a tu Historia' : '🌟 Te mencionó en su Historia';
+            contentHtml += `
+                <div class="story-card" style="background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); padding: 2px; border-radius: 12px; margin-bottom: 6px;">
+                    <div style="background: var(--bg-surface); padding: 8px 10px; border-radius: 10px;">
+                        <div style="font-size: 0.72rem; font-weight: 700; color: #fd1d1d; display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+                            <span>${title}</span>
+                        </div>
+                        ${hasMedia ? `<a href="${msg.media_url}" target="_blank" title="Haz clic para ver historia original"><img src="${msg.media_url}" style="max-height: 160px; width: 100%; object-fit: cover; border-radius: 6px; margin-bottom: 4px; border: 1px solid var(--border-color); display: block;" onerror="this.style.display='none'"></a>` : '<div style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">Historia expirada o archivo privado</div>'}
+                    </div>
+                </div>`;
+            if (cleanText && cleanText !== 'Respondió a tu historia' && cleanText !== 'Te mencionó en su historia') {
+                contentHtml += `<div class="msg-text" style="margin-top: 4px; font-weight: 500;">${escHtml(cleanText)}</div>`;
+            }
+        } else if (hasMedia) {
+            contentHtml += `
+                <div class="media-attachment" style="margin-bottom: 6px;">
+                    <a href="${msg.media_url}" target="_blank" title="Haz clic para ver archivo">
+                        <img src="${msg.media_url}" style="max-height: 200px; max-width: 100%; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); display: block;" onerror="this.outerHTML='<a href=${msg.media_url} target=_blank style=\\'font-size:0.8rem;color:var(--primary);text-decoration:underline;\\'>📎 Ver archivo multimedia adjunto</a>'">
+                    </a>
+                </div>`;
+            if (cleanText && cleanText !== '📎 Archivo multimedia' && cleanText !== '📎 Archivo adjunto') {
+                contentHtml += `<div class="msg-text">${escHtml(cleanText)}</div>`;
+            }
+        } else {
+            contentHtml = escHtml(rawText || '📎 Archivo adjunto');
+        }
+
         wrap.innerHTML = `
-            <div class="${bubbleCls}">${escHtml(msg.text)}</div>
+            <div class="${bubbleCls}">${contentHtml}</div>
             <span class="msg-meta">
                 ${ts}
                 ${isAuto ? '<span class="bot-label">🤖 Auto</span>' : ''}

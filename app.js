@@ -611,10 +611,29 @@ async function processMessagingEvent(event) {
     const myIgId = await getSetting('instagram_account_id');
     if (senderId === myIgId) return;
 
-    const text = event.message?.text || '';
+    let text = event.message?.text || '';
     const payload = event.postback?.payload || event.message?.quick_reply?.payload || '';
     const referral = event.referral?.ref;
-    const mediaUrl = event.message?.attachments?.[0]?.payload?.url || null;
+    
+    // Detectar adjuntos, respuestas a historias y menciones
+    const attachmentType = event.message?.attachments?.[0]?.type || null;
+    let mediaUrl = event.message?.attachments?.[0]?.payload?.url || null;
+    const storyReplyUrl = event.message?.reply_to?.story?.url || null;
+
+    if (storyReplyUrl) {
+        mediaUrl = storyReplyUrl;
+        if (!text.startsWith('[STORY_REPLY]')) {
+            text = `[STORY_REPLY] ${text || 'Respondió a tu historia'}`;
+        }
+    } else if (attachmentType === 'story_mention' || attachmentType === 'share') {
+        if (!text) {
+            text = `[STORY_MENTION] Te mencionó en su historia`;
+        } else if (!text.startsWith('[STORY_MENTION]')) {
+            text = `[STORY_MENTION] ${text}`;
+        }
+    } else if (mediaUrl && !text) {
+        text = `[ATTACHMENT] 📎 Archivo multimedia`;
+    }
 
     let contact = await getOrCreateContact(senderId);
     const nowIso = new Date().toISOString();
@@ -1038,10 +1057,26 @@ app.post('/api/chats/sync-history', async (req, res) => {
                 // Insert messages backwards so older messages are inserted first if order matters
                 for (let i = messagesData.length - 1; i >= 0; i--) {
                     const m = messagesData[i];
-                    if (!m.message) continue;
+                    let text = m.message || '';
+                    const storyReplyUrl = m.reply_to?.story?.url || null;
+                    const attachType = m.attachments?.data?.[0]?.type || null;
+                    let mediaUrl = m.attachments?.data?.[0]?.image_data?.url || m.attachments?.data?.[0]?.video_data?.url || null;
+
+                    if (storyReplyUrl) {
+                        mediaUrl = storyReplyUrl;
+                        if (!text.startsWith('[STORY_REPLY]')) text = `[STORY_REPLY] ${text || 'Respondió a tu historia'}`;
+                    } else if (attachType === 'story_mention' || attachType === 'share') {
+                        if (!text) text = `[STORY_MENTION] Te mencionó en su historia`;
+                        else if (!text.startsWith('[STORY_MENTION]')) text = `[STORY_MENTION] ${text}`;
+                    } else if (mediaUrl && !text) {
+                        text = `[ATTACHMENT] 📎 Archivo multimedia`;
+                    } else if (!text && !mediaUrl) {
+                        continue;
+                    }
+
                     const exists = await dbGet('messages', {
                         conversation_id: `conv_${contactId}`,
-                        text: m.message
+                        timestamp: new Date(m.created_time).toISOString()
                     });
                     
                     if (!exists) {
@@ -1049,7 +1084,8 @@ app.post('/api/chats/sync-history', async (req, res) => {
                             conversation_id: `conv_${contactId}`,
                             sender_id: m.from?.id || 'unknown',
                             recipient_id: 'unknown',
-                            text: m.message,
+                            text: text,
+                            media_url: mediaUrl,
                             direction: m.from?.id === igId ? 'outgoing' : 'incoming',
                             sender_type: m.from?.id === igId ? 'agent' : 'customer',
                             timestamp: new Date(m.created_time).toISOString()
