@@ -5,8 +5,23 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 
+const path = require('path');
+
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Almacén de clientes SSE para el dashboard
+let sseClients = [];
+
+function broadcastLog(type, message) {
+  const logEntry = { type, message, timestamp: Date.now() };
+  console.log(`[${type}] ${message}`);
+  
+  sseClients.forEach(client => {
+    client.res.write(`data: ${JSON.stringify(logEntry)}\n\n`);
+  });
+}
 
 const {
   PAGE_ACCESS_TOKEN,
@@ -18,10 +33,24 @@ const {
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
 // ─────────────────────────────────────────────
-// GET /  — Health check (Ruta principal)
+// GET /stream  — Server-Sent Events para el Dashboard UI
 // ─────────────────────────────────────────────
-app.get('/', (req, res) => {
-  res.send('🤖 CRM 2.0 Webhook Server está en línea y funcionando correctamente.');
+app.get('/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const clientId = Date.now();
+  const newClient = { id: clientId, res };
+  sseClients.push(newClient);
+
+  // Send a system message on connect
+  res.write(`data: ${JSON.stringify({ type: 'SYSTEM', message: 'Conectado al monitor de eventos', timestamp: Date.now() })}\n\n`);
+
+  req.on('close', () => {
+    sseClients = sseClients.filter(client => client.id !== clientId);
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -81,7 +110,7 @@ async function handleMessage(event) {
 
   if (!senderId || !text) return;
 
-  console.log(`💬 DM recibido de ${senderId}: "${text}"`);
+  broadcastLog('DM', `Recibido de ${senderId}: "${text}"`);
 
   // Respuesta automática simple (primer test)
   await sendMessage(senderId, `Hola! Recibimos tu mensaje: "${text}". Pronto te respondemos.`);
@@ -96,7 +125,7 @@ async function handleComment(value) {
   const text      = value.text;
   const from      = value.from?.username;
 
-  console.log(`💬 Comentario de @${from}: "${text}" (id: ${commentId})`);
+  broadcastLog('COMMENT', `@${from} comentó: "${text}"`);
 
   // Respuesta automática al comentario
   await replyComment(commentId, `Gracias @${from} por tu comentario! 🙌`);
@@ -109,7 +138,7 @@ async function handleComment(value) {
 async function handleMention(value) {
   const mediaId = value.media_id;
   const from    = value.from?.username;
-  console.log(`📸 Mención en historia de @${from} (media_id: ${mediaId})`);
+  broadcastLog('MENTION', `@${from} te mencionó en una historia.`);
 }
 
 // ─────────────────────────────────────────────
