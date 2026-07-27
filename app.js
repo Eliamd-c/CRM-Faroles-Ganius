@@ -170,7 +170,7 @@ async function handleMention(value) {
 async function sendMessage(recipientId, text) {
   try {
     await axios.post(
-      `${GRAPH_API}/${INSTAGRAM_ACCOUNT_ID}/messages`,
+      `${GRAPH_API}/me/messages`,
       {
         recipient: { id: recipientId },
         message:   { text },
