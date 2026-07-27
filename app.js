@@ -158,8 +158,11 @@ async function sendMessage(recipientId, text) {
       }
     );
     console.log(`✅ DM enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Respuesta enviada a ${recipientId}`);
   } catch (err) {
-    console.error('❌ Error enviando DM:', err.response?.data || err.message);
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando DM:', errorMsg);
+    broadcastLog('ERROR', `Error al responder: ${errorMsg}`);
   }
 }
 
@@ -175,8 +178,11 @@ async function replyComment(commentId, text) {
       { params: { access_token: PAGE_ACCESS_TOKEN } }
     );
     console.log(`✅ Respuesta enviada al comentario ${commentId}`);
+    broadcastLog('SYSTEM', `Respuesta enviada al comentario ${commentId}`);
   } catch (err) {
-    console.error('❌ Error respondiendo comentario:', err.response?.data || err.message);
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error respondiendo comentario:', errorMsg);
+    broadcastLog('ERROR', `Error al responder comentario: ${errorMsg}`);
   }
 }
 
