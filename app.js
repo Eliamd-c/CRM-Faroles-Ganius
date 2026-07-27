@@ -18,6 +18,13 @@ const {
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
 // ─────────────────────────────────────────────
+// GET /  — Health check (Ruta principal)
+// ─────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.send('🤖 CRM 2.0 Webhook Server está en línea y funcionando correctamente.');
+});
+
+// ─────────────────────────────────────────────
 // GET /webhook  — Verificación del webhook por Meta
 // DOC: https://developers.facebook.com/docs/graph-api/webhooks/getting-started
 // ─────────────────────────────────────────────
