@@ -136,6 +136,7 @@ async function runTests() {
 
   // ── 5. Servidor HTTP Real en Puerto de Prueba ─────────────────────────────
   console.log('\n5️⃣  Probando Servidor Express HTTP en puerto temporal...');
+  process.env.DONT_LISTEN = 'true';
   const app = require('../server');
   await new Promise(resolve => {
     const server = http.createServer(app);
