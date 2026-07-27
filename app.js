@@ -127,7 +127,8 @@ async function handleMessage(event) {
   const senderId = event.sender?.id;
   const text     = event.message?.text;
 
-  if (!senderId || !text) return;
+  // Ignorar mensajes vacíos o mensajes enviados por la propia cuenta (el bot)
+  if (!senderId || !text || senderId === INSTAGRAM_ACCOUNT_ID) return;
 
   const profile = await getUserProfile(senderId);
   const senderName = profile?.name || senderId;
