@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CRM de mensajería directa para Faroles Geniuss — Gestiona todos tus clientes de Instagram desde un solo panel">
+  <title>Faroles Geniuss · CRM Mensajería</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Sidebar: Lista de chats ─────────────────────────────── -->
+  <aside id="sidebar" role="complementary" aria-label="Lista de conversaciones">
+
+    <header id="sidebar-header">
+      <h1>
+        <span class="logo-icon" aria-hidden="true">🕯️</span>
+        Geniuss CRM
+      </h1>
+      <button id="sync-btn" title="Sincronizar historial de Instagram" aria-label="Sincronizar conversaciones">
+        ↻ Sincronizar
+      </button>
+    </header>
+
+    <div id="search-box" role="search">
+      <input
+        id="search-input"
+        type="search"
+        placeholder="Buscar conversación..."
+        aria-label="Buscar conversación"
+        autocomplete="off"
+      >
+    </div>
+
+    <div id="chat-list" role="list" aria-label="Conversaciones"></div>
+
+  </aside>
+
+  <!-- ── Panel de Chat ───────────────────────────────────────── -->
+  <main id="chat-panel" role="main">
+
+    <!-- Header del chat activo -->
+    <header id="chat-header">
+      <div id="chat-header-avatar" class="chat-avatar" aria-hidden="true">
+        <span class="avatar-fallback" style="width:38px;height:38px">🕯️</span>
+      </div>
+      <div id="chat-header-info">
+        <div id="chat-header-name" style="font-size:0.925rem;font-weight:700;color:var(--text-main)">
+          Selecciona una conversación
+        </div>
+        <div id="chat-header-sub" style="font-size:0.75rem;color:var(--text-muted)">
+          ←  Elige un chat de la lista
+        </div>
+      </div>
+      <div id="chat-header-actions">
+        <span id="window-badge" class="window-badge" aria-live="polite"></span>
+      </div>
+    </header>
+
+    <!-- Área de mensajes -->
+    <section id="messages-container" aria-label="Mensajes de la conversación">
+      <div class="empty-state">
+        <div class="empty-icon">🕯️</div>
+        <p>Bienvenido al CRM de Faroles Geniuss</p>
+        <p style="font-size:0.78rem;margin-top:4px">Selecciona una conversación para comenzar</p>
+      </div>
+    </section>
+
+    <!-- Input de mensaje -->
+    <footer id="input-area">
+      <textarea
+        id="msg-input"
+        placeholder="Selecciona un chat para escribir..."
+        aria-label="Escribir mensaje"
+        rows="1"
+        disabled
+      ></textarea>
+      <button id="send-btn" aria-label="Enviar mensaje" disabled title="Enviar (Enter)">
+        ➤
+      </button>
+    </footer>
+
+  </main>
+
+</div>
+
+<!-- Toast de notificaciones -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- Módulos JS (orden importa: api → chatList → chatWindow → main) -->
+<script src="/js/api.js"></script>
+<script src="/js/chatList.js"></script>
+<script src="/js/chatWindow.js"></script>
+<script src="/js/main.js"></script>
+
+</body>
+</html>
