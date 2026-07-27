@@ -14,8 +14,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Almacén de clientes SSE para el dashboard
 let sseClients = [];
 
-function broadcastLog(type, message) {
-  const logEntry = { type, message, timestamp: Date.now() };
+function broadcastLog(type, message, profile = null) {
+  const logEntry = { type, message, profile, timestamp: Date.now() };
   console.log(`[${type}] ${message}`);
   
   sseClients.forEach(client => {
@@ -101,6 +101,25 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Obtener Perfil de Usuario
+// DOC: https://developers.facebook.com/docs/messenger-platform/instagram/features/user-profile
+// ─────────────────────────────────────────────
+async function getUserProfile(senderId) {
+  try {
+    const response = await axios.get(`${GRAPH_API}/${senderId}`, {
+      params: {
+        fields: 'name,profile_pic',
+        access_token: PAGE_ACCESS_TOKEN
+      }
+    });
+    return response.data;
+  } catch (err) {
+    console.error(`❌ Error obteniendo perfil de ${senderId}:`, err.response?.data?.error?.message || err.message);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────
 // Handler: Mensaje Directo (DM)
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/messages
 // ─────────────────────────────────────────────
@@ -110,10 +129,13 @@ async function handleMessage(event) {
 
   if (!senderId || !text) return;
 
-  broadcastLog('DM', `Recibido de ${senderId}: "${text}"`);
+  const profile = await getUserProfile(senderId);
+  const senderName = profile?.name || senderId;
+
+  broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
 
   // Respuesta automática simple (primer test)
-  await sendMessage(senderId, `Hola! Recibimos tu mensaje: "${text}". Pronto te respondemos.`);
+  await sendMessage(senderId, `Hola ${senderName}! Recibimos tu mensaje: "${text}". Pronto te respondemos.`);
 }
 
 // ─────────────────────────────────────────────

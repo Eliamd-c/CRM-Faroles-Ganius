@@ -148,6 +148,21 @@
             font-size: 1rem;
             line-height: 1.5;
             word-break: break-word;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+        }
+
+        .log-text {
+            flex: 1;
         }
 
         .empty-state {
@@ -192,13 +207,21 @@
             if (log.type === 'MENTION') typeClass = 'type-mention';
             if (log.type === 'ERROR') typeClass = 'type-error';
 
+            let avatarHtml = '';
+            if (log.profile && log.profile.profile_pic) {
+                avatarHtml = `<img src="${log.profile.profile_pic}" alt="Avatar" class="user-avatar" />`;
+            }
+
             el.innerHTML = `
                 <div class="log-header">
                     <span class="log-type ${typeClass}">${log.type}</span>
                     <span>${time}</span>
                 </div>
                 <div class="log-content">
-                    ${log.message}
+                    ${avatarHtml}
+                    <div class="log-text">
+                        ${log.message}
+                    </div>
                 </div>
             `;
             return el;
