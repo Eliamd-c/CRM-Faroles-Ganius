@@ -96,7 +96,7 @@ async function resolveContact(igsid) {
       avatar_url: profile.avatar_url || '',
       stage: 'Lead',
       created_at: new Date().toISOString(),
-      is_active: true,
+      is_active: 1,
     });
     contact = await db.getContact(igsid);
   } else if (!contact.name || contact.name.startsWith('Usuario ') || contact.name === 'Unknown') {

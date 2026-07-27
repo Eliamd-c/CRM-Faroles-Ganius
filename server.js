@@ -30,8 +30,10 @@ app.get('/', (req, res) => {
 });
 
 // ── Iniciar servidor ──────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 CRM Faroles Geniuss v2 corriendo en puerto ${PORT}`);
-});
+if (require.main === module || require.main?.filename?.endsWith('app.js')) {
+  app.listen(PORT, () => {
+    console.log(`🚀 CRM Faroles Geniuss v2 corriendo en puerto ${PORT}`);
+  });
+}
 
 module.exports = app;
