@@ -164,7 +164,14 @@ function startPolling() {
   state.pollInterval = setInterval(async () => {
     await loadChats(true);
     if (state.activeConvId) {
-      await loadMessages(state.activeConvId);
+      const exists = state.chats.some(c => c.conv_id === state.activeConvId);
+      if (exists) {
+        await loadMessages(state.activeConvId);
+      } else {
+        state.activeConvId = null;
+        state.activeContactId = null;
+        state.activeChat = null;
+      }
     }
   }, 8000); // cada 8 segundos
 }
