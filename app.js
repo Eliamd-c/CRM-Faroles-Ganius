@@ -240,6 +240,24 @@ async function handleMessage(event) {
   // 2. Manejo de Mensajes Directos regulares (DM)
   broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
 
+  // 3. Verificar si el bot está pausado para este cliente en Supabase
+  if (supabase) {
+    try {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('bot_paused')
+        .eq('instagram_id', senderId)
+        .single();
+        
+      if (customer && customer.bot_paused) {
+        console.log(`[IGNORE] Bot pausado para el usuario ${senderId}`);
+        return;
+      }
+    } catch (e) {
+      console.error('[DB] Error verificando estado del bot:', e.message);
+    }
+  }
+
   // Normalizar el texto (quitar mayúsculas y acentos)
   const lowerText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   let matchedFlow = null;
@@ -276,9 +294,133 @@ async function handleMessage(event) {
         const replyText = step.message?.replace('{username}', senderName);
         await sendCard(senderId, step.card, replyText);
       } else if (step.type === 'action') {
-        await addTagToUser(senderId, senderName, step.tag);
+        await executeAction(senderId, senderName, step);
       }
     }
+  }
+}
+
+// ─────────────────────────────────────────────
+// Ejecución de Acciones de Flujo (Fase C.3)
+// ─────────────────────────────────────────────
+async function executeAction(senderId, senderName, step) {
+  if (!supabase) {
+    console.warn('⚠️ Supabase no conectado. No se ejecutó la acción:', step.actionType);
+    return;
+  }
+  
+  const { actionType, params } = step;
+  console.log(`[ACTION] Ejecutando acción: ${actionType} para el usuario ${senderId}`);
+  
+  try {
+    // 1. Obtener o crear al cliente
+    let { data: customer, error: fetchErr } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('instagram_id', senderId)
+      .single();
+
+    if (fetchErr || !customer) {
+      const { data: newCust, error: insertErr } = await supabase
+        .from('customers')
+        .insert([{ instagram_id: senderId, name: senderName }])
+        .select()
+        .single();
+      if (insertErr) {
+        console.error('❌ Error creando cliente:', insertErr.message);
+        return;
+      }
+      customer = newCust;
+    }
+
+    // 2. Procesar cada acción
+    let updates = {};
+
+    switch (actionType) {
+      case 'add_tag': {
+        const tag = params.tag?.trim();
+        if (tag) {
+          const tags = new Set(customer.tags || []);
+          tags.add(tag);
+          updates.tags = Array.from(tags);
+        }
+        break;
+      }
+      case 'remove_tag': {
+        const tag = params.tag?.trim();
+        if (tag) {
+          const tags = new Set(customer.tags || []);
+          tags.delete(tag);
+          updates.tags = Array.from(tags);
+        }
+        break;
+      }
+      case 'set_field': {
+        const field = params.field?.trim();
+        const value = params.value?.trim();
+        if (field) {
+          updates.fields = { ...customer.fields, [field]: value };
+        }
+        break;
+      }
+      case 'clear_field': {
+        const field = params.field?.trim();
+        if (field) {
+          updates.fields = { ...customer.fields };
+          delete updates.fields[field];
+        }
+        break;
+      }
+      case 'delete_contact': {
+        await supabase.from('customers').delete().eq('instagram_id', senderId);
+        broadcastLog('SYSTEM', `Contacto eliminado permanentemente: ${senderName}`);
+        return;
+      }
+      case 'pause_bot': {
+        updates.bot_paused = true;
+        break;
+      }
+      case 'resume_bot': {
+        updates.bot_paused = false;
+        break;
+      }
+      case 'mark_open': {
+        updates.status = 'open';
+        break;
+      }
+      case 'mark_closed': {
+        updates.status = 'closed';
+        break;
+      }
+      default:
+        // Por retrocompatibilidad con la version vieja (Acción de etiqueta legacy)
+        if (step.tag) {
+          console.log(`[ACTION] Legacy tag: ${step.tag}`);
+          const tags = new Set(customer.tags || []);
+          tags.add(step.tag);
+          updates.tags = Array.from(tags);
+        } else {
+          console.log(`[ACTION] Tipo de acción desconocida: ${actionType}`);
+        }
+        break;
+    }
+
+    // 3. Aplicar actualización si hay cambios
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date().toISOString();
+      const { error: updateErr } = await supabase
+        .from('customers')
+        .update(updates)
+        .eq('instagram_id', senderId);
+
+      if (updateErr) {
+        console.error(`❌ Error actualizando cliente en acción ${actionType}:`, updateErr.message);
+      } else {
+        broadcastLog('SYSTEM', `Acción ${actionType || 'legacy'} ejecutada para ${senderName}`);
+      }
+    }
+  } catch (error) {
+    console.error('[ACTION] Excepción general:', error.message);
   }
 }
 
