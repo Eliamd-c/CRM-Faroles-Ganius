@@ -159,16 +159,28 @@ async function getUserProfile(senderId) {
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/messages
 // ─────────────────────────────────────────────
 async function handleMessage(event) {
-  const senderId = event.sender?.id;
-  const text     = event.message?.text;
+  const senderId     = event.sender?.id;
+  const text         = event.message?.text;
+  const storyMention = event.message?.story?.mention;
 
-  // Ignorar mensajes enviados por la propia cuenta (el bot)
-  if (!senderId || !text) return;
+  // Ignorar eventos que no tengan ID de origen o sean del propio bot
+  if (!senderId) return;
   if (senderId === INSTAGRAM_ACCOUNT_ID) return;
+
+  // Si no hay texto ni es una mención en historia, ignoramos
+  if (!text && !storyMention) return;
 
   const profile = await getUserProfile(senderId);
   const senderName = profile?.name || senderId;
 
+  // 1. Manejo de menciones en Historias
+  if (storyMention) {
+    broadcastLog('STORY', `@${senderName} te mencionó en su historia.`, profile);
+    await sendMessage(senderId, `¡Hola @${senderName}! 👋 ¡Gracias por mencionarnos en tu historia! Nos encanta ❤️`);
+    return;
+  }
+
+  // 2. Manejo de Mensajes Directos regulares (DM)
   broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
 
   // Respuesta automática simple (primer test)

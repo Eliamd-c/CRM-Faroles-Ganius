@@ -141,6 +141,7 @@
         .type-dm { background: rgba(138, 43, 226, 0.15); color: #b175ff; }
         .type-comment { background: rgba(32, 201, 151, 0.15); color: var(--success); }
         .type-mention { background: rgba(255, 193, 7, 0.15); color: var(--warning); }
+        .type-story { background: rgba(233, 30, 99, 0.15); color: #ff6699; }
         .type-error { background: rgba(250, 82, 82, 0.15); color: var(--danger); }
         .type-system { background: rgba(255, 255, 255, 0.1); color: var(--text-muted); }
 
@@ -205,6 +206,7 @@
             if (log.type === 'DM') typeClass = 'type-dm';
             if (log.type === 'COMMENT') typeClass = 'type-comment';
             if (log.type === 'MENTION') typeClass = 'type-mention';
+            if (log.type === 'STORY') typeClass = 'type-story';
             if (log.type === 'ERROR') typeClass = 'type-error';
 
             let avatarHtml = '';
