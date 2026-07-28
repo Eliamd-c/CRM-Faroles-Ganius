@@ -95,18 +95,8 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       
       if (keywordsList.length > 0) {
         flowsConfig.flows.push(newFlow);
-      } else {
-        // Si hay un trigger sin palabras clave, lo tratamos como "Default" (cualquier mensaje)
-        flowsConfig.defaultFlow = { steps: newFlow.steps };
       }
     }
-  }
-
-  // Asegurar un fallback si el usuario no hizo un default
-  if (!flowsConfig.defaultFlow) {
-    flowsConfig.defaultFlow = { 
-      steps: [{ type: 'text', message: 'Mensaje por defecto. Por favor configura un nodo vacío para cambiar esto.' }] 
-    };
   }
 
   // Enviar a la API Backend

@@ -199,7 +199,7 @@ async function handleMessage(event) {
 
   // Ignorar eventos que no tengan ID de origen o sean del propio bot
   if (!senderId) return;
-  if (senderId === INSTAGRAM_ACCOUNT_ID) return;
+  if (String(senderId).trim() === String(INSTAGRAM_ACCOUNT_ID).trim()) return;
 
   // Si no hay texto ni es una mención en historia, ignoramos
   if (!text && !storyMention) return;
@@ -235,8 +235,8 @@ async function handleMessage(event) {
     }
   }
 
-  // Si no hay coincidencia, usar el flujo por defecto (Fallback)
-  const flowToExecute = matchedFlow || flowsConfig.defaultFlow;
+  // Si no hay coincidencia, nos quedamos en silencio absoluto (apagado el flujo por defecto)
+  const flowToExecute = matchedFlow;
   
   if (flowToExecute && flowToExecute.steps) {
     for (const step of flowToExecute.steps) {
