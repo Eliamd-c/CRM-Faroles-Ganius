@@ -275,6 +275,8 @@ async function handleMessage(event) {
       } else if (step.type === 'card') {
         const replyText = step.message?.replace('{username}', senderName);
         await sendCard(senderId, step.card, replyText);
+      } else if (step.type === 'action') {
+        await addTagToUser(senderId, senderName, step.tag);
       }
     }
   }

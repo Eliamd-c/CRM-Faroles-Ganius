@@ -79,12 +79,23 @@ const htmlCard = `
   </div>
 `;
 
+const htmlAction = `
+  <div class="node-action">
+    <div class="title-box">⚡ Acción (Etiqueta)</div>
+    <div class="box">
+      <input type="text" df-tag placeholder="Nombre de la etiqueta" />
+      <p style="font-size:11px; color:#aaa; margin:5px 0 0 0;">Esta etiqueta se guardará en el CRM</p>
+    </div>
+  </div>
+`;
+
 // Registrar los tipos de nodos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('text', htmlText);
 editor.registerNode('buttons', htmlButtons);
 editor.registerNode('template', htmlTemplate);
 editor.registerNode('card', htmlCard);
+editor.registerNode('action', htmlAction);
 
 // Configuración de Drag & Drop desde la barra lateral
 const elements = document.querySelectorAll('.drag-item');
@@ -125,6 +136,8 @@ id.addEventListener('drop', e => {
       image_url: '', title: '', subtitle: '', 
       btn_title: '', btn_type: 'postback', btn_url: ''
     }, htmlCard);
+  } else if (type === 'action') {
+    editor.addNode('action', 1, 1, posX, posY, 'action', { tag: '' }, htmlAction);
   }
 });
 
@@ -217,6 +230,13 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
 
       steps.push({ type: 'card', message: '', card: cardData });
       currentId = null; // Se ramifica por el postback oculto
+    }
+    else if (node.name === 'action') {
+      const tag = node.data.tag?.trim();
+      if (tag) {
+        steps.push({ type: 'action', tag: tag });
+      }
+      currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else {
       break;
