@@ -244,6 +244,93 @@ header {
 .cfg-type-item:hover { border-color: var(--primary); }
 .cfg-type-item.active { border-color: var(--primary); background: rgba(99,102,241,0.1); color: var(--primary); }
 
+/* ── Nodo de Acción: preview dentro del canvas ── */
+.action-node-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  min-height: 38px;
+  font-size: 13px;
+}
+.anp-empty { color: var(--text-muted); font-size: 12px; font-style: italic; }
+.anp-icon  { font-size: 16px; flex-shrink: 0; }
+.anp-info  { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.anp-info strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anp-params { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.btn-configure-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.2s;
+}
+.btn-configure-action:hover { border-color: #22c55e; color: #22c55e; }
+
+/* ── Panel de submenú de acciones ── */
+.cfg-cat-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.cfg-cat-tab {
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: 0.15s;
+  border: 1px solid transparent;
+}
+.cfg-cat-tab:hover { background: rgba(255,255,255,0.04); color: var(--text-main); }
+.cfg-cat-tab.active { background: rgba(99,102,241,0.12); color: var(--primary); border-color: rgba(99,102,241,0.3); }
+
+.cfg-actions-list { display: flex; flex-direction: column; gap: 6px; }
+.cfg-action-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.cfg-action-item:hover { border-color: var(--primary); background: rgba(99,102,241,0.05); }
+.cfg-action-item.active { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+.cfg-action-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.cfg-action-info strong { display: block; font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.cfg-action-info p { margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+
+#cfg-action-save {
+  width: 100%;
+  padding: 10px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: 0.2s;
+}
+#cfg-action-save:hover { background: var(--primary-hover); }
+
 /* Connection line */
 .drawflow .connection .main-path {
     stroke: var(--primary);

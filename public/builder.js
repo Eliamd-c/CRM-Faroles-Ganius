@@ -4,14 +4,46 @@ editor.reroute = true;
 editor.start();
 
 // ─────────────────────────────────────────────
-// Estado global: datos de botones por nodo
-// (Drawflow solo guarda campos df-*, los botones
-//  dinámicos se guardan aquí y en el JSON exportado)
+// Estado global
 // ─────────────────────────────────────────────
-const nodeButtonsState = {}; // { nodeId: [ {title, type, url}, ... ] }
+const nodeButtonsState = {}; // { nodeId: [{title, type, url}] }
+const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 
 // ─────────────────────────────────────────────
-// Helpers: construir el HTML interno de los botones
+// Catálogo de Acciones (C.1 — UI Only)
+// ─────────────────────────────────────────────
+const ACTION_CATALOG = {
+  contact: {
+    label: '📋 Datos de contacto',
+    desc: 'Gestiona etiquetas, campos y estados del contacto',
+    actions: [
+      { id: 'add_tag',        icon: '➕', label: 'Añadir etiqueta',          desc: 'Etiqueta el contacto para segmentarlo',             params: [{ key: 'tag',   label: 'Nombre de la etiqueta', placeholder: 'ej: interesado_rustico' }] },
+      { id: 'remove_tag',     icon: '➖', label: 'Eliminar etiqueta',         desc: 'Quita una etiqueta del contacto',                  params: [{ key: 'tag',   label: 'Etiqueta a eliminar',   placeholder: 'ej: interesado_rustico' }] },
+      { id: 'set_field',      icon: '📝', label: 'Establecer campo',          desc: 'Guarda un dato personalizado del contacto',        params: [{ key: 'field', label: 'Nombre del campo',     placeholder: 'ej: ciudad' }, { key: 'value', label: 'Valor', placeholder: 'ej: Bogotá' }] },
+      { id: 'clear_field',    icon: '🗑️', label: 'Borrar campo',              desc: 'Elimina un campo guardado del contacto',           params: [{ key: 'field', label: 'Campo a borrar',       placeholder: 'ej: ciudad' }] },
+      { id: 'delete_contact', icon: '🚫', label: 'Eliminar contacto',         desc: 'Elimina el contacto del CRM permanentemente',      params: [] },
+    ]
+  },
+  automation: {
+    label: '⚙️ Automatización',
+    desc: 'Controla el flujo de automatización del contacto',
+    actions: [
+      { id: 'pause_bot',      icon: '⏸️', label: 'Pausar automatizaciones',   desc: 'El bot no responderá más a este contacto',         params: [] },
+      { id: 'resume_bot',     icon: '▶️', label: 'Reanudar automatizaciones', desc: 'Reactiva el bot para este contacto',               params: [] },
+    ]
+  },
+  inbox: {
+    label: '📥 Bandeja de entrada',
+    desc: 'Gestiona el estado de la conversación',
+    actions: [
+      { id: 'mark_open',      icon: '🟢', label: 'Marcar como Abierta',       desc: 'Marca la conversación como activa',                params: [] },
+      { id: 'mark_closed',    icon: '🔴', label: 'Marcar como Cerrada',       desc: 'Marca la conversación como resuelta',              params: [] },
+    ]
+  }
+};
+
+// ─────────────────────────────────────────────
+// Helpers: botones dinámicos en nodo Mensaje
 // ─────────────────────────────────────────────
 function renderButtonsInNode(nodeId) {
   const container = document.querySelector(`#node-${nodeId} .btn-list`);
@@ -27,34 +59,45 @@ function renderButtonsInNode(nodeId) {
     `;
     container.appendChild(row);
   });
-
-  // Mostrar/ocultar el botón de agregar
   const addBtn = container.parentElement.querySelector('.btn-add');
   if (addBtn) addBtn.style.display = btns.length >= 3 ? 'none' : 'flex';
-
-  // Reposicionar conectores de salida
   setTimeout(() => repositionOutputs(nodeId), 30);
 }
 
 // ─────────────────────────────────────────────
-// Template HTML del nuevo nodo unificado
+// Helpers: Nodo de Acción
 // ─────────────────────────────────────────────
-function buildMessageNodeHtml(nodeId) {
-  return `
-  <div class="node-message" data-nodeid="${nodeId}">
-    <div class="title-box">💬 Enviar Mensaje</div>
-    <div class="box">
-      <textarea df-message placeholder="Escribe el mensaje del bot..."></textarea>
-      <div class="btn-list"></div>
-      <button class="btn-add" data-nodeid="${nodeId}">+ Añadir botón</button>
+function renderActionNode(nodeId) {
+  const nodeEl = document.querySelector(`#node-${nodeId}`);
+  if (!nodeEl) return;
+  const preview = nodeEl.querySelector('.action-node-preview');
+  if (!preview) return;
+
+  const config = nodeActionsState[nodeId];
+  if (!config) {
+    preview.innerHTML = `<span class="anp-empty">Sin configurar — haz clic en ⚙️</span>`;
+    return;
+  }
+
+  let actionDef = null;
+  for (const cat of Object.values(ACTION_CATALOG)) {
+    actionDef = cat.actions.find(a => a.id === config.type);
+    if (actionDef) break;
+  }
+  if (!actionDef) return;
+
+  const paramText = Object.values(config.params).filter(Boolean).join(' · ');
+  preview.innerHTML = `
+    <span class="anp-icon">${actionDef.icon}</span>
+    <div class="anp-info">
+      <strong>${actionDef.label}</strong>
+      ${paramText ? `<span class="anp-params">${paramText}</span>` : ''}
     </div>
-  </div>
   `;
 }
 
 // ─────────────────────────────────────────────
-// Definición de Nodos: Trigger, Card, Action
-// (el nodo Message se construye dinámicamente)
+// Definición de Nodos HTML
 // ─────────────────────────────────────────────
 const htmlTrigger = `
   <div class="node-trigger">
@@ -85,12 +128,15 @@ const htmlCard = `
   </div>
 `;
 
+// Nodo de acción: muestra resumen visual, abre panel al hacer clic en ⚙️
 const htmlAction = `
   <div class="node-action">
-    <div class="title-box">⚡ Acción (Etiqueta)</div>
+    <div class="title-box">⚡ Realizar Acciones</div>
     <div class="box">
-      <input type="text" df-tag placeholder="Nombre de la etiqueta" />
-      <p style="font-size:11px; color:#aaa; margin:5px 0 0 0;">Esta etiqueta se guardará en el CRM</p>
+      <div class="action-node-preview">
+        <span class="anp-empty">Sin configurar — haz clic en ⚙️</span>
+      </div>
+      <button class="btn-configure-action">⚙️ Configurar acción</button>
     </div>
   </div>
 `;
@@ -101,15 +147,12 @@ editor.registerNode('card', htmlCard);
 editor.registerNode('action', htmlAction);
 
 // ─────────────────────────────────────────────
-// Función que agrega un nodo Message al canvas
+// Agregar nodo Mensaje (dinámico, 1 entrada, 4 salidas)
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
   const tempHtml = `<div class="node-message"><div class="title-box">💬 Enviar Mensaje</div><div class="box"><textarea df-message placeholder="Escribe el mensaje del bot..."></textarea><div class="btn-list"></div><button class="btn-add">+ Añadir botón</button></div></div>`;
-  // 1 entrada, 4 salidas: output_1 = siguiente paso, output_2/3/4 = botones 1/2/3
   const nodeId = editor.addNode('message', 1, 4, posX, posY, 'message', { message: '', _btns: '[]' }, tempHtml);
-
   nodeButtonsState[nodeId] = [];
-
   setTimeout(() => {
     const nodeEl = document.querySelector(`#node-${nodeId}`);
     if (nodeEl) {
@@ -120,24 +163,19 @@ function addMessageNode(posX, posY) {
     }
     repositionOutputs(nodeId);
   }, 80);
-
   return nodeId;
 }
 
 // ─────────────────────────────────────────────
-// Reposicionar conectores de salida dinámicamente
-// output_1 → "Siguiente paso" (abajo del nodo)
-// output_2/3/4 → alineados con cada fila de botón
+// Reposicionar conectores de salida
 // ─────────────────────────────────────────────
 function repositionOutputs(nodeId) {
   const nodeEl = document.querySelector(`#node-${nodeId}`);
   if (!nodeEl) return;
-
   const btns = nodeButtonsState[nodeId] || [];
   const btnRows = nodeEl.querySelectorAll('.btn-row');
   const nodeRect = nodeEl.getBoundingClientRect();
 
-  // output_1: "Siguiente paso" pegado al fondo del nodo
   const out1 = nodeEl.querySelector('.output_1');
   if (out1) {
     out1.style.position = 'absolute';
@@ -146,11 +184,9 @@ function repositionOutputs(nodeId) {
     out1.style.display = 'block';
   }
 
-  // output_2, output_3, output_4: uno por fila de botón
   for (let i = 0; i < 3; i++) {
     const out = nodeEl.querySelector(`.output_${i + 2}`);
     if (!out) continue;
-
     if (i < btns.length && btnRows[i]) {
       const btnRect = btnRows[i].getBoundingClientRect();
       const relTop = (btnRect.top - nodeRect.top) + btnRect.height / 2;
@@ -189,19 +225,24 @@ id.addEventListener('drop', e => {
   } else if (type === 'message') {
     addMessageNode(posX, posY);
   } else if (type === 'card') {
-    editor.addNode('card', 1, 1, posX, posY, 'card', {
-      image_url: '', title: '', subtitle: '',
-      btn_title: '', btn_type: 'postback', btn_url: ''
-    }, htmlCard);
+    editor.addNode('card', 1, 1, posX, posY, 'card', { image_url: '', title: '', subtitle: '', btn_title: '', btn_type: 'postback', btn_url: '' }, htmlCard);
   } else if (type === 'action') {
-    editor.addNode('action', 1, 1, posX, posY, 'action', { tag: '' }, htmlAction);
+    const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
+    nodeActionsState[nodeId] = null;
+    setTimeout(() => {
+      const nodeEl = document.querySelector(`#node-${nodeId}`);
+      if (nodeEl) {
+        const cfgBtn = nodeEl.querySelector('.btn-configure-action');
+        if (cfgBtn) cfgBtn.setAttribute('data-nodeid', nodeId);
+      }
+    }, 60);
   }
 });
 
 // ─────────────────────────────────────────────
-// Panel lateral: Editar botón
+// Panel lateral: Editar Botón de Mensaje
 // ─────────────────────────────────────────────
-let activeBtnMeta = null; // { nodeId, idx }
+let activeBtnMeta = null;
 
 function openBtnPanel(nodeId, idx) {
   activeBtnMeta = { nodeId, idx };
@@ -215,7 +256,7 @@ function openBtnPanel(nodeId, idx) {
     <label class="cfg-label" style="margin-top:14px;">Cuando se presione este botón</label>
     <div class="cfg-type-list">
       <div class="cfg-type-item ${btn.type === 'postback' ? 'active' : ''}" data-type="postback">
-        <span>🔀</span> Seleccionar paso existente
+        <span>🔗</span> Seleccionar paso existente
       </div>
       <div class="cfg-type-item ${btn.type === 'web_url' ? 'active' : ''}" data-type="web_url">
         <span>🌐</span> Abrir sitio web
@@ -231,7 +272,6 @@ function openBtnPanel(nodeId, idx) {
     <button id="cfg-btn-delete" style="background:#ef444420; color:#ef4444; border:1px solid #ef444450; padding:8px 14px; border-radius:6px; cursor:pointer; width:100%; font-size:13px;">🗑️ Eliminar botón</button>
   `;
 
-  // Eventos del panel
   document.querySelectorAll('.cfg-type-item').forEach(item => {
     item.addEventListener('click', () => {
       document.querySelectorAll('.cfg-type-item').forEach(i => i.classList.remove('active'));
@@ -264,6 +304,104 @@ function saveBtnFromPanel() {
   renderButtonsInNode(nodeId);
 }
 
+// ─────────────────────────────────────────────
+// Panel lateral: Configurar Nodo de Acción
+// ─────────────────────────────────────────────
+function openActionPanel(nodeId) {
+  activeBtnMeta = null;
+  const currentConfig = nodeActionsState[nodeId] || null;
+
+  // Pre-seleccionar categoría y acción si ya había configuración
+  let selectedCat = 'contact';
+  let selectedAction = null;
+  if (currentConfig) {
+    for (const [catKey, cat] of Object.entries(ACTION_CATALOG)) {
+      const found = cat.actions.find(a => a.id === currentConfig.type);
+      if (found) { selectedCat = catKey; selectedAction = found; break; }
+    }
+  }
+
+  function renderActionPanelContent() {
+    document.getElementById('config-title').innerText = 'Realizar Acciones';
+
+    const catTabs = Object.entries(ACTION_CATALOG).map(([key, cat]) =>
+      `<div class="cfg-cat-tab ${key === selectedCat ? 'active' : ''}" data-cat="${key}">${cat.label}</div>`
+    ).join('');
+
+    const cat = ACTION_CATALOG[selectedCat];
+    const actionItems = cat.actions.map(a =>
+      `<div class="cfg-action-item ${selectedAction?.id === a.id ? 'active' : ''}" data-action="${a.id}" data-cat="${selectedCat}">
+        <span class="cfg-action-icon">${a.icon}</span>
+        <div class="cfg-action-info">
+          <strong>${a.label}</strong>
+          <p>${a.desc}</p>
+        </div>
+      </div>`
+    ).join('');
+
+    let paramsHtml = '';
+    if (selectedAction && selectedAction.params.length > 0) {
+      const savedParams = (currentConfig?.type === selectedAction.id) ? currentConfig.params : {};
+      paramsHtml = `
+        <hr style="border:0; border-top:1px solid #2a2d3e; margin:12px 0;">
+        <label class="cfg-label" style="color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Configuración</label>
+        ${selectedAction.params.map(p => `
+          <label class="cfg-label" style="margin-top:10px;">${p.label}</label>
+          <input class="cfg-input cfg-action-param" data-key="${p.key}" type="text"
+            value="${savedParams[p.key] || ''}" placeholder="${p.placeholder || ''}" />
+        `).join('')}
+      `;
+    } else if (selectedAction) {
+      paramsHtml = `<hr style="border:0; border-top:1px solid #2a2d3e; margin:12px 0;"><p style="font-size:12px; color:var(--text-muted);">Esta acción no requiere configuración adicional.</p>`;
+    }
+
+    const saveBtn = selectedAction
+      ? `<button id="cfg-action-save">Guardar acción</button>` : '';
+
+    document.getElementById('config-body').innerHTML = `
+      <div class="cfg-cat-tabs">${catTabs}</div>
+      <div class="cfg-actions-list">${actionItems}</div>
+      ${paramsHtml}
+      <div style="margin-top:14px;">${saveBtn}</div>
+    `;
+
+    // Eventos
+    document.querySelectorAll('.cfg-cat-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        selectedCat = tab.dataset.cat;
+        selectedAction = null;
+        renderActionPanelContent();
+      });
+    });
+
+    document.querySelectorAll('.cfg-action-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectedCat = item.dataset.cat;
+        selectedAction = ACTION_CATALOG[selectedCat].actions.find(a => a.id === item.dataset.action);
+        renderActionPanelContent();
+      });
+    });
+
+    document.getElementById('cfg-action-save')?.addEventListener('click', () => {
+      if (!selectedAction) return;
+      const params = {};
+      document.querySelectorAll('.cfg-action-param').forEach(input => {
+        params[input.dataset.key] = input.value.trim();
+      });
+      nodeActionsState[nodeId] = { type: selectedAction.id, params };
+      // Persistir en Drawflow data
+      if (editor.drawflow.drawflow.Home.data[nodeId]) {
+        editor.drawflow.drawflow.Home.data[nodeId].data._action = JSON.stringify(nodeActionsState[nodeId]);
+      }
+      renderActionNode(nodeId);
+      closePanel();
+    });
+  }
+
+  renderActionPanelContent();
+  document.getElementById('config-panel').classList.remove('hidden');
+}
+
 function closePanel() {
   activeBtnMeta = null;
   document.getElementById('config-panel').classList.add('hidden');
@@ -275,7 +413,7 @@ document.getElementById('close-config').addEventListener('click', closePanel);
 // Delegación de eventos en el canvas
 // ─────────────────────────────────────────────
 id.addEventListener('click', e => {
-  // Clic en "Añadir botón"
+  // Clic en "+ Añadir botón"
   const addBtn = e.target.closest('.btn-add');
   if (addBtn) {
     const nodeId = addBtn.getAttribute('data-nodeid');
@@ -289,12 +427,21 @@ id.addEventListener('click', e => {
     return;
   }
 
-  // Clic en editar botón (ícono lápiz)
+  // Clic en ✏️ editar botón
   const editBtn = e.target.closest('.btn-edit-icon');
   if (editBtn) {
     const nodeId = editBtn.getAttribute('data-nodeid');
     const idx = parseInt(editBtn.getAttribute('data-idx'), 10);
     openBtnPanel(nodeId, idx);
+    return;
+  }
+
+  // Clic en ⚙️ configurar acción
+  const cfgBtn = e.target.closest('.btn-configure-action');
+  if (cfgBtn) {
+    const nodeId = cfgBtn.getAttribute('data-nodeid');
+    if (!nodeId) return;
+    openActionPanel(nodeId);
   }
 });
 
@@ -345,36 +492,25 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
     if (node.name === 'message') {
       const btns = nodeButtonsState[currentId] || JSON.parse(node.data._btns || '[]');
       if (btns.length === 0) {
-        // Sin botones → texto puro, sigue por output_1
         steps.push({ type: 'text', message: node.data.message });
         currentId = node.outputs.output_1?.connections[0]?.node;
       } else {
-        // Con botones → template; cada botón postback genera un flujo oculto
-        // que se traza desde el cable de output_2, output_3 o output_4
         const templateBtns = btns.map((btn, i) => {
           if (btn.type === 'web_url') {
             return { type: 'web_url', title: btn.title, url: btn.url };
           } else {
             const payload = `POSTBACK_${currentId}_BTN${i}`;
-            // Trazar el cable del output correspondiente (output_2 = btn0, output_3 = btn1, output_4 = btn2)
             const connectedNodeId = node.outputs[`output_${i + 2}`]?.connections[0]?.node;
             if (connectedNodeId) {
               const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
               if (hiddenSteps.length > 0) {
-                flowsConfig.flows.push({
-                  id: `flow_${payload}`,
-                  name: `Ruta Botón ${btn.title}`,
-                  keywords: [payload],
-                  matchType: 'contains',
-                  steps: hiddenSteps
-                });
+                flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Botón ${btn.title}`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
               }
             }
             return { type: 'postback', title: btn.title, payload };
           }
         });
         steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
-        // El flujo principal continúa por output_1 (siguiente paso)
         currentId = node.outputs.output_1?.connections[0]?.node;
       }
     }
@@ -402,8 +538,11 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       currentId = null;
     }
     else if (node.name === 'action') {
-      const tag = node.data.tag?.trim();
-      if (tag) steps.push({ type: 'action', tag });
+      // Recuperar config del estado o del campo serializado
+      const config = nodeActionsState[currentId] || JSON.parse(node.data._action || 'null');
+      if (config) {
+        steps.push({ type: 'action', actionType: config.type, params: config.params });
+      }
       currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else {
@@ -414,20 +553,19 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
 }
 
 // ─────────────────────────────────────────────
-// Guardar: serializar botones en _btns antes de exportar
+// Guardar
 // ─────────────────────────────────────────────
 document.getElementById('btn-save').addEventListener('click', async () => {
-  // Serializar el estado de botones en el campo df-_btns de cada nodo message
+  // Sincronizar estado de botones con Drawflow
   for (const nodeId in nodeButtonsState) {
-    const nodeEl = document.querySelector(`#node-${nodeId} [df-_btns]`);
-    if (nodeEl) {
-      nodeEl.value = JSON.stringify(nodeButtonsState[nodeId]);
-      nodeEl.dispatchEvent(new Event('change'));
-    } else {
-      // Forzar sincronización mediante la API interna de Drawflow
-      if (editor.drawflow.drawflow.Home.data[nodeId]) {
-        editor.drawflow.drawflow.Home.data[nodeId].data._btns = JSON.stringify(nodeButtonsState[nodeId]);
-      }
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._btns = JSON.stringify(nodeButtonsState[nodeId]);
+    }
+  }
+  // Sincronizar estado de acciones con Drawflow
+  for (const nodeId in nodeActionsState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId] && nodeActionsState[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._action = JSON.stringify(nodeActionsState[nodeId]);
     }
   }
 
@@ -440,17 +578,9 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     if (node.name === 'trigger') {
       const keywordsRaw = node.data.keywords || '';
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
-      const newFlow = {
-        id: `flow_${nodeId}`,
-        name: `Flujo Visual ${nodeId}`,
-        keywords: keywordsList,
-        matchType: 'contains',
-        steps: []
-      };
+      const newFlow = { id: `flow_${nodeId}`, name: `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType: 'contains', steps: [] };
       const nextNodeId = node.outputs.output_1?.connections[0]?.node;
-      if (nextNodeId) {
-        newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
-      }
+      if (nextNodeId) newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
       if (keywordsList.length > 0) flowsConfig.flows.push(newFlow);
     }
   }
@@ -458,11 +588,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   const btn = document.getElementById('btn-save');
   btn.innerText = "Guardando...";
   try {
-    const res = await fetch('/api/flows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(flowsConfig)
-    });
+    const res = await fetch('/api/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flowsConfig) });
     if (res.ok) {
       btn.innerText = "¡Guardado con éxito!";
       setTimeout(() => btn.innerText = "Guardar Cambios", 2000);
@@ -480,7 +606,6 @@ setTimeout(() => {
   const msgId = addMessageNode(450, 200);
   setTimeout(() => {
     editor.addConnection(1, msgId, 'output_1', 'input_1');
-    // Poner texto de ejemplo
     if (editor.drawflow.drawflow.Home.data[msgId]) {
       editor.drawflow.drawflow.Home.data[msgId].data.message = '¡Hola! Nuestros faroles rústicos comienzan en $150.';
     }
