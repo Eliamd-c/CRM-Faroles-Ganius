@@ -33,6 +33,25 @@ const {
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
 // ─────────────────────────────────────────────
+// Inicialización del Bot (Cargar datos propios)
+// ─────────────────────────────────────────────
+let BOT_USERNAME = null;
+let PAGE_ID = null;
+
+async function initBot() {
+  try {
+    const res = await axios.get(`${GRAPH_API}/${INSTAGRAM_ACCOUNT_ID}`, {
+      params: { fields: 'username', access_token: PAGE_ACCESS_TOKEN }
+    });
+    BOT_USERNAME = res.data.username;
+    console.log(`🤖 Bot inicializado. Username: @${BOT_USERNAME}`);
+  } catch (err) {
+    console.error('❌ Error obteniendo datos del bot en inicio:', err.message);
+  }
+}
+initBot();
+
+// ─────────────────────────────────────────────
 // GET /stream  — Server-Sent Events para el Dashboard UI
 // ─────────────────────────────────────────────
 app.get('/stream', (req, res) => {
@@ -127,8 +146,9 @@ async function handleMessage(event) {
   const senderId = event.sender?.id;
   const text     = event.message?.text;
 
-  // Ignorar mensajes vacíos o mensajes enviados por la propia cuenta (el bot)
-  if (!senderId || !text || senderId === INSTAGRAM_ACCOUNT_ID) return;
+  // Ignorar mensajes enviados por la propia cuenta (el bot)
+  if (!senderId || !text) return;
+  if (senderId === INSTAGRAM_ACCOUNT_ID) return;
 
   const profile = await getUserProfile(senderId);
   const senderName = profile?.name || senderId;
@@ -150,7 +170,12 @@ async function handleComment(value) {
   const fromId    = value.from?.id;
 
   // Ignorar los comentarios/respuestas hechos por la propia cuenta
-  if (fromId === INSTAGRAM_ACCOUNT_ID) return;
+  // Meta a veces envía IDs distintos para la cuenta empresa (como el Page ID),
+  // así que verificamos también el username para estar 100% seguros.
+  if (fromId === INSTAGRAM_ACCOUNT_ID || (BOT_USERNAME && fromName === BOT_USERNAME)) {
+    console.log(`[IGNORE] Ignorando eco del propio bot en comentarios.`);
+    return;
+  }
 
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
