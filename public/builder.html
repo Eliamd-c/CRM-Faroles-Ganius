@@ -12,6 +12,7 @@
     <header>
         <div class="logo">Faroles Genius <span>Flow Builder</span></div>
         <div class="actions">
+            <button id="btn-arrange" class="btn-secondary" style="margin-right:10px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db;">✨ Auto-Organizar</button>
             <button id="btn-save" class="btn-primary">Guardar Cambios</button>
         </div>
     </header>
@@ -49,7 +50,16 @@
         </div>
     </div>
 
+    <!-- Menú Contextual (Doble Clic) -->
+    <div id="context-menu" class="hidden" style="position: absolute; z-index: 9999; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden; width: 180px;">
+        <div class="ctx-item" data-type="trigger" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px;"><span>⚡</span> Palabra Clave</div>
+        <div class="ctx-item" data-type="message" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>💬</span> Enviar Mensaje</div>
+        <div class="ctx-item" data-type="input" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📥</span> Pedir Dato</div>
+        <div class="ctx-item" data-type="action" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>⚡</span> Acción</div>
+    </div>
+
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
-    <script src="builder.js?v=9"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script src="builder.js?v=10"></script>
 </body>
 </html>
