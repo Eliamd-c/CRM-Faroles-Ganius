@@ -776,7 +776,7 @@ document.getElementById('btn-arrange').addEventListener('click', () => {
 const ctxMenu = document.getElementById('context-menu');
 let ctxMousePos = { x: 0, y: 0 };
 
-id.addEventListener('dblclick', e => {
+id.addEventListener('contextmenu', e => {
   if (e.target.closest('.drawflow-node')) return;
   e.preventDefault();
 
@@ -789,17 +789,17 @@ id.addEventListener('dblclick', e => {
 
   ctxMenu.style.left = e.clientX + 'px';
   ctxMenu.style.top = e.clientY + 'px';
-  ctxMenu.style.display = 'block';
+  ctxMenu.classList.remove('ctx-hidden');
 });
 
 document.addEventListener('click', e => {
   if (!e.target.closest('#context-menu') && !e.target.closest('#drawflow')) {
-    ctxMenu.style.display = 'none';
+    ctxMenu.classList.add('ctx-hidden');
   }
 });
 id.addEventListener('click', e => {
   if (!e.target.closest('.ctx-item')) {
-    ctxMenu.style.display = 'none';
+    ctxMenu.classList.add('ctx-hidden');
   }
 });
 
@@ -823,6 +823,6 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       setTimeout(() => renderInputNode(nodeId), 50);
     }
     
-    ctxMenu.style.display = 'none';
+    ctxMenu.classList.add('ctx-hidden');
   });
 });
