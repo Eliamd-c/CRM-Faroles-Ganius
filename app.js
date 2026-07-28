@@ -74,10 +74,16 @@ app.get('/stream', (req, res) => {
   if (BOT_USERNAME) {
     res.write(`data: ${JSON.stringify({ type: 'SYSTEM', message: `Bot configurado como: @${BOT_USERNAME}`, timestamp: Date.now() })}\n\n`);
   } else {
-    res.write(`data: ${JSON.stringify({ type: 'WARNING', message: 'No se pudo obtener el BOT_USERNAME. Configúralo en las variables de entorno.', timestamp: Date.now() })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'WARNING', message: 'No se pudo obtener el BOT_USERNAME. Para mayor seguridad, añade BOT_USERNAME=farolesgenius a tus variables de entorno.', timestamp: Date.now() })}\n\n`);
   }
 
+  // Heartbeat para mantener la conexión viva (cada 30 seg)
+  const heartbeat = setInterval(() => {
+    res.write(`:\n\n`); // Comentario SSE estándar para keep-alive
+  }, 30000);
+
   req.on('close', () => {
+    clearInterval(heartbeat);
     sseClients = sseClients.filter(client => client.id !== clientId);
   });
 });
