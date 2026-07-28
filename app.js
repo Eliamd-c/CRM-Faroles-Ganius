@@ -7,6 +7,7 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const supabase = require('./db');
 
 // Cargar configuración de flujos (Arquitectura JSON - Fase 1)
 let flowsConfig = { flows: [], defaultFlow: null };
