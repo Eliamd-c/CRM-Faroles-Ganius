@@ -402,10 +402,9 @@ header {
     stroke-width: 3px;
 }
 
- . c t x - i t e m : h o v e r   { 
-         b a c k g r o u n d - c o l o r :   # f 3 f 4 f 6 ; 
- } 
-  
- . h i d d e n   {   d i s p l a y :   n o n e   ! i m p o r t a n t ;   }  
- . c t x - h i d d e n   {   d i s p l a y :   n o n e   ! i m p o r t a n t ;   }  
- 
+
+.ctx-item:hover {
+    background-color: #f3f4f6;
+}
+.hidden { display: none !important; }
+.ctx-hidden { display: none !important; }
