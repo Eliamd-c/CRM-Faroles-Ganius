@@ -146,12 +146,16 @@ async function handleMessage(event) {
 async function handleComment(value) {
   const commentId = value.id;
   const text      = value.text;
-  const from      = value.from?.username;
+  const fromName  = value.from?.username;
+  const fromId    = value.from?.id;
 
-  broadcastLog('COMMENT', `@${from} comentó: "${text}"`);
+  // Ignorar los comentarios/respuestas hechos por la propia cuenta
+  if (fromId === INSTAGRAM_ACCOUNT_ID) return;
+
+  broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
   // Respuesta automática al comentario
-  await replyComment(commentId, `Gracias @${from} por tu comentario! 🙌`);
+  await replyComment(commentId, `Gracias @${fromName} por tu comentario! 🙌`);
 }
 
 // ─────────────────────────────────────────────
