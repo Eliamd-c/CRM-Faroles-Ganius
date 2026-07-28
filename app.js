@@ -332,26 +332,73 @@ async function handleMessage(event) {
 // Procesador de Pasos del Flujo
 // ─────────────────────────────────────────────
 async function processFlowSteps(steps, senderId, senderName) {
+  let customer = null;
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('customers').select('*').eq('instagram_id', senderId).single();
+      customer = data;
+    } catch (e) {
+      console.error('[DB] Error fetching customer for flow steps:', e.message);
+    }
+  }
+
+  const interpolate = (txt) => {
+    if (!txt || typeof txt !== 'string') return txt;
+    let replaced = txt.replace('{username}', senderName);
+    replaced = replaced.replace(/\{\{([\w\s_-]+)\}\}/g, (match, fieldName) => {
+      const key = fieldName.trim();
+      if (key === 'name' || key === 'username') return customer?.name || senderName;
+      if (customer?.fields && customer.fields[key] !== undefined && customer.fields[key] !== null) {
+        return customer.fields[key];
+      }
+      return '';
+    });
+    return replaced;
+  };
+
   for (const step of steps) {
     if (step.type === 'text') {
-      const replyText = step.message.replace('{username}', senderName);
-      await sendMessage(senderId, replyText);
+      await sendMessage(senderId, interpolate(step.message));
     } else if (step.type === 'buttons') {
-      const replyText = step.message.replace('{username}', senderName);
-      await sendMessage(senderId, replyText, step.buttons);
+      await sendMessage(senderId, interpolate(step.message), step.buttons);
     } else if (step.type === 'template') {
-      const replyText = step.message.replace('{username}', senderName);
-      await sendTemplate(senderId, replyText, step.buttons);
+      await sendTemplate(senderId, interpolate(step.message), step.buttons);
     } else if (step.type === 'card') {
-      const replyText = step.message?.replace('{username}', senderName);
-      await sendCard(senderId, step.card, replyText);
+      const cardData = { ...step.card, title: interpolate(step.card.title), subtitle: interpolate(step.card.subtitle) };
+      await sendCard(senderId, cardData, interpolate(step.message));
     } else if (step.type === 'action') {
       await executeAction(senderId, senderName, step);
+    } else if (step.type === 'condition') {
+      let conditionMet = false;
+      const fieldVal = (step.field === 'name') ? (customer?.name || '') : (customer?.fields?.[step.field] || '');
+      
+      const v1 = String(fieldVal).toLowerCase().trim();
+      const v2 = String(step.value || '').toLowerCase().trim();
+      
+      if (step.operator === '==') conditionMet = (v1 === v2);
+      else if (step.operator === '!=') conditionMet = (v1 !== v2);
+      else if (step.operator === '>') conditionMet = (Number(v1) > Number(v2));
+      else if (step.operator === '<') conditionMet = (Number(v1) < Number(v2));
+      else if (step.operator === 'contains') conditionMet = (v1.includes(v2));
+      else if (step.operator === 'not_contains') conditionMet = (!v1.includes(v2));
+      
+      const nextFlowId = conditionMet ? step.truePayload : step.falsePayload;
+      if (nextFlowId) {
+        const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${nextFlowId}`);
+        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName);
+      }
+      break; // Detiene el array lineal actual porque la condición bifurca
+    } else if (step.type === 'randomizer') {
+      if (step.paths && step.paths.length > 0) {
+        const randomPayload = step.paths[Math.floor(Math.random() * step.paths.length)];
+        const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${randomPayload}`);
+        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName);
+      }
+      break; // Detiene el array lineal actual
     } else if (step.type === 'input') {
-      const replyText = step.prompt?.replace('{username}', senderName) || 'Por favor responde:';
+      const replyText = interpolate(step.prompt) || 'Por favor responde:';
       await sendMessage(senderId, replyText);
       if (supabase) {
-        // Usamos current_flow_id para successPayload y current_step_index para failPayload temporalmente
         await supabase.from('customers').update({
           bot_state: 'awaiting_input',
           awaiting_input_type: step.inputType || 'text',
@@ -362,7 +409,7 @@ async function processFlowSteps(steps, senderId, senderName) {
           current_step_index: step.failPayload 
         }).eq('instagram_id', senderId);
       }
-      break; // Interrumpe la ejecución del flujo esperando respuesta
+      break; // Interrumpe la ejecución esperando respuesta
     }
   }
 }

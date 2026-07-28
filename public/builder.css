@@ -408,3 +408,8 @@ header {
 }
 .hidden { display: none !important; }
 .ctx-hidden { display: none !important; }
+
+.drawflow-node.condition { border-left: 5px solid #8b5cf6; }
+.drawflow-node.condition .title-box { background-color: #8b5cf6; }
+.drawflow-node.randomizer { border-left: 5px solid #f59e0b; }
+.drawflow-node.randomizer .title-box { background-color: #f59e0b; }

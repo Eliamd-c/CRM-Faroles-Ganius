@@ -199,6 +199,24 @@ const htmlCard = `
   </div>
 `;
 
+const htmlCondition = `
+  <div class="node-condition">
+    <div class="title-box">🔀 Condición</div>
+    <div class="box" id="cond-render-${Math.random()}" style="padding:10px;">
+      <em style="color:#6b7280; font-size:11px;">Configura en el panel...</em>
+    </div>
+  </div>
+`;
+
+const htmlRandomizer = `
+  <div class="node-randomizer">
+    <div class="title-box">🎲 Aleatorio (A/B)</div>
+    <div class="box" id="rand-render-${Math.random()}" style="padding:10px;">
+      <em style="color:#6b7280; font-size:11px;">Configura salidas en el panel...</em>
+    </div>
+  </div>
+`;
+
 const htmlAction = `
   <div class="node-action">
     <div class="title-box">⚡ Realizar Acciones</div>
@@ -294,6 +312,10 @@ function openInspector(nodeId) {
     renderActionInspector(nodeId);
   } else if (node.name === 'input') {
     renderInputInspector(nodeId);
+  } else if (node.name === 'condition') {
+    renderConditionInspector(nodeId);
+  } else if (node.name === 'randomizer') {
+    renderRandomizerInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
@@ -821,8 +843,115 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       const nodeId = editor.addNode('input', 1, 2, posX, posY, 'input', { _input: '{}' }, htmlInput);
       nodeInputState[nodeId] = { type: 'email', field: 'email', prompt: 'Por favor ingresa tu email:', retry: 'Ese correo no es válido. Intenta de nuevo:' };
       setTimeout(() => renderInputNode(nodeId), 50);
+    } else if (type === 'condition') {
+      const nodeId = editor.addNode('condition', 1, 2, posX, posY, 'condition', { _condition: '{}' }, htmlCondition);
+      nodeConditionState[nodeId] = { field: 'email', operator: 'contains', value: '@' };
+      setTimeout(() => renderConditionNode(nodeId), 50);
+    } else if (type === 'randomizer') {
+      const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
+      nodeRandomizerState[nodeId] = { paths: 2 };
+      setTimeout(() => renderRandomizerNode(nodeId), 50);
+
+    } else if (type === 'condition') {
+      const nodeId = editor.addNode('condition', 1, 2, posX, posY, 'condition', { _condition: '{}' }, htmlCondition);
+      nodeConditionState[nodeId] = { field: 'email', operator: 'contains', value: '@' };
+      setTimeout(() => renderConditionNode(nodeId), 50);
+    } else if (type === 'randomizer') {
+      const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
+      nodeRandomizerState[nodeId] = { paths: 2 };
+      setTimeout(() => renderRandomizerNode(nodeId), 50);
+
     }
     
     ctxMenu.classList.add('ctx-hidden');
   });
 });
+
+// Render Condition
+function renderConditionNode(nodeId) {
+  const container = document.getElementById('cond-render-' + nodeId);
+  if (!container) return;
+  const conf = nodeConditionState[nodeId];
+  if (!conf) return;
+  container.innerHTML = `<div style="background:#f3e8ff; padding:10px; border-radius:6px; border:1px solid #d8b4fe;">
+    <div style="font-size:12px; font-weight:600; color:#6b21a8; margin-bottom:5px;">Si ${conf.field}</div>
+    <div style="font-size:11px; color:#581c87; margin-bottom:3px;">${conf.operator}</div>
+    <div style="font-size:12px; font-weight:600; color:#6b21a8; background:white; padding:2px 5px; border-radius:4px; display:inline-block;">${conf.value || 'vacio'}</div>
+  </div>`;
+}
+
+// Render Randomizer
+function renderRandomizerNode(nodeId) {
+  const container = document.getElementById('rand-render-' + nodeId);
+  if (!container) return;
+  const conf = nodeRandomizerState[nodeId];
+  if (!conf) return;
+  container.innerHTML = `<div style="background:#fef3c7; padding:10px; border-radius:6px; border:1px solid #fcd34d;">
+    <div style="font-size:12px; font-weight:600; color:#b45309; text-align:center;">${conf.paths} Salidas (A/B)</div>
+  </div>`;
+}
+
+
+function renderConditionInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Condición';
+  const conf = nodeConditionState[nodeId] || { field: 'email', operator: 'contains', value: '' };
+  
+  const html = `
+    <div class="config-group">
+      <label class="config-label">Campo a evaluar</label>
+      <input type="text" class="config-input" id="cond-field" value="${conf.field}" placeholder="ej: email o name">
+    </div>
+    <div class="config-group">
+      <label class="config-label">Operador</label>
+      <select class="config-input" id="cond-operator">
+        <option value="==" ${conf.operator === '==' ? 'selected' : ''}>Es igual a (==)</option>
+        <option value="!=" ${conf.operator === '!=' ? 'selected' : ''}>Diferente de (!=)</option>
+        <option value=">" ${conf.operator === '>' ? 'selected' : ''}>Mayor que (>)</option>
+        <option value="<" ${conf.operator === '<' ? 'selected' : ''}>Menor que (<)</option>
+        <option value="contains" ${conf.operator === 'contains' ? 'selected' : ''}>Contiene</option>
+        <option value="not_contains" ${conf.operator === 'not_contains' ? 'selected' : ''}>No contiene</option>
+      </select>
+    </div>
+    <div class="config-group">
+      <label class="config-label">Valor de comparación</label>
+      <input type="text" class="config-input" id="cond-value" value="${conf.value}" placeholder="ej: @gmail.com">
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveCondition('${nodeId}')">Guardar Condición</button>
+  `;
+  document.getElementById('config-body').innerHTML = html;
+}
+
+function saveCondition(nodeId) {
+  const field = document.getElementById('cond-field').value;
+  const operator = document.getElementById('cond-operator').value;
+  const value = document.getElementById('cond-value').value;
+  nodeConditionState[nodeId] = { field, operator, value };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._condition = JSON.stringify(nodeConditionState[nodeId]);
+  editor.updateNodeDataFromId(nodeId, node.data);
+  renderConditionNode(nodeId);
+}
+
+function renderRandomizerInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Aleatorio';
+  const conf = nodeRandomizerState[nodeId] || { paths: 2 };
+  
+  const html = `
+    <div class="config-group">
+      <label class="config-label">Número de Salidas Aleatorias (A/B)</label>
+      <input type="number" class="config-input" id="rand-paths" value="${conf.paths}" min="2" max="6" readonly disabled title="Actualmente estático en 2 salidas en la UI">
+      <p style="font-size:11px; color:#6b7280; margin-top:5px;">El nodo elegirá aleatoriamente entre sus salidas disponibles.</p>
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveRandomizer('${nodeId}')">Guardar</button>
+  `;
+  document.getElementById('config-body').innerHTML = html;
+}
+
+function saveRandomizer(nodeId) {
+  const paths = 2; // Fixed for now due to drawflow addNode
+  nodeRandomizerState[nodeId] = { paths };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._randomizer = JSON.stringify(nodeRandomizerState[nodeId]);
+  editor.updateNodeDataFromId(nodeId, node.data);
+  renderRandomizerNode(nodeId);
+}
