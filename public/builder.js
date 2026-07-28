@@ -24,7 +24,7 @@ const htmlText = `
 
 const htmlButtons = `
   <div class="node-buttons">
-    <div class="title-box">🔘 Botones Rápidos</div>
+    <div class="title-box">🔘 Respuestas Rápidas</div>
     <div class="box">
       <textarea df-message placeholder="Texto del mensaje..."></textarea>
       <input type="text" df-btn1 placeholder="Botón 1 (Obligatorio)" />
@@ -34,10 +34,35 @@ const htmlButtons = `
   </div>
 `;
 
+const htmlTemplate = `
+  <div class="node-template">
+    <div class="title-box">🔀 Plantilla de Botones</div>
+    <div class="box">
+      <textarea df-message placeholder="Texto principal..."></textarea>
+      
+      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+      <input type="text" df-btn1_title placeholder="Botón 1 (Obligatorio)" />
+      <select df-btn1_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
+      <input type="text" df-btn1_url placeholder="URL (Si es Sitio Web)" />
+      
+      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+      <input type="text" df-btn2_title placeholder="Botón 2 (Opcional)" />
+      <select df-btn2_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
+      <input type="text" df-btn2_url placeholder="URL" />
+
+      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+      <input type="text" df-btn3_title placeholder="Botón 3 (Opcional)" />
+      <select df-btn3_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
+      <input type="text" df-btn3_url placeholder="URL" />
+    </div>
+  </div>
+`;
+
 // Registrar los tipos de nodos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('text', htmlText);
 editor.registerNode('buttons', htmlButtons);
+editor.registerNode('template', htmlTemplate);
 
 // Configuración de Drag & Drop desde la barra lateral
 const elements = document.querySelectorAll('.drag-item');
@@ -66,8 +91,79 @@ id.addEventListener('drop', e => {
     editor.addNode('text', 1, 1, posX, posY, 'text', { message: '' }, htmlText);
   } else if (type === 'buttons') {
     editor.addNode('buttons', 1, 1, posX, posY, 'buttons', { message: '', btn1: '', btn2: '', btn3: '' }, htmlButtons);
+  } else if (type === 'template') {
+    editor.addNode('template', 1, 3, posX, posY, 'template', { 
+      message: '', 
+      btn1_title: '', btn1_type: 'postback', btn1_url: '',
+      btn2_title: '', btn2_type: 'postback', btn2_url: '',
+      btn3_title: '', btn3_type: 'postback', btn3_url: ''
+    }, htmlTemplate);
   }
 });
+
+// Función recursiva para trazar los cables
+function buildStepsFromNode(nodeId, nodes, flowsConfig) {
+  let steps = [];
+  let currentId = nodeId;
+  
+  while (currentId) {
+    const node = nodes[currentId];
+    if (!node) break;
+
+    if (node.name === 'text') {
+      steps.push({ type: 'text', message: node.data.message });
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    } 
+    else if (node.name === 'buttons') {
+      const btns = [];
+      if (node.data.btn1 && node.data.btn1.trim()) btns.push({ title: node.data.btn1.trim() });
+      if (node.data.btn2 && node.data.btn2.trim()) btns.push({ title: node.data.btn2.trim() });
+      if (node.data.btn3 && node.data.btn3.trim()) btns.push({ title: node.data.btn3.trim() });
+      steps.push({ type: 'buttons', message: node.data.message, buttons: btns });
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'template') {
+      const templateBtns = [];
+      // Para cada botón, comprobamos si tiene cable (postback) o es web
+      for (let i = 1; i <= 3; i++) {
+        const title = node.data[`btn${i}_title`];
+        const type = node.data[`btn${i}_type`];
+        const url = node.data[`btn${i}_url`];
+        const connectedNodeId = node.outputs[`output_${i}`]?.connections[0]?.node;
+        
+        if (title && title.trim()) {
+          if (type === 'web_url') {
+            templateBtns.push({ type: 'web_url', title: title.trim(), url: url?.trim() || '' });
+          } else {
+            // Postback
+            const payload = `POSTBACK_${node.id}_BTN${i}`;
+            templateBtns.push({ type: 'postback', title: title.trim(), payload: payload });
+            
+            // Crear el "Flujo Oculto"
+            if (connectedNodeId) {
+              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+              if (hiddenSteps.length > 0) {
+                flowsConfig.flows.push({
+                  id: `flow_${payload}`,
+                  name: `Ruta Oculta ${title.trim()}`,
+                  keywords: [payload],
+                  matchType: 'contains',
+                  steps: hiddenSteps
+                });
+              }
+            }
+          }
+        }
+      }
+      steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
+      currentId = null; // Se ramifica, detenemos el camino principal
+    }
+    else {
+      break;
+    }
+  }
+  return steps;
+}
 
 // Lógica de Guardado (Traducir de Cajas Visuales a flows.json)
 document.getElementById('btn-save').addEventListener('click', async () => {
@@ -92,30 +188,10 @@ document.getElementById('btn-save').addEventListener('click', async () => {
         steps: []
       };
 
-      // Seguir el cable hacia el siguiente nodo
+      // Iniciar recorrido
       let nextNodeId = node.outputs.output_1?.connections[0]?.node;
-      
-      // Bucle simple para seguir la cadena (solo texto por ahora)
-      while (nextNodeId) {
-        const nextNode = nodes[nextNodeId];
-        if (nextNode.name === 'text') {
-          newFlow.steps.push({
-            type: 'text',
-            message: nextNode.data.message
-          });
-        } else if (nextNode.name === 'buttons') {
-          const btns = [];
-          if (nextNode.data.btn1 && nextNode.data.btn1.trim()) btns.push({ title: nextNode.data.btn1.trim() });
-          if (nextNode.data.btn2 && nextNode.data.btn2.trim()) btns.push({ title: nextNode.data.btn2.trim() });
-          if (nextNode.data.btn3 && nextNode.data.btn3.trim()) btns.push({ title: nextNode.data.btn3.trim() });
-          newFlow.steps.push({
-            type: 'buttons',
-            message: nextNode.data.message,
-            buttons: btns
-          });
-        }
-        // Buscar el siguiente de la cadena
-        nextNodeId = nextNode.outputs.output_1?.connections[0]?.node;
+      if (nextNodeId) {
+        newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
       }
       
       if (keywordsList.length > 0) {

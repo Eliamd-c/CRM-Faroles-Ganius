@@ -189,12 +189,12 @@ async function getUserProfile(senderId) {
 }
 
 // ─────────────────────────────────────────────
-// Handler: Mensaje Directo (DM)
+// Handler: Mensaje Directo (DM) y Postbacks
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/messages
 // ─────────────────────────────────────────────
 async function handleMessage(event) {
   const senderId     = event.sender?.id;
-  const text         = event.message?.text;
+  const text         = event.message?.text || event.postback?.payload;
   const storyMention = event.message?.story?.mention;
 
   // Ignorar eventos que no tengan ID de origen o sean del propio bot
@@ -246,6 +246,9 @@ async function handleMessage(event) {
       } else if (step.type === 'buttons') {
         const replyText = step.message.replace('{username}', senderName);
         await sendMessage(senderId, replyText, step.buttons);
+      } else if (step.type === 'template') {
+        const replyText = step.message.replace('{username}', senderName);
+        await sendTemplate(senderId, replyText, step.buttons);
       }
     }
   }
@@ -328,6 +331,47 @@ async function sendMessage(recipientId, text, quickReplies = null) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando DM:', errorMsg);
     broadcastLog('ERROR', `Error al responder: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar Plantilla de Botones (Button Template)
+// ─────────────────────────────────────────────
+async function sendTemplate(recipientId, text, buttons) {
+  try {
+    const formattedButtons = buttons.map(b => {
+      if (b.type === 'web_url') {
+        return { type: 'web_url', url: b.url, title: b.title };
+      } else {
+        return { type: 'postback', title: b.title, payload: b.payload };
+      }
+    });
+
+    const messagePayload = {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text,
+          buttons: formattedButtons
+        }
+      }
+    };
+
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: messagePayload,
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    console.log(`✅ Plantilla enviada a ${recipientId}`);
+    broadcastLog('SYSTEM', `Plantilla de botones enviada a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Plantilla:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar plantilla: ${errorMsg}`);
   }
 }
 

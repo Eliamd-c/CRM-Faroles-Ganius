@@ -127,6 +127,17 @@ header {
 .node-trigger .title-box { background: rgba(16, 185, 129, 0.2); color: var(--node-trigger); }
 .node-text .title-box { background: rgba(59, 130, 246, 0.2); color: var(--node-text); }
 .node-buttons .title-box { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+.node-template .title-box { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+.drawflow-node select {
+    width: 100%;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
 
 /* Config Panel */
 .config-panel {
