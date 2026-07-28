@@ -35,8 +35,8 @@ const GRAPH_API = 'https://graph.facebook.com/v21.0';
 // ─────────────────────────────────────────────
 // Inicialización del Bot (Cargar datos propios)
 // ─────────────────────────────────────────────
-let BOT_USERNAME = null;
-let PAGE_ID = null;
+let BOT_USERNAME = process.env.BOT_USERNAME || null;
+const recentReplies = new Set(); // Para guardar textos de respuestas recientes y evitar ecos
 
 async function initBot() {
   try {
@@ -45,11 +45,15 @@ async function initBot() {
     });
     BOT_USERNAME = res.data.username;
     console.log(`🤖 Bot inicializado. Username: @${BOT_USERNAME}`);
+    // No podemos hacer broadcast aquí porque aún no hay clientes conectados,
+    // pero guardamos el estado.
   } catch (err) {
-    console.error('❌ Error obteniendo datos del bot en inicio:', err.message);
+    console.error('❌ Error obteniendo datos del bot en inicio:', err.response?.data || err.message);
   }
 }
-initBot();
+if (!BOT_USERNAME) {
+  initBot();
+}
 
 // ─────────────────────────────────────────────
 // GET /stream  — Server-Sent Events para el Dashboard UI
@@ -66,6 +70,12 @@ app.get('/stream', (req, res) => {
 
   // Send a system message on connect
   res.write(`data: ${JSON.stringify({ type: 'SYSTEM', message: 'Conectado al monitor de eventos', timestamp: Date.now() })}\n\n`);
+  
+  if (BOT_USERNAME) {
+    res.write(`data: ${JSON.stringify({ type: 'SYSTEM', message: `Bot configurado como: @${BOT_USERNAME}`, timestamp: Date.now() })}\n\n`);
+  } else {
+    res.write(`data: ${JSON.stringify({ type: 'WARNING', message: 'No se pudo obtener el BOT_USERNAME. Configúralo en las variables de entorno.', timestamp: Date.now() })}\n\n`);
+  }
 
   req.on('close', () => {
     sseClients = sseClients.filter(client => client.id !== clientId);
@@ -169,18 +179,25 @@ async function handleComment(value) {
   const fromName  = value.from?.username;
   const fromId    = value.from?.id;
 
-  // Ignorar los comentarios/respuestas hechos por la propia cuenta
-  // Meta a veces envía IDs distintos para la cuenta empresa (como el Page ID),
-  // así que verificamos también el username para estar 100% seguros.
+  // 1. Ignorar por ID o Username
   if (fromId === INSTAGRAM_ACCOUNT_ID || (BOT_USERNAME && fromName === BOT_USERNAME)) {
-    console.log(`[IGNORE] Ignorando eco del propio bot en comentarios.`);
+    console.log(`[IGNORE] Ignorando eco del propio bot en comentarios (por ID/User).`);
+    return;
+  }
+
+  // 2. Ignorar por coincidencia de texto exacto (eco de nuestra propia respuesta)
+  if (recentReplies.has(text)) {
+    console.log(`[IGNORE] Ignorando eco del propio bot (texto coincidente).`);
+    recentReplies.delete(text); // Lo borramos para no llenar memoria
     return;
   }
 
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
   // Respuesta automática al comentario
-  await replyComment(commentId, `Gracias @${fromName} por tu comentario! 🙌`);
+  const replyText = `Gracias @${fromName} por tu comentario! 🙌`;
+  recentReplies.add(replyText);
+  await replyComment(commentId, replyText);
 }
 
 // ─────────────────────────────────────────────
