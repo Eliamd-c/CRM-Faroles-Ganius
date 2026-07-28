@@ -6,11 +6,11 @@ editor.start();
 // ─────────────────────────────────────────────
 // Estado global
 // ─────────────────────────────────────────────
-const nodeButtonsState = {}; // { nodeId: [{title, type, url}] }
+const nodeBlocksState = {}; // { nodeId: [ { id: 'b1', type: 'text', content: '', url: '', buttons: [] } ] }
 const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 
 // ─────────────────────────────────────────────
-// Catálogo de Acciones (C.1 — UI Only)
+// Catálogo de Acciones (C.1)
 // ─────────────────────────────────────────────
 const ACTION_CATALOG = {
   contact: {
@@ -42,31 +42,91 @@ const ACTION_CATALOG = {
   }
 };
 
-// ─────────────────────────────────────────────
-// Helpers: botones dinámicos en nodo Mensaje
-// ─────────────────────────────────────────────
-function renderButtonsInNode(nodeId) {
-  const container = document.querySelector(`#node-${nodeId} .btn-list`);
-  if (!container) return;
-  const btns = nodeButtonsState[nodeId] || [];
-  container.innerHTML = '';
-  btns.forEach((btn, idx) => {
-    const row = document.createElement('div');
-    row.className = 'btn-row';
-    row.innerHTML = `
-      <span class="btn-label">${btn.title || 'Sin título'}</span>
-      <button class="btn-edit-icon" data-nodeid="${nodeId}" data-idx="${idx}" title="Editar">✏️</button>
-    `;
-    container.appendChild(row);
-  });
-  const addBtn = container.parentElement.querySelector('.btn-add');
-  if (addBtn) addBtn.style.display = btns.length >= 3 ? 'none' : 'flex';
-  setTimeout(() => repositionOutputs(nodeId), 30);
+function generateId() {
+  return Math.random().toString(36).substr(2, 9);
 }
 
 // ─────────────────────────────────────────────
-// Helpers: Nodo de Acción
+// Renderizadores Visuales (Dentro del Nodo)
 // ─────────────────────────────────────────────
+function renderBlocksInNode(nodeId) {
+  const container = document.querySelector(`#node-${nodeId} .node-blocks-container`);
+  if (!container) return;
+  const blocks = nodeBlocksState[nodeId] || [];
+  
+  let html = '';
+  blocks.forEach(block => {
+    html += `<div class="canvas-block canvas-block-${block.type}" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin-bottom:8px;">`;
+    if (block.type === 'text') {
+      html += `<div class="cb-text" style="font-size:13px; color:#4b5563; white-space:pre-wrap;">${block.content || '<span class="cb-placeholder" style="color:#9ca3af; font-style:italic;">Texto vacío...</span>'}</div>`;
+    } else if (block.type === 'image') {
+      html += `<div class="cb-image" style="text-align:center;">${block.url ? `<img src="${block.url}" style="max-width:100%; border-radius:6px;" />` : '<div class="cb-placeholder-img" style="color:#9ca3af; font-size:12px; padding:15px; border:1px dashed #d1d5db; border-radius:6px;">🖼️ Sin imagen (Añade URL en Inspector)</div>'}</div>`;
+    }
+    
+    // Botones
+    if (block.buttons && block.buttons.length > 0) {
+      html += `<div class="cb-btns" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">`;
+      block.buttons.forEach(btn => {
+        html += `<div class="cb-btn-row" style="background:#fff; border:1px solid #d1d5db; padding:6px 10px; border-radius:6px; font-size:12px; display:flex; justify-content:space-between; box-shadow:0 1px 2px rgba(0,0,0,0.02);"><span>${btn.title || 'Botón'}</span> <span class="cb-btn-icon" style="color:#6b7280; font-size:10px;">►</span></div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+
+  if (blocks.length === 0) {
+    html = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size:12px;">Sin contenido.<br>Añade bloques en el Inspector.</div>`;
+  }
+
+  container.innerHTML = html;
+  
+  // Reposicionar salidas para los botones
+  setTimeout(() => repositionOutputs(nodeId), 30);
+}
+
+function repositionOutputs(nodeId) {
+  const nodeEl = document.querySelector(`#node-${nodeId}`);
+  if (!nodeEl) return;
+  
+  // Ocultar todas las salidas mayores a 1 primero
+  for(let i=2; i<=20; i++) {
+    const out = nodeEl.querySelector(`.output_${i}`);
+    if(out) out.style.display = 'none';
+  }
+
+  // Posicionar la salida general (Next Step)
+  const out1 = nodeEl.querySelector('.output_1');
+  if (out1) {
+    out1.style.position = 'absolute';
+    out1.style.top = (nodeEl.offsetHeight - 12) + 'px';
+    out1.style.right = '-8px';
+    out1.style.display = 'block';
+  }
+
+  // Posicionar las salidas de los botones
+  const btnRows = nodeEl.querySelectorAll('.cb-btn-row');
+  const blocks = nodeBlocksState[nodeId] || [];
+  let btnIndex = 0;
+  
+  blocks.forEach(block => {
+    (block.buttons || []).forEach(btn => {
+      const outId = btnIndex + 2;
+      const out = nodeEl.querySelector(`.output_${outId}`);
+      const btnEl = btnRows[btnIndex];
+      if (out && btnEl) {
+        const btnRect = btnEl.getBoundingClientRect();
+        const nodeRect = nodeEl.getBoundingClientRect();
+        const relTop = (btnRect.top - nodeRect.top) + btnRect.height / 2;
+        out.style.position = 'absolute';
+        out.style.top = relTop + 'px';
+        out.style.right = '-8px';
+        out.style.display = 'block';
+      }
+      btnIndex++;
+    });
+  });
+}
+
 function renderActionNode(nodeId) {
   const nodeEl = document.querySelector(`#node-${nodeId}`);
   if (!nodeEl) return;
@@ -75,7 +135,7 @@ function renderActionNode(nodeId) {
 
   const config = nodeActionsState[nodeId];
   if (!config) {
-    preview.innerHTML = `<span class="anp-empty">Sin configurar — haz clic en ⚙️</span>`;
+    preview.innerHTML = `<span class="anp-empty">Selecciona este nodo para configurar</span>`;
     return;
   }
 
@@ -101,42 +161,30 @@ function renderActionNode(nodeId) {
 // ─────────────────────────────────────────────
 const htmlTrigger = `
   <div class="node-trigger">
-    <div class="title-box">⚡ Palabra Clave</div>
+    <div class="title-box">⚡ Palabra Clave (Trigger)</div>
     <div class="box">
       <input type="text" df-keywords placeholder="Ej: precio, info" />
     </div>
   </div>
 `;
 
+// Nodo Legacy de Tarjeta (para compatibilidad)
 const htmlCard = `
   <div class="node-card">
-    <div class="title-box">🖼️ Tarjeta (Imagen)</div>
+    <div class="title-box">🖼️ Tarjeta (Legacy)</div>
     <div class="box">
-      <div style="margin-bottom:10px;">
-        <label style="font-size:11px; color:#aaa;">Opcional: Subir desde tu PC</label>
-        <input type="file" class="file-upload" accept="image/*" style="width:100%; margin-top:3px; background:#222; border:1px solid #444; color:#fff;" />
-        <span class="upload-status" style="font-size:10px; display:block; margin-top:2px;"></span>
-      </div>
-      <input type="text" df-image_url placeholder="URL pública (Se llena sola al subir)" />
-      <input type="text" df-title placeholder="Título principal" />
-      <input type="text" df-subtitle placeholder="Subtítulo (Opcional)" />
-      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
-      <input type="text" df-btn_title placeholder="Texto del botón" />
-      <select df-btn_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
-      <input type="text" df-btn_url placeholder="URL (Si es Sitio Web)" />
+      <p style="font-size:11px; color:#888;">Nodo antiguo, por favor usa el Inspector.</p>
     </div>
   </div>
 `;
 
-// Nodo de acción: muestra resumen visual, abre panel al hacer clic en ⚙️
 const htmlAction = `
   <div class="node-action">
     <div class="title-box">⚡ Realizar Acciones</div>
-    <div class="box">
+    <div class="box" style="padding-bottom:10px;">
       <div class="action-node-preview">
-        <span class="anp-empty">Sin configurar — haz clic en ⚙️</span>
+        <span class="anp-empty">Selecciona este nodo para configurar</span>
       </div>
-      <button class="btn-configure-action">⚙️ Configurar acción</button>
     </div>
   </div>
 `;
@@ -147,57 +195,18 @@ editor.registerNode('card', htmlCard);
 editor.registerNode('action', htmlAction);
 
 // ─────────────────────────────────────────────
-// Agregar nodo Mensaje (dinámico, 1 entrada, 4 salidas)
+// Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
-  const tempHtml = `<div class="node-message"><div class="title-box">💬 Enviar Mensaje</div><div class="box"><textarea df-message placeholder="Escribe el mensaje del bot..."></textarea><div class="btn-list"></div><button class="btn-add">+ Añadir botón</button></div></div>`;
-  const nodeId = editor.addNode('message', 1, 4, posX, posY, 'message', { message: '', _btns: '[]' }, tempHtml);
-  nodeButtonsState[nodeId] = [];
-  setTimeout(() => {
-    const nodeEl = document.querySelector(`#node-${nodeId}`);
-    if (nodeEl) {
-      const addBtn = nodeEl.querySelector('.btn-add');
-      if (addBtn) addBtn.setAttribute('data-nodeid', nodeId);
-      const nodeDiv = nodeEl.querySelector('.node-message');
-      if (nodeDiv) nodeDiv.setAttribute('data-nodeid', nodeId);
-    }
-    repositionOutputs(nodeId);
-  }, 80);
+  const tempHtml = `<div class="node-message"><div class="title-box">💬 Enviar Mensaje</div><div class="box node-blocks-container" style="padding:16px;"></div></div>`;
+  const nodeId = editor.addNode('message', 1, 20, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
+  
+  nodeBlocksState[nodeId] = [
+    { id: generateId(), type: 'text', content: '¡Hola! Escribe aquí...', buttons: [] }
+  ];
+  
+  setTimeout(() => renderBlocksInNode(nodeId), 50);
   return nodeId;
-}
-
-// ─────────────────────────────────────────────
-// Reposicionar conectores de salida
-// ─────────────────────────────────────────────
-function repositionOutputs(nodeId) {
-  const nodeEl = document.querySelector(`#node-${nodeId}`);
-  if (!nodeEl) return;
-  const btns = nodeButtonsState[nodeId] || [];
-  const btnRows = nodeEl.querySelectorAll('.btn-row');
-  const nodeRect = nodeEl.getBoundingClientRect();
-
-  const out1 = nodeEl.querySelector('.output_1');
-  if (out1) {
-    out1.style.position = 'absolute';
-    out1.style.top = (nodeEl.offsetHeight - 10) + 'px';
-    out1.style.right = '-9px';
-    out1.style.display = 'block';
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const out = nodeEl.querySelector(`.output_${i + 2}`);
-    if (!out) continue;
-    if (i < btns.length && btnRows[i]) {
-      const btnRect = btnRows[i].getBoundingClientRect();
-      const relTop = (btnRect.top - nodeRect.top) + btnRect.height / 2;
-      out.style.position = 'absolute';
-      out.style.top = relTop + 'px';
-      out.style.right = '-9px';
-      out.style.display = 'block';
-    } else {
-      out.style.display = 'none';
-    }
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -224,96 +233,128 @@ id.addEventListener('drop', e => {
     editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
   } else if (type === 'message') {
     addMessageNode(posX, posY);
-  } else if (type === 'card') {
-    editor.addNode('card', 1, 1, posX, posY, 'card', { image_url: '', title: '', subtitle: '', btn_title: '', btn_type: 'postback', btn_url: '' }, htmlCard);
   } else if (type === 'action') {
     const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
     nodeActionsState[nodeId] = null;
-    setTimeout(() => {
-      const nodeEl = document.querySelector(`#node-${nodeId}`);
-      if (nodeEl) {
-        const cfgBtn = nodeEl.querySelector('.btn-configure-action');
-        if (cfgBtn) cfgBtn.setAttribute('data-nodeid', nodeId);
-      }
-    }, 60);
+    setTimeout(() => renderActionNode(nodeId), 50);
   }
 });
 
 // ─────────────────────────────────────────────
-// Panel lateral: Editar Botón de Mensaje
+// Panel Inspector (D.2 UX)
 // ─────────────────────────────────────────────
-let activeBtnMeta = null;
+let selectedNodeId = null;
 
-function openBtnPanel(nodeId, idx) {
-  activeBtnMeta = { nodeId, idx };
-  const btn = (nodeButtonsState[nodeId] || [])[idx] || { title: '', type: 'postback', url: '' };
+function openInspector(nodeId) {
+  selectedNodeId = nodeId;
+  const node = editor.getNodeFromId(nodeId);
+  const panel = document.getElementById('config-panel');
+  panel.classList.remove('hidden');
 
-  document.getElementById('config-title').innerText = 'Editar Botón';
-  document.getElementById('config-body').innerHTML = `
-    <label class="cfg-label">Título del botón</label>
-    <input id="cfg-btn-title" class="cfg-input" type="text" value="${btn.title}" placeholder="Ej: Ver catálogo" />
+  if (node.name === 'message') {
+    renderMessageInspector(nodeId);
+  } else if (node.name === 'action') {
+    renderActionInspector(nodeId);
+  } else {
+    document.getElementById('config-title').innerText = 'Inspector';
+    document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
+  }
+}
 
-    <label class="cfg-label" style="margin-top:14px;">Cuando se presione este botón</label>
-    <div class="cfg-type-list">
-      <div class="cfg-type-item ${btn.type === 'postback' ? 'active' : ''}" data-type="postback">
-        <span>🔗</span> Seleccionar paso existente
+function closeInspector() {
+  selectedNodeId = null;
+  document.getElementById('config-panel').classList.add('hidden');
+}
+
+editor.on('nodeSelected', openInspector);
+editor.on('nodeUnselected', closeInspector);
+document.getElementById('close-config').addEventListener('click', closeInspector);
+
+// ─────────────────────────────────────────────
+// Inspector: Mensaje (Bloques)
+// ─────────────────────────────────────────────
+function renderMessageInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Inspector de Mensaje';
+  const blocks = nodeBlocksState[nodeId] || [];
+  let html = '<div class="insp-blocks-list" id="insp-blocks-list">';
+  
+  blocks.forEach((block, idx) => {
+    html += `<div class="insp-block-card" style="background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+      <div class="insp-block-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-weight:600; font-size:13px; color:#374151;">${block.type === 'text' ? '📝 Texto' : '🖼️ Imagen'}</span>
+        <button class="insp-del-btn" onclick="deleteBlock('${nodeId}', ${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:16px;">×</button>
       </div>
-      <div class="cfg-type-item ${btn.type === 'web_url' ? 'active' : ''}" data-type="web_url">
-        <span>🌐</span> Abrir sitio web
-      </div>
-    </div>
+      <div class="insp-block-body">`;
+      
+    if (block.type === 'text') {
+      html += `<textarea class="cfg-input" style="width:100%; min-height:80px; margin-bottom:8px;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Escribe tu mensaje...">${block.content}</textarea>`;
+    } else if (block.type === 'image') {
+      html += `
+        <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen</label>
+        <input class="cfg-input" type="text" style="width:100%; margin-bottom:8px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
+      `;
+    }
 
-    <div id="cfg-url-wrap" style="margin-top:10px; display:${btn.type === 'web_url' ? 'block' : 'none'};">
-      <label class="cfg-label">URL del sitio web</label>
-      <input id="cfg-btn-url" class="cfg-input" type="text" value="${btn.url || ''}" placeholder="https://..." />
-    </div>
-
-    <hr style="border:0; border-top:1px solid #2a2d3e; margin:16px 0;">
-    <button id="cfg-btn-delete" style="background:#ef444420; color:#ef4444; border:1px solid #ef444450; padding:8px 14px; border-radius:6px; cursor:pointer; width:100%; font-size:13px;">🗑️ Eliminar botón</button>
-  `;
-
-  document.querySelectorAll('.cfg-type-item').forEach(item => {
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.cfg-type-item').forEach(i => i.classList.remove('active'));
-      item.classList.add('active');
-      document.getElementById('cfg-url-wrap').style.display = item.dataset.type === 'web_url' ? 'block' : 'none';
-      saveBtnFromPanel();
+    // Botones del bloque
+    html += `<div class="insp-btns-list" style="margin-top:10px;">`;
+    (block.buttons || []).forEach((btn, bIdx) => {
+      html += `
+        <div style="background:#f9fafb; padding:10px; border-radius:6px; border:1px solid #e5e7eb; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Botón ${bIdx + 1}</span>
+            <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px;">Eliminar</button>
+          </div>
+          <input type="text" class="cfg-input" style="width:100%; margin-bottom:6px; padding:6px; font-size:12px;" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="Título del botón..." />
+          <select class="cfg-input" style="width:100%; padding:6px; font-size:12px; margin-bottom:${btn.type==='web_url'?'6px':'0'};" onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, this.value)">
+            <option value="postback" ${btn.type === 'postback'?'selected':''}>Continuar Flujo</option>
+            <option value="web_url" ${btn.type === 'web_url'?'selected':''}>Abrir Web</option>
+          </select>
+          ${btn.type === 'web_url' ? `<input type="text" class="cfg-input" style="width:100%; padding:6px; font-size:12px; margin-bottom:0;" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." />` : ''}
+        </div>
+      `;
     });
+    html += `</div>`;
+    
+    if ((block.buttons || []).length < 3) {
+      html += `<button class="btn-add" onclick="addButton('${nodeId}', ${idx})" style="width:100%; padding:8px; border:1px dashed #d1d5db; background:#f9fafb; color:var(--primary); border-radius:6px; cursor:pointer; font-size:12px; font-weight:500;">+ Añadir Botón</button>`;
+    }
+    
+    html += `</div></div>`;
   });
-
-  document.getElementById('cfg-btn-title').addEventListener('input', saveBtnFromPanel);
-  document.getElementById('cfg-btn-url')?.addEventListener('input', saveBtnFromPanel);
-
-  document.getElementById('cfg-btn-delete').addEventListener('click', () => {
-    nodeButtonsState[nodeId].splice(idx, 1);
-    renderButtonsInNode(nodeId);
-    closePanel();
-  });
-
-  document.getElementById('config-panel').classList.remove('hidden');
+  
+  html += `</div>`; // .insp-blocks-list
+  
+  html += `
+    <div style="margin-top:20px; padding:15px; border-radius:8px; background:#f3f4f6;">
+      <label class="cfg-label" style="text-align:center; display:block; margin-bottom:10px;">Añadir bloque de contenido:</label>
+      <div style="display:flex; gap:10px;">
+        <button class="btn-primary" onclick="addBlock('${nodeId}', 'text')" style="flex:1; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:500;">📝 Texto</button>
+        <button class="btn-primary" onclick="addBlock('${nodeId}', 'image')" style="flex:1; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:500;">🖼️ Imagen</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('config-body').innerHTML = html;
 }
 
-function saveBtnFromPanel() {
-  if (!activeBtnMeta) return;
-  const { nodeId, idx } = activeBtnMeta;
-  const title = document.getElementById('cfg-btn-title')?.value || '';
-  const type = document.querySelector('.cfg-type-item.active')?.dataset.type || 'postback';
-  const url = document.getElementById('cfg-btn-url')?.value || '';
-  if (!nodeButtonsState[nodeId]) nodeButtonsState[nodeId] = [];
-  nodeButtonsState[nodeId][idx] = { title, type, url };
-  renderButtonsInNode(nodeId);
-}
+// Global window functions for the generated HTML
+window.updateBlockContent = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].content = val; renderBlocksInNode(nodeId); };
+window.updateBlockUrl = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].url = val; renderBlocksInNode(nodeId); };
+window.deleteBlock = (nodeId, idx) => { nodeBlocksState[nodeId].splice(idx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
+window.addBlock = (nodeId, type) => { nodeBlocksState[nodeId].push({id: generateId(), type, content: type==='text'?'Nuevo texto':'', url:'', buttons:[]}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
+window.addButton = (nodeId, idx) => { nodeBlocksState[nodeId][idx].buttons.push({title:'Nuevo Botón', type:'postback', url:''}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
+window.deleteButton = (nodeId, idx, bIdx) => { nodeBlocksState[nodeId][idx].buttons.splice(bIdx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
+window.updateBtnTitle = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].title = val; renderBlocksInNode(nodeId); };
+window.updateBtnType = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].type = val; renderMessageInspector(nodeId); };
+window.updateBtnUrl = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].url = val; };
 
 // ─────────────────────────────────────────────
-// Panel lateral: Configurar Nodo de Acción
+// Inspector: Acción
 // ─────────────────────────────────────────────
-function openActionPanel(nodeId) {
-  activeBtnMeta = null;
+function renderActionInspector(nodeId) {
   const currentConfig = nodeActionsState[nodeId] || null;
-
-  // Pre-seleccionar categoría y acción si ya había configuración
   let selectedCat = 'contact';
   let selectedAction = null;
+  
   if (currentConfig) {
     for (const [catKey, cat] of Object.entries(ACTION_CATALOG)) {
       const found = cat.actions.find(a => a.id === currentConfig.type);
@@ -321,9 +362,8 @@ function openActionPanel(nodeId) {
     }
   }
 
-  function renderActionPanelContent() {
-    document.getElementById('config-title').innerText = 'Realizar Acciones';
-
+  function _render() {
+    document.getElementById('config-title').innerText = 'Inspector de Acción';
     const catTabs = Object.entries(ACTION_CATALOG).map(([key, cat]) =>
       `<div class="cfg-cat-tab ${key === selectedCat ? 'active' : ''}" data-cat="${key}">${cat.label}</div>`
     ).join('');
@@ -343,143 +383,52 @@ function openActionPanel(nodeId) {
     if (selectedAction && selectedAction.params.length > 0) {
       const savedParams = (currentConfig?.type === selectedAction.id) ? currentConfig.params : {};
       paramsHtml = `
-        <hr style="border:0; border-top:1px solid #2a2d3e; margin:12px 0;">
-        <label class="cfg-label" style="color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;">Configuración</label>
+        <hr style="border:0; border-top:1px solid #e5e7eb; margin:15px 0;">
+        <label class="cfg-label">Parámetros</label>
         ${selectedAction.params.map(p => `
-          <label class="cfg-label" style="margin-top:10px;">${p.label}</label>
+          <label class="cfg-label" style="margin-top:10px; font-weight:normal;">${p.label}</label>
           <input class="cfg-input cfg-action-param" data-key="${p.key}" type="text"
             value="${savedParams[p.key] || ''}" placeholder="${p.placeholder || ''}" />
         `).join('')}
       `;
-    } else if (selectedAction) {
-      paramsHtml = `<hr style="border:0; border-top:1px solid #2a2d3e; margin:12px 0;"><p style="font-size:12px; color:var(--text-muted);">Esta acción no requiere configuración adicional.</p>`;
     }
 
-    const saveBtn = selectedAction
-      ? `<button id="cfg-action-save">Guardar acción</button>` : '';
+    const saveBtn = selectedAction ? `<button id="cfg-action-save" class="btn-primary" style="width:100%; margin-top:15px; padding:10px;">Aplicar Configuración</button>` : '';
 
     document.getElementById('config-body').innerHTML = `
       <div class="cfg-cat-tabs">${catTabs}</div>
       <div class="cfg-actions-list">${actionItems}</div>
       ${paramsHtml}
-      <div style="margin-top:14px;">${saveBtn}</div>
+      ${saveBtn}
     `;
 
-    // Eventos
     document.querySelectorAll('.cfg-cat-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        selectedCat = tab.dataset.cat;
-        selectedAction = null;
-        renderActionPanelContent();
-      });
+      tab.addEventListener('click', () => { selectedCat = tab.dataset.cat; selectedAction = null; _render(); });
     });
-
     document.querySelectorAll('.cfg-action-item').forEach(item => {
       item.addEventListener('click', () => {
         selectedCat = item.dataset.cat;
         selectedAction = ACTION_CATALOG[selectedCat].actions.find(a => a.id === item.dataset.action);
-        renderActionPanelContent();
+        _render();
       });
     });
-
     document.getElementById('cfg-action-save')?.addEventListener('click', () => {
       if (!selectedAction) return;
       const params = {};
-      document.querySelectorAll('.cfg-action-param').forEach(input => {
-        params[input.dataset.key] = input.value.trim();
-      });
+      document.querySelectorAll('.cfg-action-param').forEach(input => { params[input.dataset.key] = input.value.trim(); });
       nodeActionsState[nodeId] = { type: selectedAction.id, params };
-      // Persistir en Drawflow data
       if (editor.drawflow.drawflow.Home.data[nodeId]) {
         editor.drawflow.drawflow.Home.data[nodeId].data._action = JSON.stringify(nodeActionsState[nodeId]);
       }
       renderActionNode(nodeId);
-      closePanel();
+      closeInspector(); // Opcional: auto-cerrar tras guardar
     });
   }
-
-  renderActionPanelContent();
-  document.getElementById('config-panel').classList.remove('hidden');
+  _render();
 }
 
-function closePanel() {
-  activeBtnMeta = null;
-  document.getElementById('config-panel').classList.add('hidden');
-}
-
-document.getElementById('close-config').addEventListener('click', closePanel);
-
 // ─────────────────────────────────────────────
-// Delegación de eventos en el canvas
-// ─────────────────────────────────────────────
-id.addEventListener('click', e => {
-  // Clic en "+ Añadir botón"
-  const addBtn = e.target.closest('.btn-add');
-  if (addBtn) {
-    const nodeId = addBtn.getAttribute('data-nodeid');
-    if (!nodeId) return;
-    if (!nodeButtonsState[nodeId]) nodeButtonsState[nodeId] = [];
-    if (nodeButtonsState[nodeId].length >= 3) return;
-    const idx = nodeButtonsState[nodeId].length;
-    nodeButtonsState[nodeId].push({ title: 'Nuevo Botón', type: 'postback', url: '' });
-    renderButtonsInNode(nodeId);
-    openBtnPanel(nodeId, idx);
-    return;
-  }
-
-  // Clic en ✏️ editar botón
-  const editBtn = e.target.closest('.btn-edit-icon');
-  if (editBtn) {
-    const nodeId = editBtn.getAttribute('data-nodeid');
-    const idx = parseInt(editBtn.getAttribute('data-idx'), 10);
-    openBtnPanel(nodeId, idx);
-    return;
-  }
-
-  // Clic en ⚙️ configurar acción
-  const cfgBtn = e.target.closest('.btn-configure-action');
-  if (cfgBtn) {
-    const nodeId = cfgBtn.getAttribute('data-nodeid');
-    if (!nodeId) return;
-    openActionPanel(nodeId);
-  }
-});
-
-// ─────────────────────────────────────────────
-// Subida de imágenes
-// ─────────────────────────────────────────────
-id.addEventListener('change', async (e) => {
-  if (e.target.classList.contains('file-upload')) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const statusSpan = e.target.nextElementSibling;
-    statusSpan.innerText = "Subiendo archivo...";
-    statusSpan.style.color = "#f59e0b";
-    const formData = new FormData();
-    formData.append('image', file);
-    try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.url) {
-        statusSpan.innerText = "¡Subida con éxito!";
-        statusSpan.style.color = "#10b981";
-        const box = e.target.closest('.box');
-        const urlInput = box.querySelector('input[df-image_url]');
-        urlInput.value = data.url;
-        urlInput.dispatchEvent(new Event('change'));
-      } else {
-        statusSpan.innerText = "Error: " + (data.error || 'Desconocido');
-        statusSpan.style.color = "#ef4444";
-      }
-    } catch(err) {
-      statusSpan.innerText = "Error de red.";
-      statusSpan.style.color = "#ef4444";
-    }
-  }
-});
-
-// ─────────────────────────────────────────────
-// buildStepsFromNode (recursivo)
+// buildStepsFromNode (recursivo - Convertir a formato backend)
 // ─────────────────────────────────────────────
 function buildStepsFromNode(nodeId, nodes, flowsConfig) {
   let steps = [];
@@ -490,79 +439,87 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
     if (!node) break;
 
     if (node.name === 'message') {
-      const btns = nodeButtonsState[currentId] || JSON.parse(node.data._btns || '[]');
-      if (btns.length === 0) {
-        steps.push({ type: 'text', message: node.data.message });
-        currentId = node.outputs.output_1?.connections[0]?.node;
-      } else {
-        const templateBtns = btns.map((btn, i) => {
-          if (btn.type === 'web_url') {
-            return { type: 'web_url', title: btn.title, url: btn.url };
+      const blocks = nodeBlocksState[currentId] || JSON.parse(node.data._blocks || '[]');
+      let btnIndex = 0;
+
+      blocks.forEach(block => {
+        if (block.type === 'text') {
+          if (!block.buttons || block.buttons.length === 0) {
+            steps.push({ type: 'text', message: block.content });
           } else {
-            const payload = `POSTBACK_${currentId}_BTN${i}`;
-            const connectedNodeId = node.outputs[`output_${i + 2}`]?.connections[0]?.node;
-            if (connectedNodeId) {
-              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
-              if (hiddenSteps.length > 0) {
-                flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Botón ${btn.title}`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
+            const templateBtns = block.buttons.map(btn => {
+              if (btn.type === 'web_url') return { type: 'web_url', title: btn.title, url: btn.url };
+              const payload = `POSTBACK_${currentId}_BTN${btnIndex}`;
+              const connectedNodeId = node.outputs[`output_${btnIndex + 2}`]?.connections[0]?.node;
+              if (connectedNodeId) {
+                const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+                if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Botón`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
               }
-            }
-            return { type: 'postback', title: btn.title, payload };
+              btnIndex++;
+              return { type: 'postback', title: btn.title, payload };
+            });
+            steps.push({ type: 'template', message: block.content, buttons: templateBtns });
           }
-        });
-        steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
-        currentId = node.outputs.output_1?.connections[0]?.node;
-      }
+        } else if (block.type === 'image') {
+          const cardData = { image_url: block.url, title: 'Adjunto', subtitle: '', btn_type: 'postback', btn_title: '', btn_url: '' };
+          if (block.buttons && block.buttons.length > 0) {
+             const btn = block.buttons[0]; // Card solo soporta 1 botón bien en FB/IG
+             cardData.btn_title = btn.title;
+             cardData.btn_type = btn.type;
+             cardData.btn_url = btn.url;
+             if (btn.type === 'postback') {
+                const payload = `POSTBACK_${currentId}_BTN${btnIndex}`;
+                cardData.btn_payload = payload;
+                const connectedNodeId = node.outputs[`output_${btnIndex + 2}`]?.connections[0]?.node;
+                if (connectedNodeId) {
+                  const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+                  if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Botón`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
+                }
+                btnIndex++;
+             }
+          }
+          steps.push({ type: 'card', message: '', card: cardData });
+        }
+      });
+      currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else if (node.name === 'card') {
-      const cardData = {
-        image_url: node.data.image_url?.trim() || '',
-        title: node.data.title?.trim() || '',
-        subtitle: node.data.subtitle?.trim() || '',
-        btn_title: node.data.btn_title?.trim() || '',
-        btn_type: node.data.btn_type,
-        btn_url: node.data.btn_url?.trim() || ''
-      };
+      // Legacy support
+      const cardData = { image_url: node.data.image_url||'', title: node.data.title||'', subtitle: node.data.subtitle||'', btn_title: node.data.btn_title||'', btn_type: node.data.btn_type, btn_url: node.data.btn_url||'' };
       if (cardData.btn_type === 'postback') {
         const payload = `POSTBACK_${currentId}_CARD`;
         cardData.btn_payload = payload;
         const connectedNodeId = node.outputs.output_1?.connections[0]?.node;
         if (connectedNodeId) {
           const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
-          if (hiddenSteps.length > 0) {
-            flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Tarjeta`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
-          }
+          if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Tarjeta`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
         }
       }
       steps.push({ type: 'card', message: '', card: cardData });
       currentId = null;
     }
     else if (node.name === 'action') {
-      // Recuperar config del estado o del campo serializado
       const config = nodeActionsState[currentId] || JSON.parse(node.data._action || 'null');
-      if (config) {
-        steps.push({ type: 'action', actionType: config.type, params: config.params });
-      }
+      if (config) steps.push({ type: 'action', actionType: config.type, params: config.params });
       currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else {
-      break;
+      break; // Trigger o nodo final
     }
   }
   return steps;
 }
 
 // ─────────────────────────────────────────────
-// Guardar
+// Guardar y Exportar
 // ─────────────────────────────────────────────
 document.getElementById('btn-save').addEventListener('click', async () => {
-  // Sincronizar estado de botones con Drawflow
-  for (const nodeId in nodeButtonsState) {
+  // Sincronizar estado de bloques y acciones con Drawflow
+  for (const nodeId in nodeBlocksState) {
     if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._btns = JSON.stringify(nodeButtonsState[nodeId]);
+      editor.drawflow.drawflow.Home.data[nodeId].data._blocks = JSON.stringify(nodeBlocksState[nodeId]);
     }
   }
-  // Sincronizar estado de acciones con Drawflow
   for (const nodeId in nodeActionsState) {
     if (editor.drawflow.drawflow.Home.data[nodeId] && nodeActionsState[nodeId]) {
       editor.drawflow.drawflow.Home.data[nodeId].data._action = JSON.stringify(nodeActionsState[nodeId]);
@@ -599,15 +556,32 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────
-// Nodo de ejemplo inicial
+// Carga Inicial (Ejemplo)
 // ─────────────────────────────────────────────
 setTimeout(() => {
-  editor.addNode('trigger', 0, 1, 100, 200, 'trigger', { keywords: 'precio, valor' }, htmlTrigger);
-  const msgId = addMessageNode(450, 200);
-  setTimeout(() => {
-    editor.addConnection(1, msgId, 'output_1', 'input_1');
-    if (editor.drawflow.drawflow.Home.data[msgId]) {
-      editor.drawflow.drawflow.Home.data[msgId].data.message = '¡Hola! Nuestros faroles rústicos comienzan en $150.';
+  if (Object.keys(editor.drawflow.drawflow.Home.data).length === 0) {
+    editor.addNode('trigger', 0, 1, 100, 200, 'trigger', { keywords: 'precio, valor' }, htmlTrigger);
+    const msgId = addMessageNode(450, 200);
+    setTimeout(() => {
+      editor.addConnection(1, msgId, 'output_1', 'input_1');
+      if (nodeBlocksState[msgId]) {
+        nodeBlocksState[msgId][0].content = '¡Hola! Nuestros faroles rústicos comienzan en $150.';
+        renderBlocksInNode(msgId);
+      }
+    }, 100);
+  } else {
+    // Restaurar los estados desde Drawflow si ya habían datos guardados (en un entorno de carga real)
+    const nodes = editor.drawflow.drawflow.Home.data;
+    for (const nodeId in nodes) {
+       const node = nodes[nodeId];
+       if (node.name === 'message' && node.data._blocks) {
+         nodeBlocksState[nodeId] = JSON.parse(node.data._blocks);
+         renderBlocksInNode(nodeId);
+       }
+       if (node.name === 'action' && node.data._action) {
+         nodeActionsState[nodeId] = JSON.parse(node.data._action);
+         renderActionNode(nodeId);
+       }
     }
-  }, 100);
+  }
 }, 150);
