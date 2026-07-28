@@ -200,10 +200,13 @@ async function handleComment(value) {
 
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
-  // Respuesta automática al comentario
+  // Respuesta automática al comentario pública
   const replyText = `Gracias @${fromName} por tu comentario! 🙌`;
   recentReplies.add(replyText);
   await replyComment(commentId, replyText);
+
+  // Enviar mensaje privado (DM) a quien comentó
+  await sendPrivateReply(commentId, `Hola @${fromName}! Vimos tu comentario: "${text}". Te escribimos por aquí para darte una atención más personalizada. ¿En qué podemos ayudarte?`);
 }
 
 // ─────────────────────────────────────────────
@@ -258,6 +261,29 @@ async function replyComment(commentId, text) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error respondiendo comentario:', errorMsg);
     broadcastLog('ERROR', `Error al responder comentario: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar respuesta privada (DM) a un comentario
+// DOC: https://developers.facebook.com/docs/messenger-platform/instagram/features/private-replies
+// ─────────────────────────────────────────────
+async function sendPrivateReply(commentId, text) {
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { comment_id: commentId },
+        message:   { text },
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    console.log(`✅ DM privado enviado al autor del comentario ${commentId}`);
+    broadcastLog('SYSTEM', `DM enviado en privado al autor del comentario`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando DM privado:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar DM privado: ${errorMsg}`);
   }
 }
 
