@@ -233,6 +233,11 @@
         evtSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
             
+            // Si es un mensaje de conexión pero ya tenemos logs, lo ignoramos para no hacer spam visual
+            if (data.type === 'SYSTEM' && data.message.includes('Conectado') && logsContainer.children.length > 1) {
+                return;
+            }
+
             if (emptyState) {
                 emptyState.style.display = 'none';
             }
@@ -247,13 +252,9 @@
         };
 
         evtSource.onerror = (err) => {
-            console.error("EventSource failed:", err);
-            const errorLog = {
-                type: 'ERROR',
-                message: 'Conexión con el servidor perdida. Reintentando...',
-                timestamp: Date.now()
-            };
-            logsContainer.prepend(createLogElement(errorLog));
+            // El navegador reconectará automáticamente. 
+            // Mantenemos el error solo en la consola para no asustar al usuario visualmente.
+            console.warn("La conexión en vivo se interrumpió temporalmente (EventSource). Reconectando de forma silenciosa...");
         };
     </script>
 </body>
