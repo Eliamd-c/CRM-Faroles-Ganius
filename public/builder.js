@@ -3,57 +3,61 @@ const editor = new Drawflow(id);
 editor.reroute = true;
 editor.start();
 
-// Definición de Nodos HTML para Drawflow
+// ─────────────────────────────────────────────
+// Estado global: datos de botones por nodo
+// (Drawflow solo guarda campos df-*, los botones
+//  dinámicos se guardan aquí y en el JSON exportado)
+// ─────────────────────────────────────────────
+const nodeButtonsState = {}; // { nodeId: [ {title, type, url}, ... ] }
+
+// ─────────────────────────────────────────────
+// Helpers: construir el HTML interno de los botones
+// ─────────────────────────────────────────────
+function renderButtonsInNode(nodeId) {
+  const container = document.querySelector(`#node-${nodeId} .btn-list`);
+  if (!container) return;
+  const btns = nodeButtonsState[nodeId] || [];
+  container.innerHTML = '';
+  btns.forEach((btn, idx) => {
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    row.innerHTML = `
+      <span class="btn-label">${btn.title || 'Sin título'}</span>
+      <button class="btn-edit-icon" data-nodeid="${nodeId}" data-idx="${idx}" title="Editar">✏️</button>
+    `;
+    container.appendChild(row);
+  });
+
+  // Botón de agregar (solo si hay menos de 3)
+  const addBtn = container.parentElement.querySelector('.btn-add');
+  if (addBtn) addBtn.style.display = btns.length >= 3 ? 'none' : 'flex';
+}
+
+// ─────────────────────────────────────────────
+// Template HTML del nuevo nodo unificado
+// ─────────────────────────────────────────────
+function buildMessageNodeHtml(nodeId) {
+  return `
+  <div class="node-message" data-nodeid="${nodeId}">
+    <div class="title-box">💬 Enviar Mensaje</div>
+    <div class="box">
+      <textarea df-message placeholder="Escribe el mensaje del bot..."></textarea>
+      <div class="btn-list"></div>
+      <button class="btn-add" data-nodeid="${nodeId}">+ Añadir botón</button>
+    </div>
+  </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// Definición de Nodos: Trigger, Card, Action
+// (el nodo Message se construye dinámicamente)
+// ─────────────────────────────────────────────
 const htmlTrigger = `
   <div class="node-trigger">
     <div class="title-box">⚡ Palabra Clave</div>
     <div class="box">
       <input type="text" df-keywords placeholder="Ej: precio, info" />
-    </div>
-  </div>
-`;
-
-const htmlText = `
-  <div class="node-text">
-    <div class="title-box">💬 Mensaje de Texto</div>
-    <div class="box">
-      <textarea df-message placeholder="Escribe el mensaje del bot..."></textarea>
-    </div>
-  </div>
-`;
-
-const htmlButtons = `
-  <div class="node-buttons">
-    <div class="title-box">🔘 Respuestas Rápidas</div>
-    <div class="box">
-      <textarea df-message placeholder="Texto del mensaje..."></textarea>
-      <input type="text" df-btn1 placeholder="Botón 1 (Obligatorio)" />
-      <input type="text" df-btn2 placeholder="Botón 2 (Opcional)" />
-      <input type="text" df-btn3 placeholder="Botón 3 (Opcional)" />
-    </div>
-  </div>
-`;
-
-const htmlTemplate = `
-  <div class="node-template">
-    <div class="title-box">🔀 Plantilla de Botones</div>
-    <div class="box">
-      <textarea df-message placeholder="Texto principal..."></textarea>
-      
-      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
-      <input type="text" df-btn1_title placeholder="Botón 1 (Obligatorio)" />
-      <select df-btn1_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
-      <input type="text" df-btn1_url placeholder="URL (Si es Sitio Web)" />
-      
-      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
-      <input type="text" df-btn2_title placeholder="Botón 2 (Opcional)" />
-      <select df-btn2_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
-      <input type="text" df-btn2_url placeholder="URL" />
-
-      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
-      <input type="text" df-btn3_title placeholder="Botón 3 (Opcional)" />
-      <select df-btn3_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
-      <input type="text" df-btn3_url placeholder="URL" />
     </div>
   </div>
 `;
@@ -70,7 +74,6 @@ const htmlCard = `
       <input type="text" df-image_url placeholder="URL pública (Se llena sola al subir)" />
       <input type="text" df-title placeholder="Título principal" />
       <input type="text" df-subtitle placeholder="Subtítulo (Opcional)" />
-      
       <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
       <input type="text" df-btn_title placeholder="Texto del botón" />
       <select df-btn_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
@@ -89,15 +92,39 @@ const htmlAction = `
   </div>
 `;
 
-// Registrar los tipos de nodos
+// Registrar nodos estáticos
 editor.registerNode('trigger', htmlTrigger);
-editor.registerNode('text', htmlText);
-editor.registerNode('buttons', htmlButtons);
-editor.registerNode('template', htmlTemplate);
 editor.registerNode('card', htmlCard);
 editor.registerNode('action', htmlAction);
 
-// Configuración de Drag & Drop desde la barra lateral
+// ─────────────────────────────────────────────
+// Función que agrega un nodo Message al canvas
+// ─────────────────────────────────────────────
+function addMessageNode(posX, posY) {
+  // Primero agregar con HTML temporal para obtener el ID
+  const tempHtml = `<div class="node-message"><div class="title-box">💬 Enviar Mensaje</div><div class="box"><textarea df-message placeholder="Escribe el mensaje del bot..."></textarea><div class="btn-list"></div><button class="btn-add">+ Añadir botón</button></div></div>`;
+  const nodeId = editor.addNode('message', 1, 1, posX, posY, 'message', { message: '', _btns: '[]' }, tempHtml);
+
+  // Inicializar estado de botones para este nodo
+  nodeButtonsState[nodeId] = [];
+
+  // Asignar data-nodeid correcto al botón después de que Drawflow lo renderice
+  setTimeout(() => {
+    const nodeEl = document.querySelector(`#node-${nodeId}`);
+    if (nodeEl) {
+      const addBtn = nodeEl.querySelector('.btn-add');
+      if (addBtn) addBtn.setAttribute('data-nodeid', nodeId);
+      const nodeDiv = nodeEl.querySelector('.node-message');
+      if (nodeDiv) nodeDiv.setAttribute('data-nodeid', nodeId);
+    }
+  }, 50);
+
+  return nodeId;
+}
+
+// ─────────────────────────────────────────────
+// Drag & Drop
+// ─────────────────────────────────────────────
 const elements = document.querySelectorAll('.drag-item');
 elements.forEach(el => {
   el.addEventListener('dragstart', e => {
@@ -109,31 +136,19 @@ id.addEventListener('dragover', e => e.preventDefault());
 id.addEventListener('drop', e => {
   e.preventDefault();
   const type = e.dataTransfer.getData('node');
-  // Ajustar coordenadas para soltar exactamente donde está el cursor
   const rect = id.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  
-  // Posición ajustada por el zoom y pan del editor
   const posX = x * (editor.precanvas.clientWidth / (editor.precanvas.clientWidth * editor.zoom)) - (editor.precanvas.getBoundingClientRect().x * (editor.precanvas.clientWidth / (editor.precanvas.clientWidth * editor.zoom)));
   const posY = y * (editor.precanvas.clientHeight / (editor.precanvas.clientHeight * editor.zoom)) - (editor.precanvas.getBoundingClientRect().y * (editor.precanvas.clientHeight / (editor.precanvas.clientHeight * editor.zoom)));
 
   if (type === 'trigger') {
     editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
-  } else if (type === 'text') {
-    editor.addNode('text', 1, 1, posX, posY, 'text', { message: '' }, htmlText);
-  } else if (type === 'buttons') {
-    editor.addNode('buttons', 1, 1, posX, posY, 'buttons', { message: '', btn1: '', btn2: '', btn3: '' }, htmlButtons);
-  } else if (type === 'template') {
-    editor.addNode('template', 1, 3, posX, posY, 'template', { 
-      message: '', 
-      btn1_title: '', btn1_type: 'postback', btn1_url: '',
-      btn2_title: '', btn2_type: 'postback', btn2_url: '',
-      btn3_title: '', btn3_type: 'postback', btn3_url: ''
-    }, htmlTemplate);
+  } else if (type === 'message') {
+    addMessageNode(posX, posY);
   } else if (type === 'card') {
-    editor.addNode('card', 1, 1, posX, posY, 'card', { 
-      image_url: '', title: '', subtitle: '', 
+    editor.addNode('card', 1, 1, posX, posY, 'card', {
+      image_url: '', title: '', subtitle: '',
       btn_title: '', btn_type: 'postback', btn_url: ''
     }, htmlCard);
   } else if (type === 'action') {
@@ -141,62 +156,169 @@ id.addEventListener('drop', e => {
   }
 });
 
-// Función recursiva para trazar los cables
+// ─────────────────────────────────────────────
+// Panel lateral: Editar botón
+// ─────────────────────────────────────────────
+let activeBtnMeta = null; // { nodeId, idx }
+
+function openBtnPanel(nodeId, idx) {
+  activeBtnMeta = { nodeId, idx };
+  const btn = (nodeButtonsState[nodeId] || [])[idx] || { title: '', type: 'postback', url: '' };
+
+  document.getElementById('config-title').innerText = 'Editar Botón';
+  document.getElementById('config-body').innerHTML = `
+    <label class="cfg-label">Título del botón</label>
+    <input id="cfg-btn-title" class="cfg-input" type="text" value="${btn.title}" placeholder="Ej: Ver catálogo" />
+
+    <label class="cfg-label" style="margin-top:14px;">Cuando se presione este botón</label>
+    <div class="cfg-type-list">
+      <div class="cfg-type-item ${btn.type === 'postback' ? 'active' : ''}" data-type="postback">
+        <span>🔀</span> Seleccionar paso existente
+      </div>
+      <div class="cfg-type-item ${btn.type === 'web_url' ? 'active' : ''}" data-type="web_url">
+        <span>🌐</span> Abrir sitio web
+      </div>
+    </div>
+
+    <div id="cfg-url-wrap" style="margin-top:10px; display:${btn.type === 'web_url' ? 'block' : 'none'};">
+      <label class="cfg-label">URL del sitio web</label>
+      <input id="cfg-btn-url" class="cfg-input" type="text" value="${btn.url || ''}" placeholder="https://..." />
+    </div>
+
+    <hr style="border:0; border-top:1px solid #2a2d3e; margin:16px 0;">
+    <button id="cfg-btn-delete" style="background:#ef444420; color:#ef4444; border:1px solid #ef444450; padding:8px 14px; border-radius:6px; cursor:pointer; width:100%; font-size:13px;">🗑️ Eliminar botón</button>
+  `;
+
+  // Eventos del panel
+  document.querySelectorAll('.cfg-type-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.cfg-type-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById('cfg-url-wrap').style.display = item.dataset.type === 'web_url' ? 'block' : 'none';
+      saveBtnFromPanel();
+    });
+  });
+
+  document.getElementById('cfg-btn-title').addEventListener('input', saveBtnFromPanel);
+  document.getElementById('cfg-btn-url')?.addEventListener('input', saveBtnFromPanel);
+
+  document.getElementById('cfg-btn-delete').addEventListener('click', () => {
+    nodeButtonsState[nodeId].splice(idx, 1);
+    renderButtonsInNode(nodeId);
+    closePanel();
+  });
+
+  document.getElementById('config-panel').classList.remove('hidden');
+}
+
+function saveBtnFromPanel() {
+  if (!activeBtnMeta) return;
+  const { nodeId, idx } = activeBtnMeta;
+  const title = document.getElementById('cfg-btn-title')?.value || '';
+  const type = document.querySelector('.cfg-type-item.active')?.dataset.type || 'postback';
+  const url = document.getElementById('cfg-btn-url')?.value || '';
+  if (!nodeButtonsState[nodeId]) nodeButtonsState[nodeId] = [];
+  nodeButtonsState[nodeId][idx] = { title, type, url };
+  renderButtonsInNode(nodeId);
+}
+
+function closePanel() {
+  activeBtnMeta = null;
+  document.getElementById('config-panel').classList.add('hidden');
+}
+
+document.getElementById('close-config').addEventListener('click', closePanel);
+
+// ─────────────────────────────────────────────
+// Delegación de eventos en el canvas
+// ─────────────────────────────────────────────
+id.addEventListener('click', e => {
+  // Clic en "Añadir botón"
+  const addBtn = e.target.closest('.btn-add');
+  if (addBtn) {
+    const nodeId = addBtn.getAttribute('data-nodeid');
+    if (!nodeId) return;
+    if (!nodeButtonsState[nodeId]) nodeButtonsState[nodeId] = [];
+    if (nodeButtonsState[nodeId].length >= 3) return;
+    const idx = nodeButtonsState[nodeId].length;
+    nodeButtonsState[nodeId].push({ title: 'Nuevo Botón', type: 'postback', url: '' });
+    renderButtonsInNode(nodeId);
+    openBtnPanel(nodeId, idx);
+    return;
+  }
+
+  // Clic en editar botón (ícono lápiz)
+  const editBtn = e.target.closest('.btn-edit-icon');
+  if (editBtn) {
+    const nodeId = editBtn.getAttribute('data-nodeid');
+    const idx = parseInt(editBtn.getAttribute('data-idx'), 10);
+    openBtnPanel(nodeId, idx);
+  }
+});
+
+// ─────────────────────────────────────────────
+// Subida de imágenes
+// ─────────────────────────────────────────────
+id.addEventListener('change', async (e) => {
+  if (e.target.classList.contains('file-upload')) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusSpan = e.target.nextElementSibling;
+    statusSpan.innerText = "Subiendo archivo...";
+    statusSpan.style.color = "#f59e0b";
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.url) {
+        statusSpan.innerText = "¡Subida con éxito!";
+        statusSpan.style.color = "#10b981";
+        const box = e.target.closest('.box');
+        const urlInput = box.querySelector('input[df-image_url]');
+        urlInput.value = data.url;
+        urlInput.dispatchEvent(new Event('change'));
+      } else {
+        statusSpan.innerText = "Error: " + (data.error || 'Desconocido');
+        statusSpan.style.color = "#ef4444";
+      }
+    } catch(err) {
+      statusSpan.innerText = "Error de red.";
+      statusSpan.style.color = "#ef4444";
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
+// buildStepsFromNode (recursivo)
+// ─────────────────────────────────────────────
 function buildStepsFromNode(nodeId, nodes, flowsConfig) {
   let steps = [];
   let currentId = nodeId;
-  
+
   while (currentId) {
     const node = nodes[currentId];
     if (!node) break;
 
-    if (node.name === 'text') {
-      steps.push({ type: 'text', message: node.data.message });
-      currentId = node.outputs.output_1?.connections[0]?.node;
-    } 
-    else if (node.name === 'buttons') {
-      const btns = [];
-      if (node.data.btn1 && node.data.btn1.trim()) btns.push({ title: node.data.btn1.trim() });
-      if (node.data.btn2 && node.data.btn2.trim()) btns.push({ title: node.data.btn2.trim() });
-      if (node.data.btn3 && node.data.btn3.trim()) btns.push({ title: node.data.btn3.trim() });
-      steps.push({ type: 'buttons', message: node.data.message, buttons: btns });
-      currentId = node.outputs.output_1?.connections[0]?.node;
-    }
-    else if (node.name === 'template') {
-      const templateBtns = [];
-      // Para cada botón, comprobamos si tiene cable (postback) o es web
-      for (let i = 1; i <= 3; i++) {
-        const title = node.data[`btn${i}_title`];
-        const type = node.data[`btn${i}_type`];
-        const url = node.data[`btn${i}_url`];
-        const connectedNodeId = node.outputs[`output_${i}`]?.connections[0]?.node;
-        
-        if (title && title.trim()) {
-          if (type === 'web_url') {
-            templateBtns.push({ type: 'web_url', title: title.trim(), url: url?.trim() || '' });
+    if (node.name === 'message') {
+      // Recuperar botones del estado o del campo _btns serializado
+      const btns = nodeButtonsState[currentId] || JSON.parse(node.data._btns || '[]');
+      if (btns.length === 0) {
+        // Nodo de texto puro
+        steps.push({ type: 'text', message: node.data.message });
+      } else {
+        // Nodo con botones → template
+        const templateBtns = btns.map((btn, i) => {
+          if (btn.type === 'web_url') {
+            return { type: 'web_url', title: btn.title, url: btn.url };
           } else {
-            // Postback
-            const payload = `POSTBACK_${node.id}_BTN${i}`;
-            templateBtns.push({ type: 'postback', title: title.trim(), payload: payload });
-            
-            // Crear el "Flujo Oculto"
-            if (connectedNodeId) {
-              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
-              if (hiddenSteps.length > 0) {
-                flowsConfig.flows.push({
-                  id: `flow_${payload}`,
-                  name: `Ruta Oculta ${title.trim()}`,
-                  keywords: [payload],
-                  matchType: 'contains',
-                  steps: hiddenSteps
-                });
-              }
-            }
+            const payload = `POSTBACK_${currentId}_BTN${i}`;
+            return { type: 'postback', title: btn.title, payload };
           }
-        }
+        });
+        steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
       }
-      steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
-      currentId = null; // Se ramifica, detenemos el camino principal
+      currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else if (node.name === 'card') {
       const cardData = {
@@ -207,35 +329,23 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
         btn_type: node.data.btn_type,
         btn_url: node.data.btn_url?.trim() || ''
       };
-
-      const connectedNodeId = node.outputs.output_1?.connections[0]?.node;
-
       if (cardData.btn_type === 'postback') {
-        const payload = `POSTBACK_${node.id}_CARD`;
+        const payload = `POSTBACK_${currentId}_CARD`;
         cardData.btn_payload = payload;
-
+        const connectedNodeId = node.outputs.output_1?.connections[0]?.node;
         if (connectedNodeId) {
           const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
           if (hiddenSteps.length > 0) {
-            flowsConfig.flows.push({
-              id: `flow_${payload}`,
-              name: `Ruta Oculta Tarjeta ${cardData.btn_title}`,
-              keywords: [payload],
-              matchType: 'contains',
-              steps: hiddenSteps
-            });
+            flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Tarjeta`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
           }
         }
       }
-
       steps.push({ type: 'card', message: '', card: cardData });
-      currentId = null; // Se ramifica por el postback oculto
+      currentId = null;
     }
     else if (node.name === 'action') {
       const tag = node.data.tag?.trim();
-      if (tag) {
-        steps.push({ type: 'action', tag: tag });
-      }
+      if (tag) steps.push({ type: 'action', tag });
       currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else {
@@ -246,66 +356,32 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
 }
 
 // ─────────────────────────────────────────────
-// Subida de Imágenes Automática al seleccionar archivo
+// Guardar: serializar botones en _btns antes de exportar
 // ─────────────────────────────────────────────
-document.getElementById('drawflow').addEventListener('change', async (e) => {
-  if (e.target.classList.contains('file-upload')) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const statusSpan = e.target.nextElementSibling;
-    statusSpan.innerText = "Subiendo archivo...";
-    statusSpan.style.color = "#f59e0b"; // Naranja
-
-    const formData = new FormData();
-    formData.append('image', file);
-    
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      
-      if (data.url) {
-        statusSpan.innerText = "¡Subida con éxito!";
-        statusSpan.style.color = "#10b981"; // Verde
-        
-        // Llenar el campo df-image_url invisiblemente
-        const box = e.target.closest('.box');
-        const urlInput = box.querySelector('input[df-image_url]');
-        urlInput.value = data.url;
-        
-        // Forzar actualización en Drawflow
-        urlInput.dispatchEvent(new Event('change'));
-      } else {
-        statusSpan.innerText = "Error: " + (data.error || 'Desconocido');
-        statusSpan.style.color = "#ef4444"; // Rojo
+document.getElementById('btn-save').addEventListener('click', async () => {
+  // Serializar el estado de botones en el campo df-_btns de cada nodo message
+  for (const nodeId in nodeButtonsState) {
+    const nodeEl = document.querySelector(`#node-${nodeId} [df-_btns]`);
+    if (nodeEl) {
+      nodeEl.value = JSON.stringify(nodeButtonsState[nodeId]);
+      nodeEl.dispatchEvent(new Event('change'));
+    } else {
+      // Forzar sincronización mediante la API interna de Drawflow
+      if (editor.drawflow.drawflow.Home.data[nodeId]) {
+        editor.drawflow.drawflow.Home.data[nodeId].data._btns = JSON.stringify(nodeButtonsState[nodeId]);
       }
-    } catch(err) {
-      console.error(err);
-      statusSpan.innerText = "Error de red al subir la imagen.";
-      statusSpan.style.color = "#ef4444";
     }
   }
-});
 
-// ─────────────────────────────────────────────
-// Lógica de Guardado (Traducir de Cajas Visuales a flows.json)
-document.getElementById('btn-save').addEventListener('click', async () => {
   const data = editor.export();
   const nodes = data.drawflow.Home.data;
-  
   const flowsConfig = { flows: [], defaultFlow: null };
 
-  // Buscar todos los nodos tipo 'trigger'
   for (const nodeId in nodes) {
     const node = nodes[nodeId];
-    
     if (node.name === 'trigger') {
       const keywordsRaw = node.data.keywords || '';
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
-      
       const newFlow = {
         id: `flow_${nodeId}`,
         name: `Flujo Visual ${nodeId}`,
@@ -313,20 +389,14 @@ document.getElementById('btn-save').addEventListener('click', async () => {
         matchType: 'contains',
         steps: []
       };
-
-      // Iniciar recorrido
-      let nextNodeId = node.outputs.output_1?.connections[0]?.node;
+      const nextNodeId = node.outputs.output_1?.connections[0]?.node;
       if (nextNodeId) {
         newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
       }
-      
-      if (keywordsList.length > 0) {
-        flowsConfig.flows.push(newFlow);
-      }
+      if (keywordsList.length > 0) flowsConfig.flows.push(newFlow);
     }
   }
 
-  // Enviar a la API Backend
   const btn = document.getElementById('btn-save');
   btn.innerText = "Guardando...";
   try {
@@ -340,15 +410,21 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       setTimeout(() => btn.innerText = "Guardar Cambios", 2000);
     }
   } catch(e) {
-    console.error(e);
     btn.innerText = "Error al guardar";
   }
 });
 
-// Inyectar un ejemplo inicial visual en el lienzo
+// ─────────────────────────────────────────────
+// Nodo de ejemplo inicial
+// ─────────────────────────────────────────────
 setTimeout(() => {
   editor.addNode('trigger', 0, 1, 100, 200, 'trigger', { keywords: 'precio, valor' }, htmlTrigger);
-  editor.addNode('text', 1, 1, 500, 200, 'text', { message: '¡Hola! Nuestros faroles rústicos comienzan en $150. ¿Te gustaría ver el catálogo?' }, htmlText);
-  // Conectar nodo 1 al nodo 2
-  editor.addConnection(1, 2, 'output_1', 'input_1');
-}, 100);
+  const msgId = addMessageNode(450, 200);
+  setTimeout(() => {
+    editor.addConnection(1, msgId, 'output_1', 'input_1');
+    // Poner texto de ejemplo
+    if (editor.drawflow.drawflow.Home.data[msgId]) {
+      editor.drawflow.drawflow.Home.data[msgId].data.message = '¡Hola! Nuestros faroles rústicos comienzan en $150.';
+    }
+  }, 100);
+}, 150);
