@@ -22,9 +22,22 @@ const htmlText = `
   </div>
 `;
 
+const htmlButtons = `
+  <div class="node-buttons">
+    <div class="title-box">🔘 Botones Rápidos</div>
+    <div class="box">
+      <textarea df-message placeholder="Texto del mensaje..."></textarea>
+      <input type="text" df-btn1 placeholder="Botón 1 (Obligatorio)" />
+      <input type="text" df-btn2 placeholder="Botón 2 (Opcional)" />
+      <input type="text" df-btn3 placeholder="Botón 3 (Opcional)" />
+    </div>
+  </div>
+`;
+
 // Registrar los tipos de nodos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('text', htmlText);
+editor.registerNode('buttons', htmlButtons);
 
 // Configuración de Drag & Drop desde la barra lateral
 const elements = document.querySelectorAll('.drag-item');
@@ -51,6 +64,8 @@ id.addEventListener('drop', e => {
     editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
   } else if (type === 'text') {
     editor.addNode('text', 1, 1, posX, posY, 'text', { message: '' }, htmlText);
+  } else if (type === 'buttons') {
+    editor.addNode('buttons', 1, 1, posX, posY, 'buttons', { message: '', btn1: '', btn2: '', btn3: '' }, htmlButtons);
   }
 });
 
@@ -87,6 +102,16 @@ document.getElementById('btn-save').addEventListener('click', async () => {
           newFlow.steps.push({
             type: 'text',
             message: nextNode.data.message
+          });
+        } else if (nextNode.name === 'buttons') {
+          const btns = [];
+          if (nextNode.data.btn1 && nextNode.data.btn1.trim()) btns.push({ title: nextNode.data.btn1.trim() });
+          if (nextNode.data.btn2 && nextNode.data.btn2.trim()) btns.push({ title: nextNode.data.btn2.trim() });
+          if (nextNode.data.btn3 && nextNode.data.btn3.trim()) btns.push({ title: nextNode.data.btn3.trim() });
+          newFlow.steps.push({
+            type: 'buttons',
+            message: nextNode.data.message,
+            buttons: btns
           });
         }
         // Buscar el siguiente de la cadena

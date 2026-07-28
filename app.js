@@ -243,6 +243,9 @@ async function handleMessage(event) {
       if (step.type === 'text') {
         const replyText = step.message.replace('{username}', senderName);
         await sendMessage(senderId, replyText);
+      } else if (step.type === 'buttons') {
+        const replyText = step.message.replace('{username}', senderName);
+        await sendMessage(senderId, replyText, step.buttons);
       }
     }
   }
@@ -296,13 +299,24 @@ async function handleMention(value) {
 // Enviar DM
 // DOC: https://developers.facebook.com/docs/messenger-platform/send-messages
 // ─────────────────────────────────────────────
-async function sendMessage(recipientId, text) {
+async function sendMessage(recipientId, text, quickReplies = null) {
   try {
+    const messagePayload = { text };
+    
+    // Si hay botones de respuesta rápida, agregarlos al formato de Meta
+    if (quickReplies && quickReplies.length > 0) {
+      messagePayload.quick_replies = quickReplies.map(qr => ({
+        content_type: 'text',
+        title: qr.title,
+        payload: qr.payload || qr.title
+      }));
+    }
+
     await axios.post(
       `${GRAPH_API}/me/messages`,
       {
         recipient: { id: recipientId },
-        message:   { text },
+        message: messagePayload,
       },
       {
         params: { access_token: PAGE_ACCESS_TOKEN },

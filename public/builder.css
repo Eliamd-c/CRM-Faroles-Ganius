@@ -126,6 +126,7 @@ header {
 
 .node-trigger .title-box { background: rgba(16, 185, 129, 0.2); color: var(--node-trigger); }
 .node-text .title-box { background: rgba(59, 130, 246, 0.2); color: var(--node-text); }
+.node-buttons .title-box { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
 
 /* Config Panel */
 .config-panel {
