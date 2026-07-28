@@ -8,6 +8,7 @@ editor.start();
 // ─────────────────────────────────────────────
 const nodeBlocksState = {}; // { nodeId: [ { id: 'b1', type: 'text', content: '', url: '', buttons: [] } ] }
 const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
+const nodeInputState = {}; // { nodeId: { type: 'email', field: 'email', prompt: '', retry: '' } }
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
@@ -156,6 +157,26 @@ function renderActionNode(nodeId) {
   `;
 }
 
+function renderInputNode(nodeId) {
+  const nodeEl = document.querySelector(`#node-${nodeId}`);
+  if (!nodeEl) return;
+  const preview = nodeEl.querySelector('.input-node-preview');
+  if (!preview) return;
+
+  const config = nodeInputState[nodeId];
+  if (!config) {
+    preview.innerHTML = `<span class="anp-empty" style="font-size:12px; color:#9ca3af;">Selecciona para configurar</span>`;
+    return;
+  }
+
+  const typeLabels = { email: '✉️ Email', phone: '📱 Teléfono', text: '📝 Texto Libre' };
+  preview.innerHTML = `
+    <div style="font-size:12px; font-weight:600; color:#374151; margin-bottom:4px;">Pedir: ${typeLabels[config.type] || config.type}</div>
+    <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">Guardar en: <span style="background:#e5e7eb; padding:2px 4px; border-radius:4px;">${config.field || 'N/A'}</span></div>
+    <div style="font-size:11px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">"${config.prompt || 'Sin mensaje'}"</div>
+  `;
+}
+
 // ─────────────────────────────────────────────
 // Definición de Nodos HTML
 // ─────────────────────────────────────────────
@@ -189,10 +210,22 @@ const htmlAction = `
   </div>
 `;
 
+const htmlInput = `
+  <div class="node-input">
+    <div class="title-box" style="background: #f59e0b; color: white;">📥 Pedir Dato</div>
+    <div class="box" style="padding-bottom:10px;">
+      <div class="input-node-preview" style="background:#fef3c7; padding:10px; border-radius:6px; border:1px solid #fcd34d;">
+        <span class="anp-empty" style="font-size:12px; color:#b45309;">Selecciona para configurar</span>
+      </div>
+    </div>
+  </div>
+`;
+
 // Registrar nodos estáticos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('card', htmlCard);
 editor.registerNode('action', htmlAction);
+editor.registerNode('input', htmlInput);
 
 // ─────────────────────────────────────────────
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
@@ -237,6 +270,10 @@ id.addEventListener('drop', e => {
     const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
     nodeActionsState[nodeId] = null;
     setTimeout(() => renderActionNode(nodeId), 50);
+  } else if (type === 'input') {
+    const nodeId = editor.addNode('input', 1, 2, posX, posY, 'input', { _input: '{}' }, htmlInput);
+    nodeInputState[nodeId] = { type: 'email', field: 'email', prompt: 'Por favor ingresa tu email:', retry: 'Ese correo no es válido. Intenta de nuevo:' };
+    setTimeout(() => renderInputNode(nodeId), 50);
   }
 });
 
@@ -255,6 +292,8 @@ function openInspector(nodeId) {
     renderMessageInspector(nodeId);
   } else if (node.name === 'action') {
     renderActionInspector(nodeId);
+  } else if (node.name === 'input') {
+    renderInputInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
@@ -428,6 +467,54 @@ function renderActionInspector(nodeId) {
 }
 
 // ─────────────────────────────────────────────
+// Inspector: Pedir Dato (Input)
+// ─────────────────────────────────────────────
+function renderInputInspector(nodeId) {
+  const config = nodeInputState[nodeId] || { type: 'text', field: 'custom_field', prompt: '', retry: '' };
+  
+  function _render() {
+    document.getElementById('config-title').innerText = 'Inspector: Pedir Dato';
+    
+    document.getElementById('config-body').innerHTML = `
+      <label class="cfg-label" style="margin-top:10px;">¿Qué dato vamos a pedir?</label>
+      <select id="cfg-input-type" class="cfg-input">
+        <option value="text" ${config.type==='text'?'selected':''}>Texto Libre</option>
+        <option value="email" ${config.type==='email'?'selected':''}>Correo Electrónico (Email)</option>
+        <option value="phone" ${config.type==='phone'?'selected':''}>Teléfono (Números)</option>
+      </select>
+      
+      <label class="cfg-label" style="margin-top:10px;">Guardar respuesta en campo:</label>
+      <input id="cfg-input-field" class="cfg-input" type="text" value="${config.field}" placeholder="ej: email, telefono, ciudad" />
+      
+      <hr style="border:0; border-top:1px solid #e5e7eb; margin:15px 0;">
+      
+      <label class="cfg-label">Mensaje para pedir el dato:</label>
+      <textarea id="cfg-input-prompt" class="cfg-input" style="min-height:60px;" placeholder="Ej: Por favor escribe tu correo...">${config.prompt}</textarea>
+      
+      <label class="cfg-label" style="margin-top:10px;">Mensaje si el usuario se equivoca (Reintento):</label>
+      <textarea id="cfg-input-retry" class="cfg-input" style="min-height:60px;" placeholder="Ej: Ese formato no es válido. Intenta de nuevo...">${config.retry}</textarea>
+      
+      <button id="cfg-input-save" class="btn-primary" style="width:100%; margin-top:15px; padding:10px;">Aplicar Configuración</button>
+    `;
+
+    document.getElementById('cfg-input-save').addEventListener('click', () => {
+      nodeInputState[nodeId] = {
+        type: document.getElementById('cfg-input-type').value,
+        field: document.getElementById('cfg-input-field').value.trim(),
+        prompt: document.getElementById('cfg-input-prompt').value.trim(),
+        retry: document.getElementById('cfg-input-retry').value.trim()
+      };
+      if (editor.drawflow.drawflow.Home.data[nodeId]) {
+        editor.drawflow.drawflow.Home.data[nodeId].data._input = JSON.stringify(nodeInputState[nodeId]);
+      }
+      renderInputNode(nodeId);
+      closeInspector();
+    });
+  }
+  _render();
+}
+
+// ─────────────────────────────────────────────
 // buildStepsFromNode (recursivo - Convertir a formato backend)
 // ─────────────────────────────────────────────
 function buildStepsFromNode(nodeId, nodes, flowsConfig) {
@@ -503,6 +590,38 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       if (config) steps.push({ type: 'action', actionType: config.type, params: config.params });
       currentId = node.outputs.output_1?.connections[0]?.node;
     }
+    else if (node.name === 'input') {
+      const config = nodeInputState[currentId] || JSON.parse(node.data._input || 'null');
+      if (config) {
+        const step = {
+          type: 'input',
+          inputType: config.type,
+          field: config.field,
+          prompt: config.prompt,
+          retryMessage: config.retry
+        };
+        // Salida 1: Éxito
+        const successNodeId = node.outputs.output_1?.connections[0]?.node;
+        if (successNodeId) {
+          const payloadSuccess = `INPUT_${currentId}_SUCCESS`;
+          step.successPayload = payloadSuccess;
+          const successSteps = buildStepsFromNode(successNodeId, nodes, flowsConfig);
+          if (successSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payloadSuccess}`, name: `Ruta Input Exito`, keywords: [payloadSuccess], matchType: 'contains', steps: successSteps });
+        }
+        
+        // Salida 2: Fallo
+        const failNodeId = node.outputs.output_2?.connections[0]?.node;
+        if (failNodeId) {
+          const payloadFail = `INPUT_${currentId}_FAIL`;
+          step.failPayload = payloadFail;
+          const failSteps = buildStepsFromNode(failNodeId, nodes, flowsConfig);
+          if (failSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payloadFail}`, name: `Ruta Input Fallo`, keywords: [payloadFail], matchType: 'contains', steps: failSteps });
+        }
+        
+        steps.push(step);
+      }
+      currentId = null; // Detenemos la travesía lineal principal porque el Input genera flujos desvinculados basados en los outputs (como los botones)
+    }
     else {
       break; // Trigger o nodo final
     }
@@ -523,6 +642,11 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   for (const nodeId in nodeActionsState) {
     if (editor.drawflow.drawflow.Home.data[nodeId] && nodeActionsState[nodeId]) {
       editor.drawflow.drawflow.Home.data[nodeId].data._action = JSON.stringify(nodeActionsState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeInputState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId] && nodeInputState[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._input = JSON.stringify(nodeInputState[nodeId]);
     }
   }
 
@@ -581,6 +705,10 @@ setTimeout(() => {
        if (node.name === 'action' && node.data._action) {
          nodeActionsState[nodeId] = JSON.parse(node.data._action);
          renderActionNode(nodeId);
+       }
+       if (node.name === 'input' && node.data._input) {
+         nodeInputState[nodeId] = JSON.parse(node.data._input);
+         renderInputNode(nodeId);
        }
     }
   }

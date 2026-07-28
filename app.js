@@ -240,15 +240,17 @@ async function handleMessage(event) {
   // 2. Manejo de Mensajes Directos regulares (DM)
   broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
 
-  // 3. Verificar si el bot está pausado para este cliente en Supabase
+  // 3. Verificar si el bot está pausado o en recolección de datos
+  let customer = null;
   if (supabase) {
     try {
-      const { data: customer } = await supabase
+      const { data } = await supabase
         .from('customers')
-        .select('bot_paused')
+        .select('*')
         .eq('instagram_id', senderId)
         .single();
         
+      customer = data;
       if (customer && customer.bot_paused) {
         console.log(`[IGNORE] Bot pausado para el usuario ${senderId}`);
         return;
@@ -258,11 +260,56 @@ async function handleMessage(event) {
     }
   }
 
-  // Normalizar el texto (quitar mayúsculas y acentos)
+  // 4. Máquina de Estados: Awaiting Input
+  if (customer && customer.bot_state === 'awaiting_input') {
+    const inputType = customer.awaiting_input_type;
+    const lowerTxt = text.trim();
+    let isValid = false;
+
+    if (inputType === 'email') {
+      isValid = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(lowerTxt);
+    } else if (inputType === 'phone') {
+      isValid = /^\+?[\d\s-]{7,15}$/.test(lowerTxt);
+    } else {
+      isValid = lowerTxt.length > 0;
+    }
+
+    if (isValid) {
+      const updates = { bot_state: 'active' };
+      if (customer.awaiting_input_field) {
+        updates.fields = { ...customer.fields, [customer.awaiting_input_field]: lowerTxt };
+      }
+      await supabase.from('customers').update(updates).eq('instagram_id', senderId);
+      broadcastLog('SYSTEM', `Dato capturado: ${lowerTxt} guardado en ${customer.awaiting_input_field}`);
+      
+      // Reanudar flujo por la ruta de éxito (guardada en current_flow_id)
+      if (customer.current_flow_id) {
+        const successFlow = flowsConfig.flows.find(f => f.id === `flow_${customer.current_flow_id}`);
+        if (successFlow) await processFlowSteps(successFlow.steps, senderId, senderName);
+      }
+    } else {
+      const retries = (customer.awaiting_input_retries || 0) + 1;
+      if (retries >= 3) {
+        await supabase.from('customers').update({ bot_state: 'active', awaiting_input_retries: 0 }).eq('instagram_id', senderId);
+        broadcastLog('SYSTEM', `Fallo de input máximo alcanzado para ${senderName}`);
+        
+        // Reanudar flujo por la ruta de fallo (guardada en current_step_index)
+        if (customer.current_step_index !== null && typeof customer.current_step_index === 'string') { // Lo usamos para el failPayload
+          const failFlow = flowsConfig.flows.find(f => f.id === `flow_${customer.current_step_index}`);
+          if (failFlow) await processFlowSteps(failFlow.steps, senderId, senderName);
+        }
+      } else {
+        await supabase.from('customers').update({ awaiting_input_retries: retries }).eq('instagram_id', senderId);
+        await sendMessage(senderId, customer.awaiting_input_prompt || "Ese formato no es válido. Intenta de nuevo:");
+      }
+    }
+    return;
+  }
+
+  // 5. Normalizar el texto (quitar mayúsculas y acentos) para Trigger regular
   const lowerText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   let matchedFlow = null;
 
-  // Buscar coincidencia en los flujos
   for (const flow of flowsConfig.flows) {
     if (flow.keywords && flow.matchType === 'contains') {
       const match = flow.keywords.find(kw => {
@@ -275,27 +322,47 @@ async function handleMessage(event) {
       }
     }
   }
-
-  // Si no hay coincidencia, nos quedamos en silencio absoluto (apagado el flujo por defecto)
-  const flowToExecute = matchedFlow;
   
-  if (flowToExecute && flowToExecute.steps) {
-    for (const step of flowToExecute.steps) {
-      if (step.type === 'text') {
-        const replyText = step.message.replace('{username}', senderName);
-        await sendMessage(senderId, replyText);
-      } else if (step.type === 'buttons') {
-        const replyText = step.message.replace('{username}', senderName);
-        await sendMessage(senderId, replyText, step.buttons);
-      } else if (step.type === 'template') {
-        const replyText = step.message.replace('{username}', senderName);
-        await sendTemplate(senderId, replyText, step.buttons);
-      } else if (step.type === 'card') {
-        const replyText = step.message?.replace('{username}', senderName);
-        await sendCard(senderId, step.card, replyText);
-      } else if (step.type === 'action') {
-        await executeAction(senderId, senderName, step);
+  if (matchedFlow && matchedFlow.steps) {
+    await processFlowSteps(matchedFlow.steps, senderId, senderName);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Procesador de Pasos del Flujo
+// ─────────────────────────────────────────────
+async function processFlowSteps(steps, senderId, senderName) {
+  for (const step of steps) {
+    if (step.type === 'text') {
+      const replyText = step.message.replace('{username}', senderName);
+      await sendMessage(senderId, replyText);
+    } else if (step.type === 'buttons') {
+      const replyText = step.message.replace('{username}', senderName);
+      await sendMessage(senderId, replyText, step.buttons);
+    } else if (step.type === 'template') {
+      const replyText = step.message.replace('{username}', senderName);
+      await sendTemplate(senderId, replyText, step.buttons);
+    } else if (step.type === 'card') {
+      const replyText = step.message?.replace('{username}', senderName);
+      await sendCard(senderId, step.card, replyText);
+    } else if (step.type === 'action') {
+      await executeAction(senderId, senderName, step);
+    } else if (step.type === 'input') {
+      const replyText = step.prompt?.replace('{username}', senderName) || 'Por favor responde:';
+      await sendMessage(senderId, replyText);
+      if (supabase) {
+        // Usamos current_flow_id para successPayload y current_step_index para failPayload temporalmente
+        await supabase.from('customers').update({
+          bot_state: 'awaiting_input',
+          awaiting_input_type: step.inputType || 'text',
+          awaiting_input_field: step.field,
+          awaiting_input_prompt: step.retryMessage || 'Intenta de nuevo:',
+          awaiting_input_retries: 0,
+          current_flow_id: step.successPayload, 
+          current_step_index: step.failPayload 
+        }).eq('instagram_id', senderId);
       }
+      break; // Interrumpe la ejecución del flujo esperando respuesta
     }
   }
 }
