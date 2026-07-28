@@ -6,6 +6,17 @@ const express = require('express');
 const axios = require('axios');
 
 const path = require('path');
+const fs = require('fs');
+
+// Cargar configuración de flujos (Arquitectura JSON - Fase 1)
+let flowsConfig = { flows: [], defaultFlow: null };
+try {
+  const rawData = fs.readFileSync(path.join(__dirname, 'flows.json'));
+  flowsConfig = JSON.parse(rawData);
+  console.log('✅ Flujos cargados correctamente.');
+} catch (err) {
+  console.error('❌ Error al cargar flows.json', err);
+}
 
 const app = express();
 app.use(express.json());
@@ -183,8 +194,35 @@ async function handleMessage(event) {
   // 2. Manejo de Mensajes Directos regulares (DM)
   broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
 
-  // Respuesta automática simple (primer test)
-  await sendMessage(senderId, `Hola ${senderName}! Recibimos tu mensaje: "${text}". Pronto te respondemos.`);
+  // Normalizar el texto (quitar mayúsculas y acentos)
+  const lowerText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  let matchedFlow = null;
+
+  // Buscar coincidencia en los flujos
+  for (const flow of flowsConfig.flows) {
+    if (flow.keywords && flow.matchType === 'contains') {
+      const match = flow.keywords.find(kw => {
+         const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+         return lowerText.includes(cleanKw);
+      });
+      if (match) {
+        matchedFlow = flow;
+        break;
+      }
+    }
+  }
+
+  // Si no hay coincidencia, usar el flujo por defecto (Fallback)
+  const flowToExecute = matchedFlow || flowsConfig.defaultFlow;
+  
+  if (flowToExecute && flowToExecute.steps) {
+    for (const step of flowToExecute.steps) {
+      if (step.type === 'text') {
+        const replyText = step.message.replace('{username}', senderName);
+        await sendMessage(senderId, replyText);
+      }
+    }
+  }
 }
 
 // ─────────────────────────────────────────────

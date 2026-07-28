@@ -1,0 +1,48 @@
+{
+  "flows": [
+    {
+      "id": "flow_welcome",
+      "name": "Mensaje de Bienvenida",
+      "keywords": ["hola", "buenas", "saludos", "buenos dias", "buenas tardes", "buenas noches"],
+      "matchType": "contains",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Hola, {username}! 👋 Bienvenido a Faroles Genius. ¿En qué podemos ayudarte hoy?"
+        }
+      ]
+    },
+    {
+      "id": "flow_price",
+      "name": "Información de Precios",
+      "keywords": ["precio", "cuanto vale", "cuanto cuesta", "valor", "costo"],
+      "matchType": "contains",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Claro que sí! 💰 Nuestros faroles tienen diferentes precios según el tamaño y el estilo. ¿Estás buscando algo para interior o exterior?"
+        }
+      ]
+    },
+    {
+      "id": "flow_info",
+      "name": "Información General",
+      "keywords": ["info", "informacion", "ubicacion", "donde estan", "direccion"],
+      "matchType": "contains",
+      "steps": [
+        {
+          "type": "text",
+          "message": "📍 Nos especializamos en la fabricación de faroles artesanales de alta calidad. Hacemos envíos a todo el país. ¿Te gustaría ver nuestro catálogo?"
+        }
+      ]
+    }
+  ],
+  "defaultFlow": {
+    "steps": [
+      {
+        "type": "text",
+        "message": "Hemos recibido tu mensaje. Un asesor te responderá muy pronto. (Este es un mensaje automático temporal 🤖)"
+      }
+    ]
+  }
+}
