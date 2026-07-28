@@ -789,17 +789,17 @@ id.addEventListener('dblclick', e => {
 
   ctxMenu.style.left = e.clientX + 'px';
   ctxMenu.style.top = e.clientY + 'px';
-  ctxMenu.classList.remove('ctx-hidden');
+  ctxMenu.style.display = 'block';
 });
 
 document.addEventListener('click', e => {
   if (!e.target.closest('#context-menu') && !e.target.closest('#drawflow')) {
-    ctxMenu.classList.add('ctx-hidden');
+    ctxMenu.style.display = 'none';
   }
 });
 id.addEventListener('click', e => {
   if (!e.target.closest('.ctx-item')) {
-    ctxMenu.classList.add('ctx-hidden');
+    ctxMenu.style.display = 'none';
   }
 });
 
@@ -823,6 +823,6 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       setTimeout(() => renderInputNode(nodeId), 50);
     }
     
-    ctxMenu.classList.add('ctx-hidden');
+    ctxMenu.style.display = 'none';
   });
 });
