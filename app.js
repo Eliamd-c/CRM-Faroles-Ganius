@@ -4,9 +4,9 @@
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
-
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 
 // Cargar configuración de flujos (Arquitectura JSON - Fase 1)
 let flowsConfig = { flows: [], defaultFlow: null };
@@ -21,6 +21,20 @@ try {
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Configuración de Multer (Subida de Imágenes)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
 
 // Almacén de clientes SSE para el dashboard
 let sseClients = [];
@@ -101,7 +115,6 @@ app.get('/stream', (req, res) => {
 
 // ─────────────────────────────────────────────
 // GET /webhook  — Verificación del webhook por Meta
-// DOC: https://developers.facebook.com/docs/graph-api/webhooks/getting-started
 // ─────────────────────────────────────────────
 app.get('/webhook', (req, res) => {
   const mode      = req.query['hub.mode'];
@@ -119,7 +132,6 @@ app.get('/webhook', (req, res) => {
 
 // ─────────────────────────────────────────────
 // POST /webhook  — Recepción de eventos en tiempo real
-// DOC: https://developers.facebook.com/docs/instagram/webhooks#payload-examples
 // ─────────────────────────────────────────────
 app.post('/webhook', async (req, res) => {
   // Responder 200 inmediatamente para que Meta no reintente
@@ -147,7 +159,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// API REST para el Flow Builder (Fase 1.5)
+// API REST para el Flow Builder
 // ─────────────────────────────────────────────
 
 // Leer flujos
@@ -169,9 +181,19 @@ app.post('/api/flows', (req, res) => {
   }
 });
 
+// Subir imágenes
+app.post('/api/upload', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se subió ningún archivo' });
+  }
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+  res.json({ url: imageUrl });
+});
+
 // ─────────────────────────────────────────────
 // Obtener Perfil de Usuario
-// DOC: https://developers.facebook.com/docs/messenger-platform/instagram/features/user-profile
 // ─────────────────────────────────────────────
 async function getUserProfile(senderId) {
   try {

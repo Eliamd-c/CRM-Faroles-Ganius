@@ -62,7 +62,12 @@ const htmlCard = `
   <div class="node-card">
     <div class="title-box">🖼️ Tarjeta (Imagen)</div>
     <div class="box">
-      <input type="text" df-image_url placeholder="URL de la imagen (JPG/PNG)" />
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px; color:#aaa;">Opcional: Subir desde tu PC</label>
+        <input type="file" class="file-upload" accept="image/*" style="width:100%; margin-top:3px; background:#222; border:1px solid #444; color:#fff;" />
+        <span class="upload-status" style="font-size:10px; display:block; margin-top:2px;"></span>
+      </div>
+      <input type="text" df-image_url placeholder="URL pública (Se llena sola al subir)" />
       <input type="text" df-title placeholder="Título principal" />
       <input type="text" df-subtitle placeholder="Subtítulo (Opcional)" />
       
@@ -220,6 +225,52 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
   return steps;
 }
 
+// ─────────────────────────────────────────────
+// Subida de Imágenes Automática al seleccionar archivo
+// ─────────────────────────────────────────────
+document.getElementById('drawflow').addEventListener('change', async (e) => {
+  if (e.target.classList.contains('file-upload')) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const statusSpan = e.target.nextElementSibling;
+    statusSpan.innerText = "Subiendo archivo...";
+    statusSpan.style.color = "#f59e0b"; // Naranja
+
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (data.url) {
+        statusSpan.innerText = "¡Subida con éxito!";
+        statusSpan.style.color = "#10b981"; // Verde
+        
+        // Llenar el campo df-image_url invisiblemente
+        const box = e.target.closest('.box');
+        const urlInput = box.querySelector('input[df-image_url]');
+        urlInput.value = data.url;
+        
+        // Forzar actualización en Drawflow
+        urlInput.dispatchEvent(new Event('change'));
+      } else {
+        statusSpan.innerText = "Error: " + (data.error || 'Desconocido');
+        statusSpan.style.color = "#ef4444"; // Rojo
+      }
+    } catch(err) {
+      console.error(err);
+      statusSpan.innerText = "Error de red al subir la imagen.";
+      statusSpan.style.color = "#ef4444";
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
 // Lógica de Guardado (Traducir de Cajas Visuales a flows.json)
 document.getElementById('btn-save').addEventListener('click', async () => {
   const data = editor.export();
