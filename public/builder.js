@@ -58,11 +58,28 @@ const htmlTemplate = `
   </div>
 `;
 
+const htmlCard = `
+  <div class="node-card">
+    <div class="title-box">🖼️ Tarjeta (Imagen)</div>
+    <div class="box">
+      <input type="text" df-image_url placeholder="URL de la imagen (JPG/PNG)" />
+      <input type="text" df-title placeholder="Título principal" />
+      <input type="text" df-subtitle placeholder="Subtítulo (Opcional)" />
+      
+      <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+      <input type="text" df-btn_title placeholder="Texto del botón" />
+      <select df-btn_type><option value="postback">Acción (Cable)</option><option value="web_url">Sitio Web</option></select>
+      <input type="text" df-btn_url placeholder="URL (Si es Sitio Web)" />
+    </div>
+  </div>
+`;
+
 // Registrar los tipos de nodos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('text', htmlText);
 editor.registerNode('buttons', htmlButtons);
 editor.registerNode('template', htmlTemplate);
+editor.registerNode('card', htmlCard);
 
 // Configuración de Drag & Drop desde la barra lateral
 const elements = document.querySelectorAll('.drag-item');
@@ -98,6 +115,11 @@ id.addEventListener('drop', e => {
       btn2_title: '', btn2_type: 'postback', btn2_url: '',
       btn3_title: '', btn3_type: 'postback', btn3_url: ''
     }, htmlTemplate);
+  } else if (type === 'card') {
+    editor.addNode('card', 1, 1, posX, posY, 'card', { 
+      image_url: '', title: '', subtitle: '', 
+      btn_title: '', btn_type: 'postback', btn_url: ''
+    }, htmlCard);
   }
 });
 
@@ -157,6 +179,39 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       }
       steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
       currentId = null; // Se ramifica, detenemos el camino principal
+    }
+    else if (node.name === 'card') {
+      const cardData = {
+        image_url: node.data.image_url?.trim() || '',
+        title: node.data.title?.trim() || '',
+        subtitle: node.data.subtitle?.trim() || '',
+        btn_title: node.data.btn_title?.trim() || '',
+        btn_type: node.data.btn_type,
+        btn_url: node.data.btn_url?.trim() || ''
+      };
+
+      const connectedNodeId = node.outputs.output_1?.connections[0]?.node;
+
+      if (cardData.btn_type === 'postback') {
+        const payload = `POSTBACK_${node.id}_CARD`;
+        cardData.btn_payload = payload;
+
+        if (connectedNodeId) {
+          const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+          if (hiddenSteps.length > 0) {
+            flowsConfig.flows.push({
+              id: `flow_${payload}`,
+              name: `Ruta Oculta Tarjeta ${cardData.btn_title}`,
+              keywords: [payload],
+              matchType: 'contains',
+              steps: hiddenSteps
+            });
+          }
+        }
+      }
+
+      steps.push({ type: 'card', message: '', card: cardData });
+      currentId = null; // Se ramifica por el postback oculto
     }
     else {
       break;

@@ -128,6 +128,7 @@ header {
 .node-text .title-box { background: rgba(59, 130, 246, 0.2); color: var(--node-text); }
 .node-buttons .title-box { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
 .node-template .title-box { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.node-card .title-box { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
 
 .drawflow-node select {
     width: 100%;

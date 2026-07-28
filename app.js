@@ -249,6 +249,9 @@ async function handleMessage(event) {
       } else if (step.type === 'template') {
         const replyText = step.message.replace('{username}', senderName);
         await sendTemplate(senderId, replyText, step.buttons);
+      } else if (step.type === 'card') {
+        const replyText = step.message?.replace('{username}', senderName);
+        await sendCard(senderId, step.card, replyText);
       }
     }
   }
@@ -372,6 +375,52 @@ async function sendTemplate(recipientId, text, buttons) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Plantilla:', errorMsg);
     broadcastLog('ERROR', `Error al enviar plantilla: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar Tarjeta / Carrusel (Generic Template)
+// ─────────────────────────────────────────────
+async function sendCard(recipientId, cardData, textFallback = null) {
+  try {
+    const button = cardData.btn_type === 'web_url' 
+      ? { type: 'web_url', url: cardData.btn_url, title: cardData.btn_title }
+      : { type: 'postback', title: cardData.btn_title, payload: cardData.btn_payload };
+
+    const element = {
+      title: cardData.title,
+      image_url: cardData.image_url,
+      subtitle: cardData.subtitle,
+      buttons: [button]
+    };
+
+    const messagePayload = {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: [element]
+        }
+      }
+    };
+
+    // Meta recomienda enviar un texto introductorio separado antes del carrusel si hay textFallback, 
+    // pero para mantenerlo simple, solo enviamos el attachment.
+    
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: messagePayload,
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    console.log(`✅ Tarjeta enviada a ${recipientId}`);
+    broadcastLog('SYSTEM', `Tarjeta (Imagen) enviada a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Tarjeta:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar tarjeta: ${errorMsg}`);
   }
 }
 
