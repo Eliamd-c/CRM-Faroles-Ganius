@@ -782,6 +782,75 @@ id.addEventListener('dblclick', e => {
 
   const rect = id.getBoundingClientRect();
   const x = e.clientX - rect.left;
+
+// ─────────────────────────────────────────────
+// Pilar 1: Auto-Organizar (Dagre.js)
+// ─────────────────────────────────────────────
+document.getElementById('btn-arrange').addEventListener('click', () => {
+  if (typeof dagre === 'undefined') {
+    alert('Dagre.js no está cargado.');
+    return;
+  }
+  
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: 'LR', align: 'UL', marginx: 50, marginy: 50, nodesep: 80, ranksep: 200 });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  const nodes = editor.drawflow.drawflow.Home.data;
+  const nodeKeys = Object.keys(nodes);
+  if (nodeKeys.length === 0) return;
+
+  for (const id of nodeKeys) {
+    const el = document.getElementById('node-' + id);
+    const width = el ? el.offsetWidth : 300;
+    const height = el ? el.offsetHeight : 200;
+    g.setNode(id, { width, height });
+  }
+
+  for (const id of nodeKeys) {
+    const node = nodes[id];
+    for (const outputKey in node.outputs) {
+      const connections = node.outputs[outputKey].connections;
+      for (const conn of connections) {
+        g.setEdge(id, conn.node);
+      }
+    }
+  }
+
+  dagre.layout(g);
+
+  g.nodes().forEach(v => {
+    const nodeInfo = g.node(v);
+    const dfNode = nodes[v];
+    if (dfNode) {
+      const x = nodeInfo.x - (nodeInfo.width / 2);
+      const y = nodeInfo.y - (nodeInfo.height / 2);
+      
+      dfNode.pos_x = x;
+      dfNode.pos_y = y;
+      
+      const el = document.getElementById('node-' + v);
+      if (el) {
+        el.style.top = y + 'px';
+        el.style.left = x + 'px';
+      }
+      editor.updateConnectionNodes('node-' + v);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────
+// Pilar 1: Menú Contextual (Doble Clic)
+// ─────────────────────────────────────────────
+const ctxMenu = document.getElementById('context-menu');
+let ctxMousePos = { x: 0, y: 0 };
+
+id.addEventListener('dblclick', e => {
+  if (e.target.closest('.drawflow-node')) return;
+  e.preventDefault();
+
+  const rect = id.getBoundingClientRect();
+  const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   
   ctxMousePos.x = x * (editor.precanvas.clientWidth / (editor.precanvas.clientWidth * editor.zoom)) - (editor.precanvas.getBoundingClientRect().x * (editor.precanvas.clientWidth / (editor.precanvas.clientWidth * editor.zoom)));
@@ -789,17 +858,17 @@ id.addEventListener('dblclick', e => {
 
   ctxMenu.style.left = e.clientX + 'px';
   ctxMenu.style.top = e.clientY + 'px';
-  ctxMenu.classList.remove('hidden');
+  ctxMenu.classList.remove('ctx-hidden');
 });
 
 document.addEventListener('click', e => {
   if (!e.target.closest('#context-menu') && !e.target.closest('#drawflow')) {
-    ctxMenu.classList.add('hidden');
+    ctxMenu.classList.add('ctx-hidden');
   }
 });
 id.addEventListener('click', e => {
   if (!e.target.closest('.ctx-item')) {
-    ctxMenu.classList.add('hidden');
+    ctxMenu.classList.add('ctx-hidden');
   }
 });
 
@@ -823,6 +892,6 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       setTimeout(() => renderInputNode(nodeId), 50);
     }
     
-    ctxMenu.classList.add('hidden');
+    ctxMenu.classList.add('ctx-hidden');
   });
 });
