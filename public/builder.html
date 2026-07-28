@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Builder - Faroles Genius</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.css">
+    <link rel="stylesheet" href="builder.css">
+</head>
+<body>
+    <header>
+        <div class="logo">Faroles Genius <span>Flow Builder</span></div>
+        <div class="actions">
+            <button id="btn-save" class="btn-primary">Guardar Cambios</button>
+        </div>
+    </header>
+
+    <div class="wrapper">
+        <div class="sidebar">
+            <div class="drag-item" draggable="true" data-node="trigger">
+                <span>⚡</span> Palabra Clave (Trigger)
+            </div>
+            <div class="drag-item" draggable="true" data-node="text">
+                <span>💬</span> Mensaje de Texto
+            </div>
+            <!-- More node types will go here in future phases -->
+        </div>
+        
+        <div class="col-right">
+            <div id="drawflow"></div>
+        </div>
+    </div>
+
+    <!-- Panel lateral derecho para configuraciones detalladas -->
+    <div id="config-panel" class="config-panel hidden">
+        <div class="config-header">
+            <h3 id="config-title">Configuración</h3>
+            <button id="close-config">×</button>
+        </div>
+        <div id="config-body" class="config-body">
+            <!-- Los inputs se inyectarán aquí -->
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
+    <script src="builder.js"></script>
+</body>
+</html>

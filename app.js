@@ -147,6 +147,29 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// API REST para el Flow Builder (Fase 1.5)
+// ─────────────────────────────────────────────
+
+// Leer flujos
+app.get('/api/flows', (req, res) => {
+  res.json(flowsConfig);
+});
+
+// Guardar flujos
+app.post('/api/flows', (req, res) => {
+  try {
+    const newFlows = req.body;
+    fs.writeFileSync(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
+    flowsConfig = newFlows; // Actualizar memoria
+    console.log('✅ flows.json actualizado desde el Builder');
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error guardando flows.json', err);
+    res.status(500).json({ error: 'Failed to save' });
+  }
+});
+
+// ─────────────────────────────────────────────
 // Obtener Perfil de Usuario
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/features/user-profile
 // ─────────────────────────────────────────────
