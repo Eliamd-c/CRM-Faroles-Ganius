@@ -28,9 +28,12 @@ function renderButtonsInNode(nodeId) {
     container.appendChild(row);
   });
 
-  // Botón de agregar (solo si hay menos de 3)
+  // Mostrar/ocultar el botón de agregar
   const addBtn = container.parentElement.querySelector('.btn-add');
   if (addBtn) addBtn.style.display = btns.length >= 3 ? 'none' : 'flex';
+
+  // Reposicionar conectores de salida
+  setTimeout(() => repositionOutputs(nodeId), 30);
 }
 
 // ─────────────────────────────────────────────
@@ -101,14 +104,12 @@ editor.registerNode('action', htmlAction);
 // Función que agrega un nodo Message al canvas
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
-  // Primero agregar con HTML temporal para obtener el ID
   const tempHtml = `<div class="node-message"><div class="title-box">💬 Enviar Mensaje</div><div class="box"><textarea df-message placeholder="Escribe el mensaje del bot..."></textarea><div class="btn-list"></div><button class="btn-add">+ Añadir botón</button></div></div>`;
-  const nodeId = editor.addNode('message', 1, 1, posX, posY, 'message', { message: '', _btns: '[]' }, tempHtml);
+  // 1 entrada, 4 salidas: output_1 = siguiente paso, output_2/3/4 = botones 1/2/3
+  const nodeId = editor.addNode('message', 1, 4, posX, posY, 'message', { message: '', _btns: '[]' }, tempHtml);
 
-  // Inicializar estado de botones para este nodo
   nodeButtonsState[nodeId] = [];
 
-  // Asignar data-nodeid correcto al botón después de que Drawflow lo renderice
   setTimeout(() => {
     const nodeEl = document.querySelector(`#node-${nodeId}`);
     if (nodeEl) {
@@ -117,9 +118,50 @@ function addMessageNode(posX, posY) {
       const nodeDiv = nodeEl.querySelector('.node-message');
       if (nodeDiv) nodeDiv.setAttribute('data-nodeid', nodeId);
     }
-  }, 50);
+    repositionOutputs(nodeId);
+  }, 80);
 
   return nodeId;
+}
+
+// ─────────────────────────────────────────────
+// Reposicionar conectores de salida dinámicamente
+// output_1 → "Siguiente paso" (abajo del nodo)
+// output_2/3/4 → alineados con cada fila de botón
+// ─────────────────────────────────────────────
+function repositionOutputs(nodeId) {
+  const nodeEl = document.querySelector(`#node-${nodeId}`);
+  if (!nodeEl) return;
+
+  const btns = nodeButtonsState[nodeId] || [];
+  const btnRows = nodeEl.querySelectorAll('.btn-row');
+  const nodeRect = nodeEl.getBoundingClientRect();
+
+  // output_1: "Siguiente paso" pegado al fondo del nodo
+  const out1 = nodeEl.querySelector('.output_1');
+  if (out1) {
+    out1.style.position = 'absolute';
+    out1.style.top = (nodeEl.offsetHeight - 10) + 'px';
+    out1.style.right = '-9px';
+    out1.style.display = 'block';
+  }
+
+  // output_2, output_3, output_4: uno por fila de botón
+  for (let i = 0; i < 3; i++) {
+    const out = nodeEl.querySelector(`.output_${i + 2}`);
+    if (!out) continue;
+
+    if (i < btns.length && btnRows[i]) {
+      const btnRect = btnRows[i].getBoundingClientRect();
+      const relTop = (btnRect.top - nodeRect.top) + btnRect.height / 2;
+      out.style.position = 'absolute';
+      out.style.top = relTop + 'px';
+      out.style.right = '-9px';
+      out.style.display = 'block';
+    } else {
+      out.style.display = 'none';
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -301,24 +343,40 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
     if (!node) break;
 
     if (node.name === 'message') {
-      // Recuperar botones del estado o del campo _btns serializado
       const btns = nodeButtonsState[currentId] || JSON.parse(node.data._btns || '[]');
       if (btns.length === 0) {
-        // Nodo de texto puro
+        // Sin botones → texto puro, sigue por output_1
         steps.push({ type: 'text', message: node.data.message });
+        currentId = node.outputs.output_1?.connections[0]?.node;
       } else {
-        // Nodo con botones → template
+        // Con botones → template; cada botón postback genera un flujo oculto
+        // que se traza desde el cable de output_2, output_3 o output_4
         const templateBtns = btns.map((btn, i) => {
           if (btn.type === 'web_url') {
             return { type: 'web_url', title: btn.title, url: btn.url };
           } else {
             const payload = `POSTBACK_${currentId}_BTN${i}`;
+            // Trazar el cable del output correspondiente (output_2 = btn0, output_3 = btn1, output_4 = btn2)
+            const connectedNodeId = node.outputs[`output_${i + 2}`]?.connections[0]?.node;
+            if (connectedNodeId) {
+              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+              if (hiddenSteps.length > 0) {
+                flowsConfig.flows.push({
+                  id: `flow_${payload}`,
+                  name: `Ruta Botón ${btn.title}`,
+                  keywords: [payload],
+                  matchType: 'contains',
+                  steps: hiddenSteps
+                });
+              }
+            }
             return { type: 'postback', title: btn.title, payload };
           }
         });
         steps.push({ type: 'template', message: node.data.message, buttons: templateBtns });
+        // El flujo principal continúa por output_1 (siguiente paso)
+        currentId = node.outputs.output_1?.connections[0]?.node;
       }
-      currentId = node.outputs.output_1?.connections[0]?.node;
     }
     else if (node.name === 'card') {
       const cardData = {
