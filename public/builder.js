@@ -434,12 +434,19 @@ function openButtonEditor(nodeId, idx, bIdx) {
 
   const btn = nodeBlocksState[nodeId][idx].buttons[bIdx];
   
+  // Guardar posición de scroll si ya estaba abierto
+  let scrollTop = 0;
+  const scrollContainer = modal.querySelector('.modal-scroll-container');
+  if (scrollContainer) {
+    scrollTop = scrollContainer.scrollTop;
+  }
+  
   modal.innerHTML = `
     <div style="display:flex; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
       <h3 style="margin:0; font-size:16px; color:#1c1e21;">Editar botón</h3>
       <button onclick="closeButtonEditor()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#6b7280;">×</button>
     </div>
-    <div style="padding:20px; overflow-y:auto; max-height:450px;">
+    <div class="modal-scroll-container" style="padding:20px; overflow-y:auto; max-height:450px;">
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
       <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid #0084ff; border-radius:8px; font-size:14px; outline:none; margin-bottom:20px; font-weight:600; color:#0084ff;" />
       
@@ -506,6 +513,12 @@ function openButtonEditor(nodeId, idx, bIdx) {
   
   modal.style.display = 'flex';
   document.getElementById('btn-edit-backdrop').style.display = 'block';
+
+  // Restaurar scroll
+  const newScrollContainer = modal.querySelector('.modal-scroll-container');
+  if (newScrollContainer && scrollTop > 0) {
+    newScrollContainer.scrollTop = scrollTop;
+  }
 }
 
 function closeButtonEditor() {
