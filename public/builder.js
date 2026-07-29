@@ -448,56 +448,49 @@ function openButtonEditor(nodeId, idx, bIdx) {
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
         
         <!-- Instagram (Mensaje) -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; transition: 0.2s; ${btn.type === 'postback' || btn.type === 'instagram' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : 'hover:border-gray-400'}">
-          <input type="radio" name="btnType" value="postback" ${btn.type === 'postback' || btn.type === 'instagram' ? 'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'postback')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'instagram')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'postback' || btn.type === 'instagram' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'postback' || btn.type === 'instagram' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <div style="width:24px; height:24px; border-radius:50%; background:linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); display:flex; align-items:center; justify-content:center; color:white; font-size:14px;">📷</div>
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Instagram</span>
-        </label>
+        </div>
         
         <!-- AI Step -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; ${btn.type === 'ai_step' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="ai_step" ${btn.type === 'ai_step'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'ai_step')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'ai_step')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'ai_step' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'ai_step' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:18px;">✨</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">AI Step</span>
-        </label>
+        </div>
 
         <!-- Abrir sitio web -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; ${btn.type === 'web_url' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="web_url" ${btn.type === 'web_url'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'web_url')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'web_url')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'web_url' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'web_url' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:18px;">🔗</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Abrir sitio web</span>
-        </label>
+        </div>
 
         <!-- Realizar acciones -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; ${btn.type === 'action' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="action" ${btn.type === 'action'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'action')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'action')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'action' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'action' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:18px; color:#f59e0b;">⚡</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Realizar acciones</span>
-        </label>
+        </div>
 
         <!-- Condición -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; ${btn.type === 'condition' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="condition" ${btn.type === 'condition'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'condition')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'condition')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'condition' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'condition' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:18px; color:#0ea5e9;">🔀</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21; flex:1;">Condición</span>
           <span style="background:#2563eb; color:white; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold;">UPGRADE</span>
-        </label>
+        </div>
 
         <!-- Aleatorizador -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; ${btn.type === 'randomizer' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="randomizer" ${btn.type === 'randomizer'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'randomizer')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'randomizer')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'randomizer' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'randomizer' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:18px; color:#8b5cf6;">🎲</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21; flex:1;">Aleatorizador</span>
           <span style="background:#2563eb; color:white; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold;">UPGRADE</span>
-        </label>
+        </div>
         
         <!-- Pausa inteligente -->
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px dashed #d1d5db; border-radius:8px; cursor:pointer; ${btn.type === 'smart_delay' ? 'border: 1px solid #0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="smart_delay" ${btn.type === 'smart_delay'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'smart_delay')" style="display:none;" />
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'smart_delay')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'smart_delay' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'smart_delay' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:18px; color:#ef4444;">🕒</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21; flex:1;">Pausa inteligente</span>
           <span style="background:#2563eb; color:white; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold;">UPGRADE</span>
-        </label>
+        </div>
       </div>
 
       ${btn.type === 'web_url' ? `
