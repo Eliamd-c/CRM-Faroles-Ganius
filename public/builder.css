@@ -284,13 +284,15 @@ ESTÉTICA MANYCHAT: BURBUJAS DE CHAT
 
 /* LINEAS SVG (Conexiones) */
 .drawflow .connection .main-path {
-    stroke: #b0b8c4;
-    stroke-width: 3px;
+    stroke: #9ea8b3;
+    stroke-width: 2.5px;
+    stroke-linecap: round;
+    fill: none;
 }
 .drawflow .connection .main-path:hover,
 .drawflow .connection.selected .main-path {
     stroke: var(--primary);
-    stroke-width: 4px;
+    stroke-width: 3px;
 }
 .drawflow .connection .point {
     stroke: var(--primary);

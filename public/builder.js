@@ -1,6 +1,7 @@
 const id = document.getElementById("drawflow");
 const editor = new Drawflow(id);
 editor.reroute = true;
+editor.curvature = 0.5;
 editor.start();
 
 // ─────────────────────────────────────────────
