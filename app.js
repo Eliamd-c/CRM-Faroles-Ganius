@@ -320,6 +320,15 @@ async function handleMessage(event) {
       isValid = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(lowerTxt);
     } else if (inputType === 'phone') {
       isValid = /^\+?[\d\s-]{7,15}$/.test(lowerTxt);
+    } else if (inputType === 'number') {
+      isValid = /^-?\d+(\.\d+)?$/.test(lowerTxt);
+    } else if (inputType === 'url') {
+      isValid = /^https?:\/\/.+\..+/.test(lowerTxt);
+    } else if (inputType === 'date') {
+      isValid = !isNaN(Date.parse(lowerTxt));
+    } else if (inputType === 'choice') {
+      const choices = (customer.awaiting_input_choices || '').split(',').map(c => c.trim().toLowerCase());
+      isValid = choices.includes(lowerTxt.toLowerCase());
     } else {
       isValid = lowerTxt.length > 0;
     }
@@ -361,15 +370,32 @@ async function handleMessage(event) {
   let matchedFlow = null;
 
   for (const flow of flowsConfig.flows) {
-    if (flow.keywords && flow.matchType === 'contains') {
+    if (!flow.keywords || flow.keywords.length === 0) continue;
+    const matchType = flow.matchType || 'contains';
+
+    if (matchType === 'contains') {
       const match = flow.keywords.find(kw => {
-         const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-         return lowerText.includes(cleanKw);
+        const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return lowerText.includes(cleanKw);
       });
-      if (match) {
-        matchedFlow = flow;
-        break;
-      }
+      if (match) { matchedFlow = flow; break; }
+    } else if (matchType === 'exact') {
+      const match = flow.keywords.find(kw => {
+        const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return lowerText === cleanKw;
+      });
+      if (match) { matchedFlow = flow; break; }
+    } else if (matchType === 'starts_with') {
+      const match = flow.keywords.find(kw => {
+        const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return lowerText.startsWith(cleanKw);
+      });
+      if (match) { matchedFlow = flow; break; }
+    } else if (matchType === 'regex') {
+      const match = flow.keywords.find(kw => {
+        try { return new RegExp(kw, 'i').test(text); } catch (e) { return false; }
+      });
+      if (match) { matchedFlow = flow; break; }
     }
   }
   
@@ -645,28 +671,41 @@ async function handleComment(value) {
   const fromName  = value.from?.username;
   const fromId    = value.from?.id;
 
-  // 1. Ignorar por ID o Username
-  if (fromId === INSTAGRAM_ACCOUNT_ID || (BOT_USERNAME && fromName === BOT_USERNAME)) {
-    console.log(`[IGNORE] Ignorando eco del propio bot en comentarios (por ID/User).`);
-    return;
-  }
+  if (fromId === INSTAGRAM_ACCOUNT_ID || (BOT_USERNAME && fromName === BOT_USERNAME)) return;
 
-  // 2. Ignorar si ya procesamos este comentario (deduplicación por commentId)
-  if (recentReplies.has(commentId)) {
-    console.log(`[IGNORE] Comentario ${commentId} ya procesado.`);
-    return;
-  }
+  if (recentReplies.has(commentId)) return;
   recentReplies.add(commentId);
-  setTimeout(() => recentReplies.delete(commentId), 60_000); // limpiar tras 60s
+  setTimeout(() => recentReplies.delete(commentId), 60_000);
 
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
-  // Respuesta automática al comentario pública
-  const replyText = `Gracias @${fromName} por tu comentario! 🙌`;
-  await replyComment(commentId, replyText);
+  const commentTriggers = flowsConfig.commentTriggers || [];
+  const lowerText = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  let matched = null;
 
-  // Enviar mensaje privado (DM) a quien comentó
-  await sendPrivateReply(commentId, `Hola @${fromName}! Vimos tu comentario: "${text}". Te escribimos por aquí para darte una atención más personalizada. ¿En qué podemos ayudarte?`);
+  for (const trigger of commentTriggers) {
+    if (!trigger.keywords || trigger.keywords.length === 0) continue;
+    const matchType = trigger.matchType || 'contains';
+    const found = trigger.keywords.find(kw => {
+      const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      if (matchType === 'exact') return lowerText === cleanKw;
+      if (matchType === 'starts_with') return lowerText.startsWith(cleanKw);
+      return lowerText.includes(cleanKw);
+    });
+    if (found) { matched = trigger; break; }
+  }
+
+  if (matched) {
+    if (matched.publicReply) await replyComment(commentId, matched.publicReply.replace('{username}', fromName));
+    if (matched.privateReply) await sendPrivateReply(commentId, matched.privateReply.replace('{username}', fromName));
+    if (matched.dmFlowId) {
+      const flow = flowsConfig.flows.find(f => f.id === matched.dmFlowId);
+      if (flow) await sendPrivateReply(commentId, flow.steps?.[0]?.message || 'Hola, te escribimos por privado.');
+    }
+  } else {
+    await replyComment(commentId, `Gracias @${fromName} por tu comentario! 🙌`);
+    await sendPrivateReply(commentId, `Hola @${fromName}! Vimos tu comentario: "${text}". Te escribimos por aquí para darte una atención más personalizada. ¿En qué podemos ayudarte?`);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -674,9 +713,15 @@ async function handleComment(value) {
 // DOC: https://developers.facebook.com/docs/instagram-platform/reference/ig-user/tags
 // ─────────────────────────────────────────────
 async function handleMention(value) {
-  const mediaId = value.media_id;
-  const from    = value.from?.username;
+  const from = value.from?.username;
   broadcastLog('MENTION', `@${from} te mencionó en una historia.`);
+
+  if (flowsConfig.mentionFlow?.steps?.length > 0) {
+    const senderId = value.from?.id;
+    if (senderId) {
+      await processFlowSteps(flowsConfig.mentionFlow.steps, senderId, from || senderId);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -1140,6 +1185,132 @@ app.get('/api/widget-config', (req, res) => {
 app.get('/chat-init', (req, res) => {
   if (!INSTAGRAM_HANDLE) return res.status(400).json({ error: 'INSTAGRAM_HANDLE no configurado' });
   res.redirect(`https://ig.me/m/${INSTAGRAM_HANDLE}`);
+});
+
+// ─────────────────────────────────────────────
+// Comment Triggers API
+// ─────────────────────────────────────────────
+app.get('/api/comment-triggers', (req, res) => {
+  res.json(flowsConfig.commentTriggers || []);
+});
+
+app.post('/api/comment-triggers', async (req, res) => {
+  try {
+    flowsConfig.commentTriggers = req.body;
+    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Mention Flow API
+// ─────────────────────────────────────────────
+app.get('/api/mention-flow', (req, res) => {
+  res.json(flowsConfig.mentionFlow || { steps: [] });
+});
+
+app.post('/api/mention-flow', async (req, res) => {
+  try {
+    flowsConfig.mentionFlow = req.body;
+    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Contactos API — Dashboard, filtros, exportar
+// ─────────────────────────────────────────────
+app.get('/api/contacts', async (req, res) => {
+  if (!supabase) return res.json([]);
+  try {
+    const { search, tag, status, limit = 50, offset = 0 } = req.query;
+    let query = supabase.from('customers').select('*');
+    if (search) query = query.or(`name.ilike.%${search}%,instagram_id.ilike.%${search}%`);
+    if (tag) query = query.contains('tags', [tag]);
+    if (status) query = query.eq('status', status);
+    query = query.order('updated_at', { ascending: false }).range(Number(offset), Number(offset) + Number(limit) - 1);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/contacts/count', async (req, res) => {
+  if (!supabase) return res.json({ count: 0 });
+  try {
+    const { count, error } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ count });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/contacts/:id', async (req, res) => {
+  if (!supabase) return res.status(404).json({ error: 'No DB' });
+  try {
+    const { data, error } = await supabase.from('customers').select('*').eq('instagram_id', req.params.id).single();
+    if (error) return res.status(404).json({ error: 'Contacto no encontrado' });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch('/api/contacts/:id', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const updates = req.body;
+    updates.updated_at = new Date().toISOString();
+    const { data, error } = await supabase.from('customers').update(updates).eq('instagram_id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/contacts-export', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+    if (!data || data.length === 0) return res.status(404).json({ error: 'Sin contactos' });
+    const headers = ['instagram_id', 'name', 'tags', 'status', 'bot_paused', 'bot_state', 'fields', 'created_at', 'updated_at'];
+    const csvRows = [headers.join(',')];
+    for (const row of data) {
+      csvRows.push(headers.map(h => {
+        const val = row[h];
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'object') return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
+        return `"${String(val).replace(/"/g, '""')}"`;
+      }).join(','));
+    }
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="contactos.csv"');
+    res.send(csvRows.join('\n'));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/tags', async (req, res) => {
+  if (!supabase) return res.json([]);
+  try {
+    const { data } = await supabase.from('customers').select('tags');
+    const allTags = new Set();
+    for (const row of (data || [])) {
+      for (const tag of (row.tags || [])) allTags.add(tag);
+    }
+    res.json(Array.from(allTags).sort());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─────────────────────────────────────────────
