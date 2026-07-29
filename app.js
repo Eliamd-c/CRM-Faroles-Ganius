@@ -129,8 +129,6 @@ app.get('/stream', (req, res) => {
   
   if (BOT_USERNAME) {
     res.write(`data: ${JSON.stringify({ type: 'SYSTEM', message: `Bot configurado como: @${BOT_USERNAME}`, timestamp: Date.now() })}\n\n`);
-  } else {
-    res.write(`data: ${JSON.stringify({ type: 'WARNING', message: 'No se pudo obtener el BOT_USERNAME. Para mayor seguridad, añade BOT_USERNAME=farolesgenius a tus variables de entorno.', timestamp: Date.now() })}\n\n`);
   }
 
   // Heartbeat para mantener la conexión viva (cada 30 seg)
