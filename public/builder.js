@@ -421,52 +421,52 @@ function openButtonEditor(nodeId, idx, bIdx) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'btn-edit-modal';
-    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; width:340px; border-radius:12px; box-shadow:0 20px 40px rgba(0,0,0,0.15); z-index:10000; display:flex; flex-direction:column; overflow:hidden; font-family:Inter,sans-serif; border: 1px solid #e5e7eb;';
+    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; width:360px; border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,0.2); z-index:10000; display:flex; flex-direction:column; overflow:hidden; font-family:Inter,sans-serif; border: 1px solid #e5e7eb;';
     document.body.appendChild(modal);
     
-    // Add backdrop
     const backdrop = document.createElement('div');
     backdrop.id = 'btn-edit-backdrop';
-    backdrop.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:9999;';
+    backdrop.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:9999;';
     backdrop.onclick = () => closeButtonEditor();
     document.body.appendChild(backdrop);
   }
 
   const btn = nodeBlocksState[nodeId][idx].buttons[bIdx];
   
+  const isPostback = btn.type === 'postback';
+  const isWebUrl = btn.type === 'web_url';
+
   modal.innerHTML = `
-    <div style="display:flex; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
-      <h3 style="margin:0; font-size:16px; color:#1c1e21;">Editar botón</h3>
-      <button onclick="closeButtonEditor()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#6b7280;">×</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
+      <h3 style="margin:0; font-size:16px; color:#1c1e21; font-weight:600;">Editar botón</h3>
+      <button onclick="closeButtonEditor()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#9ca3af; padding:0; line-height:1;">&times;</button>
     </div>
-    <div style="padding:20px;">
+    <div style="padding:20px; padding-bottom:10px;">
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
-      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid #0084ff; border-radius:8px; font-size:14px; outline:none; margin-bottom:20px; font-weight:600; color:#0084ff;" />
+      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 14px; border:1px solid #0084ff; box-shadow: 0 0 0 1px #0084ff; border-radius:8px; font-size:14px; outline:none; margin-bottom:24px; font-weight:600; color:#0084ff;" />
       
-      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Cuando se presiona este botón</label>
+      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:12px;">Cuando se presiona este botón</label>
       
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; ${btn.type === 'postback' ? 'border-color:#0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="postback" ${btn.type === 'postback'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'postback')" style="display:none;" />
-          <span style="font-size:18px;">💬</span>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'postback')" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid ${isPostback ? '#0084ff' : '#e5e7eb'}; border-radius:8px; cursor:pointer; background:${isPostback ? '#f4f8ff' : '#ffffff'}; transition:all 0.15s;">
+          <span style="font-size:16px; opacity:0.8;">💬</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Continuar Flujo</span>
-        </label>
+        </div>
         
-        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; ${btn.type === 'web_url' ? 'border-color:#0084ff; background:#f0f7ff;' : ''}">
-          <input type="radio" name="btnType" value="web_url" ${btn.type === 'web_url'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'web_url')" style="display:none;" />
-          <span style="font-size:18px;">🔗</span>
+        <div onclick="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'web_url')" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid ${isWebUrl ? '#0084ff' : '#e5e7eb'}; border-radius:8px; cursor:pointer; background:${isWebUrl ? '#f4f8ff' : '#ffffff'}; transition:all 0.15s;">
+          <span style="font-size:16px; opacity:0.8;">🔗</span>
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Abrir sitio web</span>
-        </label>
+        </div>
       </div>
 
-      ${btn.type === 'web_url' ? `
+      ${isWebUrl ? `
         <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Dirección del sitio web</label>
-        <input type="text" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; outline:none; margin-bottom:20px;" />
+        <input type="text" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." style="width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; margin-bottom:10px;" />
       ` : ''}
     </div>
-    <div style="display:flex; justify-content:space-between; padding:16px 20px; border-top:1px solid #f3f4f6; background:#f9fafb;">
-      <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx}); closeButtonEditor();" style="background:none; border:none; color:#ef4444; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:4px;">🗑️ Botón Eliminar</button>
-      <button onclick="closeButtonEditor()" style="background:#0084ff; color:white; border:none; border-radius:8px; padding:8px 24px; font-size:14px; font-weight:600; cursor:pointer;">Listo</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-top:1px solid #f3f4f6; background:#f9fafb;">
+      <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx}); closeButtonEditor();" style="background:none; border:none; color:#ef4444; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; padding:0;">🗑️ Botón Eliminar</button>
+      <button onclick="closeButtonEditor()" style="background:#0084ff; color:white; border:none; border-radius:8px; padding:10px 24px; font-size:14px; font-weight:600; cursor:pointer; transition:background 0.15s;" onmouseover="this.style.background='#0073e6'" onmouseout="this.style.background='#0084ff'">Listo</button>
     </div>
   `;
   
