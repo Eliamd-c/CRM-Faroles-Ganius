@@ -356,66 +356,49 @@ document.getElementById('close-config').addEventListener('click', closeInspector
 // Inspector: Mensaje (Bloques)
 // ─────────────────────────────────────────────
 function renderMessageInspector(nodeId) {
-  document.getElementById('config-title').innerHTML = 'Enviar mensaje <span style="font-size:12px;color:#9ca3af;cursor:pointer">✏️</span>';
+  document.getElementById('config-title').innerText = 'Enviar mensaje';
   const blocks = nodeBlocksState[nodeId] || [];
-  let html = `
-    <div style="font-size: 13px; color: #374151; margin-bottom: 15px; font-weight: 500;">
-      Enviar <span style="color:#0084ff; border-bottom: 1px solid #0084ff; padding-bottom: 2px;">dentro de la ventana de 24 horas</span> <span style="color:#9ca3af; font-size: 11px;">ⓘ</span>
-    </div>
-    <hr style="border:none; border-top: 1px solid #e5e7eb; margin-bottom: 20px;">
-    <div class="insp-blocks-list" id="insp-blocks-list">
-  `;
+  let html = '<div class="insp-blocks-list" id="insp-blocks-list">';
   
   blocks.forEach((block, idx) => {
-    // Contenedor principal gris unificado
-    html += `<div class="insp-block-card" style="position:relative; margin-bottom:20px;">
-      ${idx > 0 ? `<div style="text-align:right; margin-bottom:5px;"><button class="insp-del-btn" onclick="deleteBlock('${nodeId}', ${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; font-weight:600;">Eliminar bloque</button></div>` : ''}
-      
-      <div style="background:#f3f4f6; border-radius:12px; padding:2px; display:flex; flex-direction:column;">
-        <div style="padding:12px; padding-bottom:8px;">`;
+    html += `
+      <div class="ms-block-wrapper" style="margin-bottom: 24px; position: relative;">
+        <!-- Botón para eliminar bloque -->
+        <button onclick="deleteBlock('${nodeId}', ${idx})" style="position: absolute; top: 10px; right: -30px; background: none; border: none; color: #ef4444; font-size: 16px; cursor: pointer;" title="Eliminar bloque">×</button>
+    `;
       
     if (block.type === 'text') {
-      html += `<textarea class="cfg-input" style="width:100%; min-height:80px; background:transparent; border:none; outline:none; box-shadow:none; padding:0; font-size:13px; color:#1c1e21; resize:none;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Introduce tu texto...">${block.content}</textarea>`;
+      html += `
+        <div style="background: #f1f2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <textarea class="cfg-input" style="width: 100%; border: none; background: transparent; outline: none; resize: none; min-height: 80px; font-size: 13px; font-family: inherit; color: #1c1e21;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Introduce tu texto...">${block.content}</textarea>
+      `;
     } else if (block.type === 'image') {
       html += `
-        <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen</label>
-        <input class="cfg-input" type="text" style="width:100%; background:transparent; border:none; border-bottom:1px solid #d1d5db; border-radius:0; box-shadow:none; padding:4px 0; margin-bottom:8px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
+        <div style="background: #f1f2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen</label>
+          <input class="cfg-input" type="text" style="width:100%; border: none; background: #ffffff; padding: 8px; border-radius: 6px; font-size: 13px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
       `;
     }
 
-    html += `</div>`; // fin padding text
-
-    // Botones del bloque (estilo list-group)
-    if (block.buttons && block.buttons.length > 0) {
-      html += `<div class="insp-btns-list" style="display:flex; flex-direction:column; gap:1px; background:#e5e7eb; border-radius:0 0 10px 10px; overflow:hidden;">`;
-      block.buttons.forEach((btn, bIdx) => {
-        // En Manychat los botones en el inspector solo muestran el título, el resto de configs podría ir en un accordion, pero para mantenerlo simple:
-        html += `
-          <div style="background:#ffffff; padding:8px 12px; display:flex; flex-direction:column; gap:6px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <input type="text" style="border:none; outline:none; color:#0084ff; font-weight:500; font-size:13px; width:100%;" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="New Button #${bIdx+1}" />
-              <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; margin-left:10px;" title="Eliminar botón">×</button>
-            </div>
-            <div style="display:flex; gap:6px;">
-              <select style="flex:1; border:1px solid #e5e7eb; border-radius:4px; padding:4px; font-size:11px; color:#4b5563; outline:none;" onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, this.value)">
-                <option value="postback" ${btn.type === 'postback'?'selected':''}>Continuar Flujo</option>
-                <option value="web_url" ${btn.type === 'web_url'?'selected':''}>Abrir Web</option>
-              </select>
-              ${btn.type === 'web_url' ? `<input type="text" style="flex:1; border:1px solid #e5e7eb; border-radius:4px; padding:4px; font-size:11px; outline:none;" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." />` : ''}
-            </div>
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
+    // Botones (compartidos por texto e imagen)
+    html += `<div class="ms-btns-container" style="display: flex; flex-direction: column; gap: 4px;">`;
+    (block.buttons || []).forEach((btn, bIdx) => {
+      html += `
+        <div class="ms-btn" onclick="openButtonEditor('${nodeId}', ${idx}, ${bIdx})" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; text-align: center; font-size: 13px; font-weight: 600; color: #0084ff; cursor: pointer; display: flex; justify-content: center; align-items: center; position: relative; transition: border-color 0.15s;">
+          ${btn.title || 'New Button'}
+          <div style="position: absolute; right: 10px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db;"></div>
+        </div>`;
+    });
+    html += `</div>`; // fin .ms-btns-container
     
-    html += `</div>`; // fin contenedor gris
+    html += `</div>`; // fin bloque gris (#f1f2f6)
 
+    // Botón "+ Añadir botón" fuera del bloque gris (como respuesta rápida o botón extra)
     if ((block.buttons || []).length < 3) {
-      html += `<div style="text-align:center; margin-top:10px;"><button class="btn-add" onclick="addButton('${nodeId}', ${idx})" style="padding:6px 20px; border:1px dashed #d1d5db; background:transparent; color:#9ca3af; border-radius:20px; cursor:pointer; font-size:12px; font-weight:500; transition:all 0.2s;">+ Añadir botón</button></div>`;
+      html += `<div onclick="addButton('${nodeId}', ${idx})" style="border: 1px dashed #b0b8c4; border-radius: 20px; padding: 10px; text-align: center; font-size: 13px; font-weight: 500; color: #b0b8c4; cursor: pointer; margin-top: 10px; transition: color 0.15s, border-color 0.15s;" onmouseover="this.style.color='#0084ff'; this.style.borderColor='#0084ff';" onmouseout="this.style.color='#b0b8c4'; this.style.borderColor='#b0b8c4';">+ Añadir botón</div>`;
     }
     
-    html += `</div>`;
+    html += `</div>`; // fin .ms-block-wrapper
   });
   
   html += `</div>`; // .insp-blocks-list
@@ -432,16 +415,84 @@ function renderMessageInspector(nodeId) {
   document.getElementById('config-body').innerHTML = html;
 }
 
+// Modal for editing buttons
+function openButtonEditor(nodeId, idx, bIdx) {
+  let modal = document.getElementById('btn-edit-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'btn-edit-modal';
+    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; width:340px; border-radius:12px; box-shadow:0 20px 40px rgba(0,0,0,0.15); z-index:10000; display:flex; flex-direction:column; overflow:hidden; font-family:Inter,sans-serif; border: 1px solid #e5e7eb;';
+    document.body.appendChild(modal);
+    
+    // Add backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'btn-edit-backdrop';
+    backdrop.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:9999;';
+    backdrop.onclick = () => closeButtonEditor();
+    document.body.appendChild(backdrop);
+  }
+
+  const btn = nodeBlocksState[nodeId][idx].buttons[bIdx];
+  
+  modal.innerHTML = `
+    <div style="display:flex; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
+      <h3 style="margin:0; font-size:16px; color:#1c1e21;">Editar botón</h3>
+      <button onclick="closeButtonEditor()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#6b7280;">×</button>
+    </div>
+    <div style="padding:20px;">
+      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
+      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid #0084ff; border-radius:8px; font-size:14px; outline:none; margin-bottom:20px; font-weight:600; color:#0084ff;" />
+      
+      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Cuando se presiona este botón</label>
+      
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; ${btn.type === 'postback' ? 'border-color:#0084ff; background:#f0f7ff;' : ''}">
+          <input type="radio" name="btnType" value="postback" ${btn.type === 'postback'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'postback')" style="display:none;" />
+          <span style="font-size:18px;">💬</span>
+          <span style="font-size:14px; font-weight:500; color:#1c1e21;">Continuar Flujo</span>
+        </label>
+        
+        <label style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; ${btn.type === 'web_url' ? 'border-color:#0084ff; background:#f0f7ff;' : ''}">
+          <input type="radio" name="btnType" value="web_url" ${btn.type === 'web_url'?'checked':''} onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, 'web_url')" style="display:none;" />
+          <span style="font-size:18px;">🔗</span>
+          <span style="font-size:14px; font-weight:500; color:#1c1e21;">Abrir sitio web</span>
+        </label>
+      </div>
+
+      ${btn.type === 'web_url' ? `
+        <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Dirección del sitio web</label>
+        <input type="text" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; outline:none; margin-bottom:20px;" />
+      ` : ''}
+    </div>
+    <div style="display:flex; justify-content:space-between; padding:16px 20px; border-top:1px solid #f3f4f6; background:#f9fafb;">
+      <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx}); closeButtonEditor();" style="background:none; border:none; color:#ef4444; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:4px;">🗑️ Botón Eliminar</button>
+      <button onclick="closeButtonEditor()" style="background:#0084ff; color:white; border:none; border-radius:8px; padding:8px 24px; font-size:14px; font-weight:600; cursor:pointer;">Listo</button>
+    </div>
+  `;
+  
+  modal.style.display = 'flex';
+  document.getElementById('btn-edit-backdrop').style.display = 'block';
+}
+
+function closeButtonEditor() {
+  const modal = document.getElementById('btn-edit-modal');
+  const backdrop = document.getElementById('btn-edit-backdrop');
+  if (modal) modal.style.display = 'none';
+  if (backdrop) backdrop.style.display = 'none';
+}
+
 // Global window functions for the generated HTML
 window.updateBlockContent = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].content = val; renderBlocksInNode(nodeId); };
 window.updateBlockUrl = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].url = val; renderBlocksInNode(nodeId); };
 window.deleteBlock = (nodeId, idx) => { nodeBlocksState[nodeId].splice(idx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
 window.addBlock = (nodeId, type) => { nodeBlocksState[nodeId].push({id: generateId(), type, content: type==='text'?'Nuevo texto':'', url:'', buttons:[]}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
-window.addButton = (nodeId, idx) => { nodeBlocksState[nodeId][idx].buttons.push({title:'Nuevo Botón', type:'postback', url:''}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
+window.addButton = (nodeId, idx) => { nodeBlocksState[nodeId][idx].buttons.push({title:'New Button', type:'postback', url:''}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
 window.deleteButton = (nodeId, idx, bIdx) => { nodeBlocksState[nodeId][idx].buttons.splice(bIdx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
-window.updateBtnTitle = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].title = val; renderBlocksInNode(nodeId); };
-window.updateBtnType = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].type = val; renderMessageInspector(nodeId); };
+window.updateBtnTitle = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].title = val; renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
+window.updateBtnType = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].type = val; openButtonEditor(nodeId, idx, bIdx); renderBlocksInNode(nodeId); };
 window.updateBtnUrl = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].url = val; };
+window.openButtonEditor = openButtonEditor;
+window.closeButtonEditor = closeButtonEditor;
 
 // ─────────────────────────────────────────────
 // Inspector: Acción
