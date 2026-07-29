@@ -434,7 +434,9 @@ function openInspector(nodeId) {
   const panel = document.getElementById('config-panel');
   panel.classList.remove('hidden');
 
-  if (node.name === 'message') {
+  if (node.name === 'trigger') {
+    renderTriggerInspector(nodeId);
+  } else if (node.name === 'message') {
     renderMessageInspector(nodeId);
   } else if (node.name === 'action') {
     renderActionInspector(nodeId);
@@ -828,7 +830,14 @@ function renderInputInspector(nodeId) {
         <option value="text" ${config.type==='text'?'selected':''}>Texto Libre</option>
         <option value="email" ${config.type==='email'?'selected':''}>Correo Electrónico (Email)</option>
         <option value="phone" ${config.type==='phone'?'selected':''}>Teléfono (Números)</option>
+        <option value="number" ${config.type==='number'?'selected':''}>Número</option>
+        <option value="url" ${config.type==='url'?'selected':''}>URL / Enlace</option>
+        <option value="date" ${config.type==='date'?'selected':''}>Fecha</option>
+        <option value="choice" ${config.type==='choice'?'selected':''}>Opción Múltiple</option>
       </select>
+
+      ${config.type === 'choice' ? `<label class="cfg-label" style="margin-top:10px;">Opciones válidas (separadas por coma):</label>
+      <input id="cfg-input-choices" class="cfg-input" type="text" value="${config.choices || ''}" placeholder="ej: si, no, tal vez" />` : ''}
       
       <label class="cfg-label" style="margin-top:10px;">Guardar respuesta en campo:</label>
       <input id="cfg-input-field" class="cfg-input" type="text" value="${config.field}" placeholder="ej: email, telefono, ciudad" />
@@ -845,12 +854,15 @@ function renderInputInspector(nodeId) {
     `;
 
     document.getElementById('cfg-input-save').addEventListener('click', () => {
-      nodeInputState[nodeId] = {
+      const inputState = {
         type: document.getElementById('cfg-input-type').value,
         field: document.getElementById('cfg-input-field').value.trim(),
         prompt: document.getElementById('cfg-input-prompt').value.trim(),
         retry: document.getElementById('cfg-input-retry').value.trim()
       };
+      const choicesEl = document.getElementById('cfg-input-choices');
+      if (choicesEl) inputState.choices = choicesEl.value.trim();
+      nodeInputState[nodeId] = inputState;
       if (editor.drawflow.drawflow.Home.data[nodeId]) {
         editor.drawflow.drawflow.Home.data[nodeId].data._input = JSON.stringify(nodeInputState[nodeId]);
       }
@@ -1080,7 +1092,8 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     if (node.name === 'trigger') {
       const keywordsRaw = node.data.keywords || '';
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
-      const newFlow = { id: `flow_${nodeId}`, name: `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType: 'contains', steps: [] };
+      const matchType = node.data.matchType || 'contains';
+      const newFlow = { id: `flow_${nodeId}`, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
       const nextNodeId = node.outputs.output_1?.connections[0]?.node;
       if (nextNodeId) newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
       if (keywordsList.length > 0) flowsConfig.flows.push(newFlow);
@@ -1737,4 +1750,66 @@ function saveGoto(nodeId) {
   const node = editor.getNodeFromId(nodeId);
   node.data._goto = JSON.stringify(nodeGotoState[nodeId]);
   renderGotoNode(nodeId);
+}
+
+// ─────────────────────────────────────────────
+// Trigger Inspector (matchType + keywords + nombre)
+// ─────────────────────────────────────────────
+function renderTriggerInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Trigger';
+  const node = editor.getNodeFromId(nodeId);
+  const keywords = node.data.keywords || '';
+  const matchType = node.data.matchType || 'contains';
+  const flowName = node.data.flowName || '';
+
+  document.getElementById('config-body').innerHTML = `
+    <div class="config-group">
+      <label class="config-label">Nombre del flujo</label>
+      <input type="text" class="config-input" id="trigger-flow-name" value="${flowName}" placeholder="ej: Flujo de precios">
+    </div>
+    <div class="config-group">
+      <label class="config-label">Palabras clave (separadas por coma)</label>
+      <input type="text" class="config-input" id="trigger-keywords" value="${keywords}" placeholder="ej: precio, valor, costo">
+    </div>
+    <div class="config-group">
+      <label class="config-label">Tipo de coincidencia</label>
+      <select class="config-input" id="trigger-match-type">
+        <option value="contains" ${matchType === 'contains' ? 'selected' : ''}>Contiene la palabra</option>
+        <option value="exact" ${matchType === 'exact' ? 'selected' : ''}>Coincidencia exacta</option>
+        <option value="starts_with" ${matchType === 'starts_with' ? 'selected' : ''}>Empieza con</option>
+        <option value="regex" ${matchType === 'regex' ? 'selected' : ''}>Expresión regular (avanzado)</option>
+      </select>
+      <p style="font-size:11px; color:#6b7280; margin-top:4px;">
+        ${matchType === 'contains' ? 'El mensaje del usuario debe contener alguna de las palabras.' :
+          matchType === 'exact' ? 'El mensaje debe ser exactamente igual a la palabra clave.' :
+          matchType === 'starts_with' ? 'El mensaje debe empezar con la palabra clave.' :
+          'Usa regex para patrones avanzados. Ej: ^hola.*mundo$'}
+      </p>
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveTrigger('${nodeId}')">Guardar Trigger</button>`;
+}
+
+function saveTrigger(nodeId) {
+  const node = editor.getNodeFromId(nodeId);
+  node.data.keywords = document.getElementById('trigger-keywords').value.trim();
+  node.data.matchType = document.getElementById('trigger-match-type').value;
+  node.data.flowName = document.getElementById('trigger-flow-name').value.trim();
+  renderTriggerNode(nodeId);
+}
+
+function renderTriggerNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.trigger-node-preview');
+  if (!container) return;
+  const node = editor.getNodeFromId(nodeId);
+  const kw = node.data.keywords || '';
+  const matchType = node.data.matchType || 'contains';
+  const matchLabels = { contains: 'Contiene', exact: 'Exacto', starts_with: 'Empieza con', regex: 'Regex' };
+  if (kw) {
+    container.innerHTML = `<div style="background:#e8f5e9; padding:8px; border-radius:6px; font-size:11px;">
+      <div style="color:#2e7d32; font-weight:600; margin-bottom:4px;">${matchLabels[matchType] || 'Contiene'}</div>
+      <div style="color:#1b5e20;">${kw}</div>
+    </div>`;
+  }
 }
