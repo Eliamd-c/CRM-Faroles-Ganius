@@ -9,6 +9,8 @@ editor.start();
 const nodeBlocksState = {}; // { nodeId: [ { id: 'b1', type: 'text', content: '', url: '', buttons: [] } ] }
 const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 const nodeInputState = {}; // { nodeId: { type: 'email', field: 'email', prompt: '', retry: '' } }
+const nodeConditionState = {}; // { nodeId: { field: '', operator: '', value: '' } }
+const nodeRandomizerState = {}; // { nodeId: { paths: 2 } }
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
