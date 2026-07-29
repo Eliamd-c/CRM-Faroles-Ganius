@@ -202,7 +202,7 @@ const htmlCard = `
 const htmlCondition = `
   <div class="node-condition">
     <div class="title-box">🔀 Condición</div>
-    <div class="box" id="cond-render-${Math.random()}" style="padding:10px;">
+    <div class="box condition-node-preview" style="padding:10px;">
       <em style="color:#6b7280; font-size:11px;">Configura en el panel...</em>
     </div>
   </div>
@@ -211,7 +211,7 @@ const htmlCondition = `
 const htmlRandomizer = `
   <div class="node-randomizer">
     <div class="title-box">🎲 Aleatorio (A/B)</div>
-    <div class="box" id="rand-render-${Math.random()}" style="padding:10px;">
+    <div class="box randomizer-node-preview" style="padding:10px;">
       <em style="color:#6b7280; font-size:11px;">Configura salidas en el panel...</em>
     </div>
   </div>
@@ -292,6 +292,14 @@ id.addEventListener('drop', e => {
     const nodeId = editor.addNode('input', 1, 2, posX, posY, 'input', { _input: '{}' }, htmlInput);
     nodeInputState[nodeId] = { type: 'email', field: 'email', prompt: 'Por favor ingresa tu email:', retry: 'Ese correo no es válido. Intenta de nuevo:' };
     setTimeout(() => renderInputNode(nodeId), 50);
+  } else if (type === 'condition') {
+    const nodeId = editor.addNode('condition', 1, 2, posX, posY, 'condition', { _condition: '{}' }, htmlCondition);
+    nodeConditionState[nodeId] = { field: 'email', operator: 'contains', value: '@' };
+    setTimeout(() => renderConditionNode(nodeId), 50);
+  } else if (type === 'randomizer') {
+    const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
+    nodeRandomizerState[nodeId] = { paths: 2 };
+    setTimeout(() => renderRandomizerNode(nodeId), 50);
   }
 });
 
@@ -869,7 +877,9 @@ document.querySelectorAll('.ctx-item').forEach(item => {
 
 // Render Condition
 function renderConditionNode(nodeId) {
-  const container = document.getElementById('cond-render-' + nodeId);
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.condition-node-preview');
   if (!container) return;
   const conf = nodeConditionState[nodeId];
   if (!conf) return;
@@ -882,7 +892,9 @@ function renderConditionNode(nodeId) {
 
 // Render Randomizer
 function renderRandomizerNode(nodeId) {
-  const container = document.getElementById('rand-render-' + nodeId);
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.randomizer-node-preview');
   if (!container) return;
   const conf = nodeRandomizerState[nodeId];
   if (!conf) return;
