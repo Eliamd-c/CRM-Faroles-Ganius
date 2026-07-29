@@ -80,7 +80,11 @@ const {
   INSTAGRAM_ACCOUNT_ID,
   VERIFY_TOKEN,
   PORT = 3000,
+  INSTAGRAM_ACCESS_TOKEN,
 } = process.env;
+
+// Fallback: si no está INSTAGRAM_ACCESS_TOKEN, usa PAGE_ACCESS_TOKEN
+const ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
 
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
@@ -93,7 +97,7 @@ const recentReplies = new Set(); // Para guardar textos de respuestas recientes 
 async function initBot() {
   try {
     const res = await axios.get(`${GRAPH_API}/${INSTAGRAM_ACCOUNT_ID}`, {
-      params: { fields: 'username', access_token: PAGE_ACCESS_TOKEN }
+      params: { fields: 'username', access_token: ACCESS_TOKEN }
     });
     BOT_USERNAME = res.data.username;
     console.log(`🤖 Bot inicializado. Username: @${BOT_USERNAME}`);
@@ -232,7 +236,7 @@ async function getUserProfile(senderId) {
     const response = await axios.get(`${GRAPH_API}/${senderId}`, {
       params: {
         fields: 'name,profile_pic',
-        access_token: PAGE_ACCESS_TOKEN
+        access_token: ACCESS_TOKEN
       }
     });
     return response.data;
@@ -748,7 +752,7 @@ async function sendMessage(recipientId, text, quickReplies = null) {
         message: messagePayload,
       },
       {
-        params: { access_token: PAGE_ACCESS_TOKEN },
+        params: { access_token: ACCESS_TOKEN },
       }
     );
     console.log(`✅ DM enviado a ${recipientId}`);
@@ -790,7 +794,7 @@ async function sendTemplate(recipientId, text, buttons) {
         recipient: { id: recipientId },
         message: messagePayload,
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     console.log(`✅ Plantilla enviada a ${recipientId}`);
     broadcastLog('SYSTEM', `Plantilla de botones enviada a ${recipientId}`);
@@ -836,7 +840,7 @@ async function sendCard(recipientId, cardData, textFallback = null) {
         recipient: { id: recipientId },
         message: messagePayload,
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     console.log(`✅ Tarjeta enviada a ${recipientId}`);
     broadcastLog('SYSTEM', `Tarjeta (Imagen) enviada a ${recipientId}`);
@@ -879,7 +883,7 @@ async function sendCarousel(recipientId, elements) {
           }
         }
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Carrusel (${formattedElements.length} tarjetas) enviado a ${recipientId}`);
   } catch (err) {
@@ -901,7 +905,7 @@ async function sendGallery(recipientId, images, delayBetweenMs = 300) {
           recipient: { id: recipientId },
           message: { attachment: { type: 'image', payload: { url: img.url, is_reusable: true } } }
         },
-        { params: { access_token: PAGE_ACCESS_TOKEN } }
+        { params: { access_token: ACCESS_TOKEN } }
       );
     } catch (err) {
       const msg = err.response?.data?.error?.message || err.message;
@@ -923,7 +927,7 @@ async function sendAudio(recipientId, audioUrl) {
         recipient: { id: recipientId },
         message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: true } } }
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Audio enviado a ${recipientId}`);
   } catch (err) {
@@ -944,7 +948,7 @@ async function sendVideo(recipientId, videoUrl) {
         recipient: { id: recipientId },
         message: { attachment: { type: 'video', payload: { url: videoUrl, is_reusable: true } } }
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Video enviado a ${recipientId}`);
   } catch (err) {
@@ -965,7 +969,7 @@ async function sendFile(recipientId, fileUrl) {
         recipient: { id: recipientId },
         message: { attachment: { type: 'file', payload: { url: fileUrl, is_reusable: true } } }
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Archivo enviado a ${recipientId}`);
   } catch (err) {
@@ -984,7 +988,7 @@ async function replyComment(commentId, text) {
     await axios.post(
       `${GRAPH_API}/${commentId}/replies`,
       { message: text },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     console.log(`✅ Respuesta enviada al comentario ${commentId}`);
     broadcastLog('SYSTEM', `Respuesta enviada al comentario ${commentId}`);
@@ -1007,7 +1011,7 @@ async function sendPrivateReply(commentId, text) {
         recipient: { comment_id: commentId },
         message:   { text },
       },
-      { params: { access_token: PAGE_ACCESS_TOKEN } }
+      { params: { access_token: ACCESS_TOKEN } }
     );
     console.log(`✅ DM privado enviado al autor del comentario ${commentId}`);
     broadcastLog('SYSTEM', `DM enviado en privado al autor del comentario`);
