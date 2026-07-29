@@ -356,52 +356,66 @@ document.getElementById('close-config').addEventListener('click', closeInspector
 // Inspector: Mensaje (Bloques)
 // ─────────────────────────────────────────────
 function renderMessageInspector(nodeId) {
-  document.getElementById('config-title').innerText = 'Inspector de Mensaje';
+  document.getElementById('config-title').innerHTML = 'Enviar mensaje <span style="font-size:12px;color:#9ca3af;cursor:pointer">✏️</span>';
   const blocks = nodeBlocksState[nodeId] || [];
-  let html = '<div class="insp-blocks-list" id="insp-blocks-list">';
+  let html = `
+    <div style="font-size: 13px; color: #374151; margin-bottom: 15px; font-weight: 500;">
+      Enviar <span style="color:#0084ff; border-bottom: 1px solid #0084ff; padding-bottom: 2px;">dentro de la ventana de 24 horas</span> <span style="color:#9ca3af; font-size: 11px;">ⓘ</span>
+    </div>
+    <hr style="border:none; border-top: 1px solid #e5e7eb; margin-bottom: 20px;">
+    <div class="insp-blocks-list" id="insp-blocks-list">
+  `;
   
   blocks.forEach((block, idx) => {
-    html += `<div class="insp-block-card" style="background:#ffffff; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:12px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
-      <div class="insp-block-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span style="font-weight:600; font-size:13px; color:#374151;">${block.type === 'text' ? '📝 Texto' : '🖼️ Imagen'}</span>
-        <button class="insp-del-btn" onclick="deleteBlock('${nodeId}', ${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:16px;">×</button>
-      </div>
-      <div class="insp-block-body">`;
+    // Contenedor principal gris unificado
+    html += `<div class="insp-block-card" style="position:relative; margin-bottom:20px;">
+      ${idx > 0 ? `<div style="text-align:right; margin-bottom:5px;"><button class="insp-del-btn" onclick="deleteBlock('${nodeId}', ${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px; font-weight:600;">Eliminar bloque</button></div>` : ''}
+      
+      <div style="background:#f3f4f6; border-radius:12px; padding:2px; display:flex; flex-direction:column;">
+        <div style="padding:12px; padding-bottom:8px;">`;
       
     if (block.type === 'text') {
-      html += `<textarea class="cfg-input" style="width:100%; min-height:80px; margin-bottom:8px;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Escribe tu mensaje...">${block.content}</textarea>`;
+      html += `<textarea class="cfg-input" style="width:100%; min-height:80px; background:transparent; border:none; outline:none; box-shadow:none; padding:0; font-size:13px; color:#1c1e21; resize:none;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Introduce tu texto...">${block.content}</textarea>`;
     } else if (block.type === 'image') {
       html += `
         <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen</label>
-        <input class="cfg-input" type="text" style="width:100%; margin-bottom:8px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
+        <input class="cfg-input" type="text" style="width:100%; background:transparent; border:none; border-bottom:1px solid #d1d5db; border-radius:0; box-shadow:none; padding:4px 0; margin-bottom:8px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
       `;
     }
 
-    // Botones del bloque
-    html += `<div class="insp-btns-list" style="margin-top:10px;">`;
-    (block.buttons || []).forEach((btn, bIdx) => {
-      html += `
-        <div style="background:#f9fafb; padding:10px; border-radius:6px; border:1px solid #e5e7eb; margin-bottom:8px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; font-weight:600; color:#6b7280; text-transform:uppercase;">Botón ${bIdx + 1}</span>
-            <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px;">Eliminar</button>
+    html += `</div>`; // fin padding text
+
+    // Botones del bloque (estilo list-group)
+    if (block.buttons && block.buttons.length > 0) {
+      html += `<div class="insp-btns-list" style="display:flex; flex-direction:column; gap:1px; background:#e5e7eb; border-radius:0 0 10px 10px; overflow:hidden;">`;
+      block.buttons.forEach((btn, bIdx) => {
+        // En Manychat los botones en el inspector solo muestran el título, el resto de configs podría ir en un accordion, pero para mantenerlo simple:
+        html += `
+          <div style="background:#ffffff; padding:8px 12px; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <input type="text" style="border:none; outline:none; color:#0084ff; font-weight:500; font-size:13px; width:100%;" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="New Button #${bIdx+1}" />
+              <button onclick="deleteButton('${nodeId}', ${idx}, ${bIdx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; margin-left:10px;" title="Eliminar botón">×</button>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <select style="flex:1; border:1px solid #e5e7eb; border-radius:4px; padding:4px; font-size:11px; color:#4b5563; outline:none;" onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, this.value)">
+                <option value="postback" ${btn.type === 'postback'?'selected':''}>Continuar Flujo</option>
+                <option value="web_url" ${btn.type === 'web_url'?'selected':''}>Abrir Web</option>
+              </select>
+              ${btn.type === 'web_url' ? `<input type="text" style="flex:1; border:1px solid #e5e7eb; border-radius:4px; padding:4px; font-size:11px; outline:none;" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." />` : ''}
+            </div>
           </div>
-          <input type="text" class="cfg-input" style="width:100%; margin-bottom:6px; padding:6px; font-size:12px;" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="Título del botón..." />
-          <select class="cfg-input" style="width:100%; padding:6px; font-size:12px; margin-bottom:${btn.type==='web_url'?'6px':'0'};" onchange="updateBtnType('${nodeId}', ${idx}, ${bIdx}, this.value)">
-            <option value="postback" ${btn.type === 'postback'?'selected':''}>Continuar Flujo</option>
-            <option value="web_url" ${btn.type === 'web_url'?'selected':''}>Abrir Web</option>
-          </select>
-          ${btn.type === 'web_url' ? `<input type="text" class="cfg-input" style="width:100%; padding:6px; font-size:12px; margin-bottom:0;" value="${btn.url||''}" oninput="updateBtnUrl('${nodeId}', ${idx}, ${bIdx}, this.value)" placeholder="https://..." />` : ''}
-        </div>
-      `;
-    });
-    html += `</div>`;
-    
-    if ((block.buttons || []).length < 3) {
-      html += `<button class="btn-add" onclick="addButton('${nodeId}', ${idx})" style="width:100%; padding:8px; border:1px dashed #d1d5db; background:#f9fafb; color:var(--primary); border-radius:6px; cursor:pointer; font-size:12px; font-weight:500;">+ Añadir Botón</button>`;
+        `;
+      });
+      html += `</div>`;
     }
     
-    html += `</div></div>`;
+    html += `</div>`; // fin contenedor gris
+
+    if ((block.buttons || []).length < 3) {
+      html += `<div style="text-align:center; margin-top:10px;"><button class="btn-add" onclick="addButton('${nodeId}', ${idx})" style="padding:6px 20px; border:1px dashed #d1d5db; background:transparent; color:#9ca3af; border-radius:20px; cursor:pointer; font-size:12px; font-weight:500; transition:all 0.2s;">+ Añadir botón</button></div>`;
+    }
+    
+    html += `</div>`;
   });
   
   html += `</div>`; // .insp-blocks-list
