@@ -374,6 +374,7 @@ id.addEventListener('drop', e => {
 let selectedNodeId = null;
 
 function openInspector(nodeId) {
+  try {
   selectedNodeId = nodeId;
   const node = editor.getNodeFromId(nodeId);
   const panel = document.getElementById('config-panel');
@@ -394,6 +395,10 @@ function openInspector(nodeId) {
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
+  }
+  } catch(e) {
+    document.getElementById('config-title').innerText = 'Error!';
+    document.getElementById('config-body').innerHTML = '<div style="color:red; font-size:12px;">' + e.message + '<br><br>' + e.stack + '</div>';
   }
 }
 
