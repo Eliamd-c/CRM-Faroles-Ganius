@@ -402,7 +402,7 @@ function renderMessageInspector(nodeId) {
     html += `</div>`; // fin bloque gris (#f1f2f6)
 
     // Botón "+ Añadir botón" fuera del bloque gris (como respuesta rápida o botón extra)
-    if ((block.buttons || []).length < 3) {
+    if ((block.buttons || []).length < 13) {
       html += `<div onclick="addButton('${nodeId}', ${idx})" style="border: 1px dashed #b0b8c4; border-radius: 20px; padding: 10px; text-align: center; font-size: 13px; font-weight: 500; color: #b0b8c4; cursor: pointer; margin-top: 10px; transition: color 0.15s, border-color 0.15s;" onmouseover="this.style.color='#0084ff'; this.style.borderColor='#0084ff';" onmouseout="this.style.color='#b0b8c4'; this.style.borderColor='#b0b8c4';">+ Añadir botón</div>`;
     }
     
@@ -456,7 +456,8 @@ function openButtonEditor(nodeId, idx, bIdx) {
     </div>
     <div class="modal-scroll-container" style="padding:20px; overflow-y:auto; max-height:450px;">
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
-      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid #0084ff; border-radius:8px; font-size:14px; outline:none; margin-bottom:20px; font-weight:600; color:#0084ff;" />
+      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid ${btn.title.length > 20 ? '#ef4444' : '#0084ff'}; border-radius:8px; font-size:14px; outline:none; font-weight:600; color:${btn.title.length > 20 ? '#ef4444' : '#0084ff'};" />
+      ${btn.title.length > 20 ? '<div style="font-size:11px; color:#ef4444; margin-top:4px; margin-bottom:16px;">⚠️ Instagram truncará este texto (máx 20 caracteres)</div>' : '<div style="margin-bottom:20px;"></div>'}
       
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Cuando se presiona este botón</label>
       
@@ -779,7 +780,12 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
               btnIndex++;
               return { type: 'postback', title: btn.title, payload };
             });
-            steps.push({ type: 'template', message: block.content, buttons: templateBtns });
+            const hasWebUrl = block.buttons.some(b => b.type === 'web_url');
+            if (hasWebUrl) {
+              steps.push({ type: 'template', message: block.content, buttons: templateBtns });
+            } else {
+              steps.push({ type: 'buttons', message: block.content, buttons: templateBtns, buttonType: 'quick_reply' });
+            }
           }
         } else if (block.type === 'image') {
           const cardData = { image_url: block.url, title: 'Adjunto', subtitle: '', btn_type: 'postback', btn_title: '', btn_url: '' };

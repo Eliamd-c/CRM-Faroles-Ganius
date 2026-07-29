@@ -238,7 +238,8 @@ async function getUserProfile(senderId) {
 // ─────────────────────────────────────────────
 async function handleMessage(event) {
   const senderId     = event.sender?.id;
-  const text         = event.message?.text || event.postback?.payload;
+  const payload      = event.message?.quick_reply?.payload || event.postback?.payload;
+  const text         = payload || event.message?.text;
   const storyMention = event.message?.story?.mention;
 
   // Ignorar eventos que no tengan ID de origen o sean del propio bot
@@ -327,7 +328,17 @@ async function handleMessage(event) {
     return;
   }
 
-  // 5. Normalizar el texto (quitar mayúsculas y acentos) para Trigger regular
+  // 5. Ruteo por Payload (Prioridad alta)
+  if (payload) {
+    const flowId = `flow_${payload}`;
+    const targetFlow = flowsConfig.flows.find(f => f.id === flowId);
+    if (targetFlow && targetFlow.steps) {
+      await processFlowSteps(targetFlow.steps, senderId, senderName, new Set([targetFlow.id]));
+      return;
+    }
+  }
+
+  // 6. Normalizar el texto (quitar mayúsculas y acentos) para Trigger regular
   const lowerText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   let matchedFlow = null;
 
