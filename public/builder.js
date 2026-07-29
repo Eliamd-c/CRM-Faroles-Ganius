@@ -4,6 +4,14 @@ editor.reroute = true;
 editor.curvature = 0.5;
 editor.start();
 
+let adminApiKey = sessionStorage.getItem('ADMIN_API_KEY');
+if (!adminApiKey) {
+  adminApiKey = prompt("Por favor, ingresa tu ADMIN_API_KEY para acceder al Builder:");
+  if (adminApiKey) {
+    sessionStorage.setItem('ADMIN_API_KEY', adminApiKey);
+  }
+}
+
 // ─────────────────────────────────────────────
 // Estado global
 // ─────────────────────────────────────────────
@@ -895,7 +903,22 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   const btn = document.getElementById('btn-save');
   btn.innerText = "Guardando...";
   try {
-    const res = await fetch('/api/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flowsConfig) });
+    const res = await fetch('/api/flows', { 
+      method: 'POST', 
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': adminApiKey || ''
+      }, 
+      body: JSON.stringify(flowsConfig) 
+    });
+    
+    if (res.status === 401) {
+      alert("Error: API Key inválida");
+      sessionStorage.removeItem('ADMIN_API_KEY');
+      location.reload();
+      return;
+    }
+    
     if (res.ok) {
       btn.innerText = "¡Guardado con éxito!";
       setTimeout(() => btn.innerText = "Guardar Cambios", 2000);
@@ -1064,15 +1087,10 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       nodeRandomizerState[nodeId] = { paths: 2 };
       setTimeout(() => renderRandomizerNode(nodeId), 50);
 
-    } else if (type === 'condition') {
-      const nodeId = editor.addNode('condition', 1, 2, posX, posY, 'condition', { _condition: '{}' }, htmlCondition);
-      nodeConditionState[nodeId] = { field: 'email', operator: 'contains', value: '@' };
-      setTimeout(() => renderConditionNode(nodeId), 50);
     } else if (type === 'randomizer') {
       const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
       nodeRandomizerState[nodeId] = { paths: 2 };
       setTimeout(() => renderRandomizerNode(nodeId), 50);
-
     }
     
     ctxMenu.classList.add('ctx-hidden');

@@ -209,23 +209,37 @@
             if (log.type === 'STORY') typeClass = 'type-story';
             if (log.type === 'ERROR') typeClass = 'type-error';
 
-            let avatarHtml = '';
+            const logHeader = document.createElement('div');
+            logHeader.className = 'log-header';
+            
+            const logType = document.createElement('span');
+            logType.className = `log-type ${typeClass}`;
+            logType.textContent = log.type;
+            
+            const logTime = document.createElement('span');
+            logTime.textContent = time;
+            
+            logHeader.appendChild(logType);
+            logHeader.appendChild(logTime);
+
+            const logContent = document.createElement('div');
+            logContent.className = 'log-content';
+
             if (log.profile && log.profile.profile_pic) {
-                avatarHtml = `<img src="${log.profile.profile_pic}" alt="Avatar" class="user-avatar" />`;
+                const avatar = document.createElement('img');
+                avatar.src = log.profile.profile_pic;
+                avatar.alt = 'Avatar';
+                avatar.className = 'user-avatar';
+                logContent.appendChild(avatar);
             }
 
-            el.innerHTML = `
-                <div class="log-header">
-                    <span class="log-type ${typeClass}">${log.type}</span>
-                    <span>${time}</span>
-                </div>
-                <div class="log-content">
-                    ${avatarHtml}
-                    <div class="log-text">
-                        ${log.message}
-                    </div>
-                </div>
-            `;
+            const logTextContainer = document.createElement('div');
+            logTextContainer.className = 'log-text';
+            logTextContainer.textContent = log.message;
+            logContent.appendChild(logTextContainer);
+
+            el.appendChild(logHeader);
+            el.appendChild(logContent);
             return el;
         }
 

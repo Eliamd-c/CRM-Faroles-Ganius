@@ -23,6 +23,15 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Middleware para validar API KEY
+const requireApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== process.env.ADMIN_API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+  }
+  next();
+};
+
 // Configuración de Multer (Subida de Imágenes)
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -35,7 +44,19 @@ const storage = multer.diskStorage({
     cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage });
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limite 5MB
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error("Solo se permiten imágenes (jpeg, jpg, png, gif, webp)"));
+  }
+});
 
 // Almacén de clientes SSE para el dashboard
 let sseClients = [];
@@ -164,15 +185,15 @@ app.post('/webhook', async (req, res) => {
 // ─────────────────────────────────────────────
 
 // Leer flujos
-app.get('/api/flows', (req, res) => {
+app.get('/api/flows', requireApiKey, (req, res) => {
   res.json(flowsConfig);
 });
 
 // Guardar flujos
-app.post('/api/flows', (req, res) => {
+app.post('/api/flows', requireApiKey, async (req, res) => {
   try {
     const newFlows = req.body;
-    fs.writeFileSync(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
+    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
     flowsConfig = newFlows; // Actualizar memoria
     console.log('✅ flows.json actualizado desde el Builder');
     res.json({ success: true });
@@ -183,7 +204,7 @@ app.post('/api/flows', (req, res) => {
 });
 
 // Subir imágenes
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', requireApiKey, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se subió ningún archivo' });
   }
@@ -277,7 +298,7 @@ async function handleMessage(event) {
     if (isValid) {
       const updates = { bot_state: 'active' };
       if (customer.awaiting_input_field) {
-        updates.fields = { ...customer.fields, [customer.awaiting_input_field]: lowerTxt };
+        updates.fields = { ...(customer.fields || {}), [customer.awaiting_input_field]: lowerTxt };
       }
       await supabase.from('customers').update(updates).eq('instagram_id', senderId);
       broadcastLog('SYSTEM', `Dato capturado: ${lowerTxt} guardado en ${customer.awaiting_input_field}`);
@@ -324,14 +345,16 @@ async function handleMessage(event) {
   }
   
   if (matchedFlow && matchedFlow.steps) {
-    await processFlowSteps(matchedFlow.steps, senderId, senderName);
+    await processFlowSteps(matchedFlow.steps, senderId, senderName, new Set([matchedFlow.id]));
+  } else if (flowsConfig.defaultFlow && flowsConfig.defaultFlow.steps) {
+    await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName, new Set(['defaultFlow']));
   }
 }
 
 // ─────────────────────────────────────────────
 // Procesador de Pasos del Flujo
 // ─────────────────────────────────────────────
-async function processFlowSteps(steps, senderId, senderName) {
+async function processFlowSteps(steps, senderId, senderName, visitedFlows = new Set()) {
   let customer = null;
   if (supabase) {
     try {
@@ -384,15 +407,31 @@ async function processFlowSteps(steps, senderId, senderName) {
       
       const nextFlowId = conditionMet ? step.truePayload : step.falsePayload;
       if (nextFlowId) {
-        const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${nextFlowId}`);
-        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName);
+        const flowKey = `flow_${nextFlowId}`;
+        if (visitedFlows.has(flowKey)) {
+          console.warn(`[WARNING] Ciclo infinito detectado en el flujo ${flowKey}`);
+          break;
+        }
+        const nextFlow = flowsConfig.flows.find(f => f.id === flowKey);
+        if (nextFlow) {
+          visitedFlows.add(flowKey);
+          await processFlowSteps(nextFlow.steps, senderId, senderName, visitedFlows);
+        }
       }
       break; // Detiene el array lineal actual porque la condición bifurca
     } else if (step.type === 'randomizer') {
       if (step.paths && step.paths.length > 0) {
         const randomPayload = step.paths[Math.floor(Math.random() * step.paths.length)];
-        const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${randomPayload}`);
-        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName);
+        const flowKey = `flow_${randomPayload}`;
+        if (visitedFlows.has(flowKey)) {
+          console.warn(`[WARNING] Ciclo infinito detectado en el flujo ${flowKey}`);
+          break;
+        }
+        const nextFlow = flowsConfig.flows.find(f => f.id === flowKey);
+        if (nextFlow) {
+          visitedFlows.add(flowKey);
+          await processFlowSteps(nextFlow.steps, senderId, senderName, visitedFlows);
+        }
       }
       break; // Detiene el array lineal actual
     } else if (step.type === 'input') {
@@ -554,18 +593,18 @@ async function handleComment(value) {
     return;
   }
 
-  // 2. Ignorar por coincidencia de texto exacto (eco de nuestra propia respuesta)
-  if (recentReplies.has(text)) {
-    console.log(`[IGNORE] Ignorando eco del propio bot (texto coincidente).`);
-    recentReplies.delete(text); // Lo borramos para no llenar memoria
+  // 2. Ignorar comentario duplicado para evitar procesamiento doble
+  if (recentReplies.has(commentId)) {
+    console.log(`[IGNORE] Ignorando comentario duplicado.`);
     return;
   }
+  recentReplies.add(commentId);
+  setTimeout(() => recentReplies.delete(commentId), 60000);
 
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
   // Respuesta automática al comentario pública
   const replyText = `Gracias @${fromName} por tu comentario! 🙌`;
-  recentReplies.add(replyText);
   await replyComment(commentId, replyText);
 
   // Enviar mensaje privado (DM) a quien comentó
@@ -751,6 +790,14 @@ async function sendPrivateReply(commentId, text) {
 // ─────────────────────────────────────────────
 // Arranque del servidor
 // ─────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message.includes('permiten imágenes')) {
+    return res.status(400).json({ error: err.message });
+  }
+  console.error('❌ Unhandled Global Error:', err.stack || err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 CRM 2.0 Webhook escuchando en http://localhost:${PORT}/webhook`);
   console.log(`   Account ID : ${INSTAGRAM_ACCOUNT_ID}`);
