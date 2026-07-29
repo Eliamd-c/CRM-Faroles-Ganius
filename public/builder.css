@@ -1,30 +1,28 @@
 
 :root {
-    /* Tema Claro Premium (Manychat Style) */
     --bg-color: #f6f8fa;
     --panel-bg: #ffffff;
-    --border-color: #dadada;
+    --border-color: #e2e8f0;
     --text-main: #253746;
     --text-muted: #8492a6;
     --primary: #0084ff;
     --primary-hover: #0073e6;
     --node-bg: #ffffff;
-    --node-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
+    --node-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     
-    /* Colores Indicadores de Nodo */
-    --indicator-message: #0084ff; /* Azul Manychat */
-    --indicator-action: #0bcb6b;  /* Verde de confirmación/acción */
-    --indicator-trigger: #f5a623; /* Naranja para disparadores */
-    --indicator-logic: #8b5cf6;   /* Morado para lógica/condición */
-    --indicator-random: #ec4899;  /* Rosa para randomizer */
-    --indicator-input: #f59e0b;   /* Amarillo oscuro para inputs */
+    --indicator-message: #0084ff; 
+    --indicator-action: #0bcb6b;  
+    --indicator-trigger: #f5a623; 
+    --indicator-logic: #8b5cf6;   
+    --indicator-random: #ec4899;  
+    --indicator-input: #f59e0b;   
 }
 
 * { box-sizing: border-box; }
 
 body {
     margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-main);
     display: flex;
@@ -45,10 +43,7 @@ header {
     z-index: 10;
 }
 
-.logo {
-    font-size: 1.2rem;
-    font-weight: 600;
-}
+.logo { font-size: 1.2rem; font-weight: 600; }
 .logo span { color: var(--primary); }
 
 .btn-primary {
@@ -74,11 +69,7 @@ header {
 }
 .btn-secondary:hover { background: #f3f4f6; }
 
-.wrapper {
-    display: flex;
-    flex: 1;
-    position: relative;
-}
+.wrapper { display: flex; flex: 1; position: relative; }
 
 /* SIDEBAR MINIMALISTA */
 .sidebar {
@@ -106,7 +97,6 @@ header {
     font-weight: 500;
     color: var(--text-main);
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 .drag-item span { font-size: 16px; }
 .drag-item:hover { 
@@ -116,94 +106,173 @@ header {
     color: var(--primary);
 }
 
-.col-right {
-    flex: 1;
-    position: relative;
-}
+.col-right { flex: 1; position: relative; }
 
 /* CANVAS DOT PATTERN */
 #drawflow {
     width: 100%;
     height: 100%;
-    background-color: #f6f8fa;
+    background-color: #f0f2f5; /* Messenger background color */
     background-image: radial-gradient(#d1d5db 1px, transparent 1px);
     background-size: 20px 20px;
 }
 
-/* NODOS DRAWFLOW (Estilo Manychat) */
+/* NODOS DRAWFLOW (Estilo Manychat Exacto) */
 .drawflow-node {
-    background: var(--node-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: var(--node-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
     color: var(--text-main);
-    min-width: 280px;
-    box-shadow: var(--node-shadow);
-    padding: 0;
+    width: 320px !important;
+    min-width: 320px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    padding: 0 !important;
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    overflow: hidden;
 }
 .drawflow-node.selected {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(0, 132, 255, 0.15);
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(0, 132, 255, 0.15) !important;
 }
 
-/* Indicadores Laterales */
-.node-trigger    { border-left: 4px solid var(--indicator-trigger); }
-.node-message    { border-left: 4px solid var(--indicator-message); }
-.node-action     { border-left: 4px solid var(--indicator-action); }
-.node-input      { border-left: 4px solid var(--indicator-input); }
-.node-condition  { border-left: 4px solid var(--indicator-logic); }
-.node-randomizer { border-left: 4px solid var(--indicator-random); }
-
-/* Cabecera minimalista del nodo */
+/* FORZAR LIMPIEZA DE COLORES EN NODOS VIEJOS */
 .drawflow-node .title-box {
-    padding: 12px 16px;
-    font-weight: 600;
-    font-size: 14px;
+    background: #f8f9fa !important;
+    color: var(--text-muted) !important;
+    padding: 8px 12px !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: transparent;
-    color: var(--text-main);
-    border-bottom: 1px solid #f0f0f0;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color) !important;
 }
-.drawflow-node .title-box span { font-size: 16px; }
+.drawflow-node .title-box span { font-size: 13px !important; }
 
+/* Contenedor interno del nodo */
 .drawflow-node .box {
-    padding: 16px;
+    padding: 16px 16px 24px 16px !important;
+    background: #ffffff !important;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-/* Inputs internos de los nodos */
+/* 
+===============================================
+ESTÉTICA MANYCHAT: BURBUJAS DE CHAT 
+===============================================
+*/
+
+/* Burbuja base */
+.mc-bubble {
+    background: #f1f2f6;
+    border-radius: 18px 18px 18px 4px;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #1c1e21;
+    position: relative;
+    max-width: 90%;
+    align-self: flex-start;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Si la burbuja tiene botones abajo, se quita el radio inferior para "pegar" el botón */
+.mc-bubble.has-buttons {
+    border-radius: 18px 18px 4px 4px;
+    margin-bottom: 2px;
+}
+
+/* Grupo de botones pegados debajo de una burbuja */
+.mc-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 90%;
+    align-self: flex-start;
+}
+
+/* Botón individual de burbuja (Manychat Quick Reply / Button) */
+.mc-button {
+    background: #ffffff;
+    border: 1px solid #e4e6eb;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 14px;
+    text-align: center;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.mc-button:first-child { border-top-left-radius: 4px; border-top-right-radius: 4px; }
+.mc-button:last-child { border-bottom-left-radius: 18px; border-bottom-right-radius: 18px; }
+
+/* Imagen como burbuja */
+.mc-image-bubble {
+    width: 90%;
+    align-self: flex-start;
+    border-radius: 18px 18px 18px 4px;
+    overflow: hidden;
+    border: 1px solid #e4e6eb;
+}
+.mc-image-bubble img { width: 100%; display: block; }
+.mc-image-bubble.has-buttons { border-radius: 18px 18px 4px 4px; }
+
+/* Botón "Añadir botón" */
+.btn-add-mc {
+  margin-top: 6px;
+  width: 90%;
+  align-self: flex-start;
+  padding: 8px;
+  border: 1px dashed #ced0d4;
+  background: transparent;
+  color: #8a8d91;
+  border-radius: 18px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-add-mc:hover { background: #f0f2f5; color: #1c1e21; }
+
+/* Inputs dentro del nodo */
 .drawflow-node input, .drawflow-node textarea {
     width: 100%;
-    background: #ffffff;
-    border: 1px solid var(--border-color);
+    background: #f0f2f5;
+    border: none;
     color: var(--text-main);
-    padding: 8px 10px;
-    border-radius: 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
     font-family: inherit;
-    font-size: 13px;
-    margin-bottom: 10px;
+    font-size: 14px;
     resize: vertical;
-    transition: border-color 0.2s, box-shadow 0.2s;
 }
 .drawflow-node input:focus, .drawflow-node textarea:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2);
+    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.3);
 }
 
 /* PUERTOS (Conectores) */
+/* Posicionaremos el output en la parte central derecha pero más grande y estilo Messenger */
 .drawflow .drawflow-node .input, .drawflow .drawflow-node .output {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     background: #ffffff;
-    border: 2px solid #b0b8c4;
+    border: 3px solid #b0b8c4;
     border-radius: 50%;
     transition: 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .drawflow .drawflow-node .input:hover, .drawflow .drawflow-node .output:hover {
     background: var(--primary);
-    border-color: var(--primary);
+    border-color: #ffffff;
     transform: scale(1.2);
 }
 .drawflow .drawflow-node .output { right: -8px; }
@@ -212,13 +281,12 @@ header {
 /* LINEAS SVG (Conexiones) */
 .drawflow .connection .main-path {
     stroke: #b0b8c4;
-    stroke-width: 2.5px;
-    transition: stroke 0.2s;
+    stroke-width: 3px;
 }
 .drawflow .connection .main-path:hover,
 .drawflow .connection.selected .main-path {
     stroke: var(--primary);
-    stroke-width: 3px;
+    stroke-width: 4px;
 }
 .drawflow .connection .point {
     stroke: var(--primary);
@@ -226,60 +294,13 @@ header {
     fill: white;
 }
 
-/* BOTONES INTERNOS (Mensajes) */
-.btn-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 
-.btn-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #ffffff;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-}
-.btn-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--primary); }
-.btn-edit-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-  padding: 0 4px;
-  color: var(--text-muted);
-  transition: color 0.2s;
-}
-.btn-edit-icon:hover { color: #eb5038; }
-
-.btn-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 8px;
-  border: 1px dashed var(--border-color);
-  background: transparent;
-  color: var(--text-muted);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: 0.2s;
-}
-.btn-add:hover { 
-  border-color: var(--primary); 
-  color: var(--primary); 
-  background: rgba(0,132,255,0.05); 
-}
-
-/* CONFIG PANEL (Inspector) */
+/* CONFIG PANEL (Inspector Minimalista) */
 .config-panel {
     position: absolute;
     top: 0;
     left: 0;
-    width: 320px;
+    width: 340px;
     height: 100%;
     background: var(--panel-bg);
     border-right: 1px solid var(--border-color);
@@ -300,168 +321,49 @@ header {
     justify-content: space-between;
     align-items: center;
 }
-.config-header h3 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 600;
-}
-.config-header button {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 20px;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-}
-.config-header button:hover { background: #f3f4f6; color: var(--text-main); }
+.config-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.config-header button { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
 
-.config-body {
-    padding: 20px;
-    overflow-y: auto;
-    flex: 1;
-}
+.config-body { padding: 20px; overflow-y: auto; flex: 1; }
 
 .cfg-label {
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: var(--text-main);
+    color: var(--text-muted);
     margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 .cfg-input {
     width: 100%;
     background: #ffffff;
-    border: 1px solid var(--border-color);
+    border: 1px solid #ced0d4;
     color: var(--text-main);
     padding: 10px;
     border-radius: 6px;
-    font-family: inherit;
-    font-size: 13px;
+    font-size: 14px;
     margin-bottom: 16px;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: 0.2s;
 }
-.cfg-input:focus { 
-    outline: none; 
-    border-color: var(--primary); 
-    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2); 
-}
-
-/* Listas y Botones del Inspector */
-.cfg-type-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
-.cfg-type-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: 0.2s;
-}
-.cfg-type-item:hover { border-color: var(--primary); }
-.cfg-type-item.active { 
-  border-color: var(--primary); 
-  background: rgba(0,132,255,0.05); 
-  color: var(--primary); 
-}
-
-/* Previsualizadores de nodo (Inputs, Acciones) */
-.action-node-preview, .input-node-preview, .condition-node-preview, .randomizer-node-preview {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #f9fafb;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  margin-bottom: 10px;
-  min-height: 44px;
-}
-.anp-empty { color: var(--text-muted); font-size: 12px; font-style: italic; }
-.anp-icon  { font-size: 18px; flex-shrink: 0; }
-.anp-info  { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-.anp-info strong { font-size: 13px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.anp-params { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.btn-configure-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 8px;
-  border: 1px solid var(--border-color);
-  background: #ffffff;
-  color: var(--text-main);
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: 0.2s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-}
-.btn-configure-action:hover { border-color: var(--primary); color: var(--primary); }
-
-/* Acciones en Inspector */
-.cfg-cat-tabs { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-.cfg-cat-tab {
-  padding: 10px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  transition: 0.15s;
-  border: 1px solid transparent;
-}
-.cfg-cat-tab:hover { background: #f9fafb; color: var(--text-main); }
-.cfg-cat-tab.active { background: rgba(0,132,255,0.05); color: var(--primary); border-color: rgba(0,132,255,0.2); }
-
-.cfg-actions-list { display: flex; flex-direction: column; gap: 8px; }
-.cfg-action-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: #ffffff;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.cfg-action-item:hover { border-color: var(--primary); box-shadow: 0 2px 5px rgba(0,132,255,0.05); }
-.cfg-action-item.active { border-color: var(--primary); background: rgba(0,132,255,0.05); box-shadow: 0 0 0 1px var(--primary); }
-.cfg-action-icon { font-size: 18px; flex-shrink: 0; }
-.cfg-action-info strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
-.cfg-action-info p { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
-
-#cfg-action-save {
-  width: 100%;
-  padding: 10px;
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: 0.2s;
-}
-#cfg-action-save:hover { background: var(--primary-hover); }
+.cfg-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.15); }
 
 /* UTILIDADES Y FIXES */
 .hidden { display: none !important; }
 .ctx-hidden { display: none !important; }
 
-/* Menú contextual modernizado */
 #context-menu {
-  border-radius: 8px !important;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04) !important;
-  border: 1px solid var(--border-color) !important;
-  background: rgba(255,255,255,0.95) !important;
-  backdrop-filter: blur(5px);
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05) !important;
+  border: 1px solid #e4e6eb !important;
+  background: #ffffff !important;
+  padding: 6px;
 }
-.ctx-item { transition: background 0.2s; }
-.ctx-item:hover { background-color: rgba(0,132,255,0.05) !important; color: var(--primary) !important; }
+.ctx-item { 
+  border-radius: 6px;
+  padding: 8px 12px !important;
+  transition: background 0.2s; 
+  border-top: none !important;
+  margin-bottom: 2px;
+}
+.ctx-item:hover { background-color: #f0f2f5 !important; }

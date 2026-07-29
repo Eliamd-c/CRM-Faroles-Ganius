@@ -59,33 +59,38 @@ function renderBlocksInNode(nodeId) {
   
   let html = '';
   blocks.forEach(block => {
-    html += `<div class="canvas-block canvas-block-${block.type}" style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:10px; margin-bottom:8px;">`;
+    let hasButtons = block.buttons && block.buttons.length > 0;
+    let bubbleClass = hasButtons ? 'has-buttons' : '';
+    
+    html += `<div style="display:flex; flex-direction:column; margin-bottom:12px; width:100%;">`;
+    
     if (block.type === 'text') {
-      html += `<div class="cb-text" style="font-size:13px; color:#4b5563; white-space:pre-wrap;">${block.content || '<span class="cb-placeholder" style="color:#9ca3af; font-style:italic;">Texto vacío...</span>'}</div>`;
+      html += `<div class="mc-bubble ${bubbleClass}">${block.content || '<span style="color:#aeb5bc; font-style:italic;">Escribe algo...</span>'}</div>`;
     } else if (block.type === 'image') {
-      html += `<div class="cb-image" style="text-align:center;">${block.url ? `<img src="${block.url}" style="max-width:100%; border-radius:6px;" />` : '<div class="cb-placeholder-img" style="color:#9ca3af; font-size:12px; padding:15px; border:1px dashed #d1d5db; border-radius:6px;">🖼️ Sin imagen (Añade URL en Inspector)</div>'}</div>`;
+      html += `<div class="mc-image-bubble ${bubbleClass}">${block.url ? `<img src="${block.url}" />` : '<div style="padding:20px; text-align:center; color:#aeb5bc; font-size:12px;">Sin imagen</div>'}</div>`;
     }
     
-    // Botones
-    if (block.buttons && block.buttons.length > 0) {
-      html += `<div class="cb-btns" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">`;
+    if (hasButtons) {
+      html += `<div class="mc-btn-group">`;
       block.buttons.forEach(btn => {
-        html += `<div class="cb-btn-row" style="background:#fff; border:1px solid #d1d5db; padding:6px 10px; border-radius:6px; font-size:12px; display:flex; justify-content:space-between; box-shadow:0 1px 2px rgba(0,0,0,0.02);"><span>${btn.title || 'Botón'}</span> <span class="cb-btn-icon" style="color:#6b7280; font-size:10px;">►</span></div>`;
+        html += `<div class="mc-button"><span>${btn.title || 'New Button'}</span><span style="font-size:16px;">›</span></div>`;
       });
       html += `</div>`;
     }
+    
     html += `</div>`;
   });
 
   if (blocks.length === 0) {
-    html = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size:12px;">Sin contenido.<br>Añade bloques en el Inspector.</div>`;
+    html = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size:12px;">Empty node</div>`;
   }
 
   container.innerHTML = html;
   
-  // Reposicionar salidas para los botones
-  setTimeout(() => repositionOutputs(nodeId), 30);
+  // Posicionar conectores (opcional, hack drawflow)
+  // Dejamos que CSS se encargue del layout general de outputs
 }
+
 
 function repositionOutputs(nodeId) {
   const nodeEl = document.querySelector(`#node-${nodeId}`);
@@ -184,9 +189,9 @@ function renderInputNode(nodeId) {
 // ─────────────────────────────────────────────
 const htmlTrigger = `
   <div class="node-trigger">
-    <div class="title-box">⚡ Palabra Clave (Trigger)</div>
-    <div class="box">
-      <input type="text" df-keywords placeholder="Ej: precio, info" />
+    <div class="title-box"><span>⚡</span> Starting Step</div>
+    <div class="box trigger-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Palabra Clave</em>
     </div>
   </div>
 `;
@@ -203,40 +208,36 @@ const htmlCard = `
 
 const htmlCondition = `
   <div class="node-condition">
-    <div class="title-box">🔀 Condición</div>
-    <div class="box condition-node-preview" style="padding:10px;">
-      <em style="color:#6b7280; font-size:11px;">Configura en el panel...</em>
+    <div class="title-box"><span>🔀</span> Condition</div>
+    <div class="box condition-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Configura en el panel...</em>
     </div>
   </div>
 `;
 
 const htmlRandomizer = `
   <div class="node-randomizer">
-    <div class="title-box">🎲 Aleatorio (A/B)</div>
-    <div class="box randomizer-node-preview" style="padding:10px;">
-      <em style="color:#6b7280; font-size:11px;">Configura salidas en el panel...</em>
+    <div class="title-box"><span>🎲</span> Randomizer</div>
+    <div class="box randomizer-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Configura salidas en el panel...</em>
     </div>
   </div>
 `;
 
 const htmlAction = `
   <div class="node-action">
-    <div class="title-box">⚡ Realizar Acciones</div>
-    <div class="box" style="padding-bottom:10px;">
-      <div class="action-node-preview">
-        <span class="anp-empty">Selecciona este nodo para configurar</span>
-      </div>
+    <div class="title-box"><span>⚡</span> Action</div>
+    <div class="box action-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin configurar</em>
     </div>
   </div>
 `;
 
 const htmlInput = `
   <div class="node-input">
-    <div class="title-box">📥 Pedir Dato</div>
-    <div class="box" style="padding-bottom:10px;">
-      <div class="input-node-preview" style="background:#fef3c7; padding:10px; border-radius:6px; border:1px solid #fcd34d;">
-        <span class="anp-empty" style="font-size:12px; color:#b45309;">Selecciona para configurar</span>
-      </div>
+    <div class="title-box"><span>📥</span> User Input</div>
+    <div class="box input-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin configurar</em>
     </div>
   </div>
 `;
