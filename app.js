@@ -280,7 +280,7 @@ async function handleMessage(event) {
         .select('*')
         .eq('instagram_id', senderId)
         .single();
-        
+
       customer = data;
       if (customer && customer.bot_paused) {
         console.log(`[IGNORE] Bot pausado para el usuario ${senderId}`);
@@ -288,6 +288,25 @@ async function handleMessage(event) {
       }
     } catch (e) {
       console.error('[DB] Error verificando estado del bot:', e.message);
+    }
+  }
+
+  // 3.5 Welcome Message: Primer contacto
+  if (!customer && supabase) {
+    try {
+      const { error: insertErr } = await supabase
+        .from('customers')
+        .insert([{ instagram_id: senderId, name: senderName, tags: [], fields: {}, bot_paused: false, bot_state: 'active' }]);
+      if (!insertErr) {
+        broadcastLog('SYSTEM', `Nuevo contacto creado: ${senderName}`);
+        if (flowsConfig.welcomeFlow?.steps?.length > 0) {
+          broadcastLog('SYSTEM', `Ejecutando Welcome Flow para ${senderName}`);
+          await processFlowSteps(flowsConfig.welcomeFlow.steps, senderId, senderName);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('[DB] Error creando nuevo contacto:', e.message);
     }
   }
 
@@ -564,6 +583,25 @@ async function executeAction(senderId, senderName, step) {
       case 'mark_closed': {
         updates.status = 'closed';
         break;
+      }
+      case 'subscribe_sequence': {
+        const seqId = params.sequence_id;
+        if (seqId) {
+          await subscribeToSequence(senderId, seqId);
+          broadcastLog('SYSTEM', `${senderName} suscrito a secuencia ${seqId}`);
+        }
+        return;
+      }
+      case 'unsubscribe_sequence': {
+        const seqId = params.sequence_id;
+        if (seqId) {
+          await supabase.from('sequence_subscriptions')
+            .update({ is_unsubscribed: true })
+            .eq('instagram_id', senderId)
+            .eq('sequence_id', seqId);
+          broadcastLog('SYSTEM', `${senderName} desuscrito de secuencia ${seqId}`);
+        }
+        return;
       }
       default:
         // Por retrocompatibilidad con la version vieja (Acción de etiqueta legacy)
@@ -934,6 +972,175 @@ async function sendPrivateReply(commentId, text) {
     broadcastLog('ERROR', `Error al enviar DM privado: ${errorMsg}`);
   }
 }
+
+// ─────────────────────────────────────────────
+// Secuencias / Drip Campaigns
+// ─────────────────────────────────────────────
+let sequencesConfig = [];
+try {
+  const rawSeq = fs.readFileSync(path.join(__dirname, 'sequences.json'));
+  sequencesConfig = JSON.parse(rawSeq);
+} catch (e) { /* no sequences.json yet */ }
+
+async function subscribeToSequence(instagramId, sequenceId) {
+  if (!supabase) return;
+  const { data: existing } = await supabase.from('sequence_subscriptions')
+    .select('id').eq('instagram_id', instagramId).eq('sequence_id', sequenceId).eq('is_completed', false).eq('is_unsubscribed', false).maybeSingle();
+  if (existing) return;
+  const seq = sequencesConfig.find(s => s.id === sequenceId);
+  if (!seq || !seq.steps || seq.steps.length === 0) return;
+  const firstDelay = (seq.steps[0].delay_hours || 0) * 3600000;
+  await supabase.from('sequence_subscriptions').insert([{
+    sequence_id: sequenceId,
+    instagram_id: instagramId,
+    current_step: 0,
+    next_send_at: new Date(Date.now() + firstDelay).toISOString(),
+    is_completed: false,
+    is_unsubscribed: false
+  }]);
+}
+
+async function processSequenceScheduler() {
+  if (!supabase) return;
+  try {
+    const { data: pending } = await supabase.from('sequence_subscriptions')
+      .select('*')
+      .eq('is_completed', false)
+      .eq('is_unsubscribed', false)
+      .lte('next_send_at', new Date().toISOString())
+      .limit(50);
+    if (!pending || pending.length === 0) return;
+    for (const sub of pending) {
+      const seq = sequencesConfig.find(s => s.id === sub.sequence_id);
+      if (!seq || !seq.steps) continue;
+      const step = seq.steps[sub.current_step];
+      if (!step) continue;
+      const profile = await getUserProfile(sub.instagram_id);
+      const name = profile?.name || sub.instagram_id;
+      if (step.steps && step.steps.length > 0) {
+        await processFlowSteps(step.steps, sub.instagram_id, name);
+      }
+      const nextIdx = sub.current_step + 1;
+      if (nextIdx >= seq.steps.length) {
+        await supabase.from('sequence_subscriptions').update({ is_completed: true }).eq('id', sub.id);
+        broadcastLog('SYSTEM', `Secuencia ${seq.name || seq.id} completada para ${name}`);
+      } else {
+        const nextDelay = (seq.steps[nextIdx].delay_hours || 0) * 3600000;
+        await supabase.from('sequence_subscriptions').update({
+          current_step: nextIdx,
+          next_send_at: new Date(Date.now() + nextDelay).toISOString()
+        }).eq('id', sub.id);
+      }
+    }
+  } catch (e) {
+    console.error('[SEQUENCES] Error en scheduler:', e.message);
+  }
+}
+
+setInterval(processSequenceScheduler, 60_000);
+
+app.get('/api/sequences', (req, res) => res.json(sequencesConfig));
+
+app.post('/api/sequences', async (req, res) => {
+  try {
+    sequencesConfig = req.body;
+    await fs.promises.writeFile(path.join(__dirname, 'sequences.json'), JSON.stringify(sequencesConfig, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Broadcasts — Envío masivo
+// ─────────────────────────────────────────────
+let activeBroadcasts = {};
+
+app.post('/api/broadcasts', async (req, res) => {
+  const { name, message_steps, recipient_filter, scheduled_at } = req.body;
+  const id = 'bc_' + Date.now();
+  const broadcast = { id, name, message_steps, recipient_filter, scheduled_at, status: scheduled_at ? 'scheduled' : 'sending', total: 0, sent: 0, failed: 0, created_at: new Date().toISOString() };
+  activeBroadcasts[id] = broadcast;
+  if (!scheduled_at) {
+    executeBroadcast(broadcast);
+  }
+  res.json(broadcast);
+});
+
+app.get('/api/broadcasts', (req, res) => res.json(Object.values(activeBroadcasts)));
+
+async function executeBroadcast(broadcast) {
+  if (!supabase) { broadcast.status = 'failed'; return; }
+  try {
+    let query = supabase.from('customers').select('instagram_id, name');
+    const filter = broadcast.recipient_filter;
+    if (filter?.tags?.length > 0) query = query.contains('tags', filter.tags);
+    const { data: recipients } = await query;
+    if (!recipients) { broadcast.status = 'failed'; return; }
+    broadcast.total = recipients.length;
+    broadcast.status = 'sending';
+    broadcastLog('SYSTEM', `Broadcast "${broadcast.name}" iniciado: ${recipients.length} destinatarios`);
+    for (const { instagram_id, name } of recipients) {
+      try {
+        await processFlowSteps(broadcast.message_steps || [], instagram_id, name || instagram_id);
+        broadcast.sent++;
+      } catch (e) {
+        broadcast.failed++;
+      }
+      await new Promise(r => setTimeout(r, 100));
+    }
+    broadcast.status = 'completed';
+    broadcast.completed_at = new Date().toISOString();
+    broadcastLog('SYSTEM', `Broadcast "${broadcast.name}" completado: ${broadcast.sent}/${broadcast.total} enviados`);
+  } catch (e) {
+    broadcast.status = 'failed';
+    console.error('[BROADCAST] Error:', e.message);
+  }
+}
+
+setInterval(() => {
+  const now = new Date();
+  for (const bc of Object.values(activeBroadcasts)) {
+    if (bc.status === 'scheduled' && bc.scheduled_at && new Date(bc.scheduled_at) <= now) {
+      executeBroadcast(bc);
+    }
+  }
+}, 60_000);
+
+// ─────────────────────────────────────────────
+// Welcome Flow API
+// ─────────────────────────────────────────────
+app.get('/api/welcome-flow', (req, res) => {
+  res.json(flowsConfig.welcomeFlow || { steps: [] });
+});
+
+app.post('/api/welcome-flow', async (req, res) => {
+  try {
+    flowsConfig.welcomeFlow = req.body;
+    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Opt-in Widgets — Generar enlaces de chat
+// ─────────────────────────────────────────────
+const INSTAGRAM_HANDLE = process.env.INSTAGRAM_HANDLE || '';
+
+app.get('/api/widget-config', (req, res) => {
+  res.json({
+    instagram_handle: INSTAGRAM_HANDLE,
+    chat_url: INSTAGRAM_HANDLE ? `https://ig.me/m/${INSTAGRAM_HANDLE}` : null,
+    flows: flowsConfig.flows.map(f => ({ id: f.id, name: f.name }))
+  });
+});
+
+app.get('/chat-init', (req, res) => {
+  if (!INSTAGRAM_HANDLE) return res.status(400).json({ error: 'INSTAGRAM_HANDLE no configurado' });
+  res.redirect(`https://ig.me/m/${INSTAGRAM_HANDLE}`);
+});
 
 // ─────────────────────────────────────────────
 // Manejador de errores global Express

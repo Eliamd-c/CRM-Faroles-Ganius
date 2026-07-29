@@ -18,6 +18,7 @@ const nodeAudioState = {};    // { nodeId: { audio_url: '' } }
 const nodeVideoState = {};    // { nodeId: { video_url: '' } }
 const nodeFileState = {};     // { nodeId: { file_url: '' } }
 const nodeDelayState = {};    // { nodeId: { seconds: 5 } }
+const nodeGotoState = {};     // { nodeId: { flow_id: '' } }
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
@@ -40,6 +41,8 @@ const ACTION_CATALOG = {
     actions: [
       { id: 'pause_bot',      icon: '⏸️', label: 'Pausar automatizaciones',   desc: 'El bot no responderá más a este contacto',         params: [] },
       { id: 'resume_bot',     icon: '▶️', label: 'Reanudar automatizaciones', desc: 'Reactiva el bot para este contacto',               params: [] },
+      { id: 'subscribe_sequence',   icon: '📬', label: 'Suscribir a secuencia',   desc: 'Inicia una secuencia/drip para este contacto',  params: [{ key: 'sequence_id', label: 'ID de la secuencia', placeholder: 'ej: seq_welcome' }] },
+      { id: 'unsubscribe_sequence', icon: '🚫', label: 'Desuscribir secuencia',   desc: 'Detiene una secuencia activa del contacto',     params: [{ key: 'sequence_id', label: 'ID de la secuencia', placeholder: 'ej: seq_welcome' }] },
     ]
   },
   inbox: {
@@ -312,6 +315,15 @@ const htmlDelay = `
   </div>
 `;
 
+const htmlGoto = `
+  <div class="node-goto">
+    <div class="title-box"><span>↗️</span> Goto / Saltar</div>
+    <div class="box goto-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin destino</em>
+    </div>
+  </div>
+`;
+
 // Registrar nodos estáticos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('card', htmlCard);
@@ -323,6 +335,7 @@ editor.registerNode('audio', htmlAudio);
 editor.registerNode('video', htmlVideo);
 editor.registerNode('file', htmlFile);
 editor.registerNode('delay', htmlDelay);
+editor.registerNode('goto', htmlGoto);
 
 // ─────────────────────────────────────────────
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
@@ -403,6 +416,10 @@ id.addEventListener('drop', e => {
     const nodeId = editor.addNode('delay', 1, 1, posX, posY, 'delay', { _delay: '{}' }, htmlDelay);
     nodeDelayState[nodeId] = { seconds: 5 };
     setTimeout(() => renderDelayNode(nodeId), 50);
+  } else if (type === 'goto') {
+    const nodeId = editor.addNode('goto', 1, 0, posX, posY, 'goto', { _goto: '{}' }, htmlGoto);
+    nodeGotoState[nodeId] = { flow_id: '' };
+    setTimeout(() => renderGotoNode(nodeId), 50);
   }
 });
 
@@ -439,6 +456,8 @@ function openInspector(nodeId) {
     renderFileInspector(nodeId);
   } else if (node.name === 'delay') {
     renderDelayInspector(nodeId);
+  } else if (node.name === 'goto') {
+    renderGotoInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
@@ -984,6 +1003,11 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       steps.push({ type: 'delay', seconds: conf.seconds || 5 });
       currentId = node.outputs.output_1?.connections[0]?.node;
     }
+    else if (node.name === 'goto') {
+      const conf = nodeGotoState[currentId] || JSON.parse(node.data._goto || '{}');
+      if (conf.flow_id) steps.push({ type: 'goto', flow_id: conf.flow_id });
+      currentId = null;
+    }
     else {
       break; // Trigger o nodo final
     }
@@ -1039,6 +1063,11 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   for (const nodeId in nodeDelayState) {
     if (editor.drawflow.drawflow.Home.data[nodeId]) {
       editor.drawflow.drawflow.Home.data[nodeId].data._delay = JSON.stringify(nodeDelayState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeGotoState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._goto = JSON.stringify(nodeGotoState[nodeId]);
     }
   }
 
@@ -1133,6 +1162,10 @@ setTimeout(() => {
        if (node.name === 'delay' && node.data._delay) {
          nodeDelayState[nodeId] = JSON.parse(node.data._delay);
          renderDelayNode(nodeId);
+       }
+       if (node.name === 'goto' && node.data._goto) {
+         nodeGotoState[nodeId] = JSON.parse(node.data._goto);
+         renderGotoNode(nodeId);
        }
     }
   }
@@ -1277,6 +1310,10 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       const nodeId = editor.addNode('delay', 1, 1, posX, posY, 'delay', { _delay: '{}' }, htmlDelay);
       nodeDelayState[nodeId] = { seconds: 5 };
       setTimeout(() => renderDelayNode(nodeId), 50);
+    } else if (type === 'goto') {
+      const nodeId = editor.addNode('goto', 1, 0, posX, posY, 'goto', { _goto: '{}' }, htmlGoto);
+      nodeGotoState[nodeId] = { flow_id: '' };
+      setTimeout(() => renderGotoNode(nodeId), 50);
     }
 
     ctxMenu.classList.add('ctx-hidden');
@@ -1666,4 +1703,38 @@ async function uploadMediaFile(nodeId, type, inputEl) {
   } catch (e) {
     alert('Error de red al subir archivo');
   }
+}
+
+// ─────────────────────────────────────────────
+// Goto / Saltar a flujo
+// ─────────────────────────────────────────────
+function renderGotoNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.goto-node-preview');
+  if (!container) return;
+  const conf = nodeGotoState[nodeId];
+  container.innerHTML = conf?.flow_id
+    ? `<div style="background:#dbeafe; padding:8px; border-radius:6px; text-align:center; font-size:12px; color:#1d4ed8; font-weight:600;">↗️ ${conf.flow_id}</div>`
+    : '<em style="color:#8492a6; font-size:11px;">Sin destino</em>';
+}
+
+function renderGotoInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Goto / Saltar';
+  const conf = nodeGotoState[nodeId] || { flow_id: '' };
+  document.getElementById('config-body').innerHTML = `
+    <div class="config-group">
+      <label class="config-label">ID del flujo destino</label>
+      <input type="text" class="config-input" id="goto-flow-id" value="${conf.flow_id || ''}" placeholder="ej: flow_checkout o nombre del trigger">
+      <p style="font-size:11px; color:#6b7280; margin-top:4px;">El flujo saltará al destino y no continuará con los pasos siguientes.</p>
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveGoto('${nodeId}')">Guardar</button>`;
+}
+
+function saveGoto(nodeId) {
+  const flowId = document.getElementById('goto-flow-id').value.trim();
+  nodeGotoState[nodeId] = { flow_id: flowId };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._goto = JSON.stringify(nodeGotoState[nodeId]);
+  renderGotoNode(nodeId);
 }

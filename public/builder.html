@@ -6,7 +6,7 @@
     <title>Flow Builder - Faroles Genius</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.css">
-    <link rel="stylesheet" href="builder.css?v=18">
+    <link rel="stylesheet" href="builder.css?v=19">
 </head>
 <body>
     <header>
@@ -57,6 +57,9 @@
             <div class="drag-item" draggable="true" data-node="delay">
                 <span>⏱</span> Espera (Delay)
             </div>
+            <div class="drag-item" draggable="true" data-node="goto">
+                <span>↗️</span> Goto / Saltar
+            </div>
         </div>
         
         <div class="col-right">
@@ -90,10 +93,11 @@
         <div class="ctx-item" data-type="video" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎥</span> Video</div>
         <div class="ctx-item" data-type="file" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📄</span> Archivo / PDF</div>
         <div class="ctx-item" data-type="delay" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>⏱</span> Espera</div>
+        <div class="ctx-item" data-type="goto" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>↗️</span> Goto / Saltar</div>
     </div>
 
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <script src="builder.js?v=28"></script>
+    <script src="builder.js?v=29"></script>
 </body>
 </html>
