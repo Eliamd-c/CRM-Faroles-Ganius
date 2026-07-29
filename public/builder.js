@@ -4,14 +4,6 @@ editor.reroute = true;
 editor.curvature = 0.5;
 editor.start();
 
-let adminApiKey = sessionStorage.getItem('ADMIN_API_KEY');
-if (!adminApiKey) {
-  adminApiKey = prompt("Por favor, ingresa tu ADMIN_API_KEY para acceder al Builder:");
-  if (adminApiKey) {
-    sessionStorage.setItem('ADMIN_API_KEY', adminApiKey);
-  }
-}
-
 // ─────────────────────────────────────────────
 // Estado global
 // ─────────────────────────────────────────────
@@ -20,7 +12,12 @@ const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 const nodeInputState = {}; // { nodeId: { type: 'email', field: 'email', prompt: '', retry: '' } }
 const nodeConditionState = {}; // { nodeId: { field: '', operator: '', value: '' } }
 const nodeRandomizerState = {}; // { nodeId: { paths: 2 } }
-window.nodeCarouselState = {};
+const nodeCarouselState = {}; // { nodeId: { elements: [{title,subtitle,image_url,buttons:[]}] } }
+const nodeGalleryState = {};  // { nodeId: { images: [{url}], delay_between_ms: 300 } }
+const nodeAudioState = {};    // { nodeId: { audio_url: '' } }
+const nodeVideoState = {};    // { nodeId: { video_url: '' } }
+const nodeFileState = {};     // { nodeId: { file_url: '' } }
+const nodeDelayState = {};    // { nodeId: { seconds: 5 } }
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
@@ -103,30 +100,6 @@ function renderBlocksInNode(nodeId) {
   }, 10);
 }
 
-
-function renderCarouselInNode(nodeId) {
-  let container = document.querySelector(`#node-${nodeId} .node-carousel-container`);
-  if (!container) return;
-  const data = nodeCarouselState[nodeId];
-  if (!data || !data.elements) return;
-  
-  let html = '<div style="display:flex; overflow-x:auto; gap:10px; padding-bottom:10px; max-width:260px;">';
-  data.elements.forEach((el, idx) => {
-    html += `
-      <div style="flex: 0 0 160px; background:white; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
-        ${el.image_url ? `<img src="${el.image_url}" style="width:100%; height:80px; object-fit:cover;" />` : `<div style="width:100%; height:80px; background:#f3f4f6; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:12px;">Sin imagen</div>`}
-        <div style="padding:8px;">
-          <div style="font-size:12px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${el.title || 'Título'}</div>
-          <div style="font-size:10px; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${el.subtitle || ''}</div>
-        </div>
-      </div>
-    `;
-  });
-  html += '</div>';
-  container.innerHTML = html;
-  
-  setTimeout(() => repositionOutputs(nodeId), 10);
-}
 
 function repositionOutputs(nodeId) {
   const nodeEl = document.querySelector(`#node-${nodeId}`);
@@ -285,11 +258,71 @@ const htmlInput = `
   </div>
 `;
 
+const htmlCarousel = `
+  <div class="node-carousel">
+    <div class="title-box"><span>🖼️</span> Carrusel</div>
+    <div class="box carousel-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin tarjetas configuradas</em>
+    </div>
+  </div>
+`;
+
+const htmlGallery = `
+  <div class="node-gallery">
+    <div class="title-box"><span>📸</span> Galería</div>
+    <div class="box gallery-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin imágenes</em>
+    </div>
+  </div>
+`;
+
+const htmlAudio = `
+  <div class="node-audio">
+    <div class="title-box"><span>🎵</span> Audio</div>
+    <div class="box audio-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin audio configurado</em>
+    </div>
+  </div>
+`;
+
+const htmlVideo = `
+  <div class="node-video">
+    <div class="title-box"><span>🎥</span> Video</div>
+    <div class="box video-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin video configurado</em>
+    </div>
+  </div>
+`;
+
+const htmlFile = `
+  <div class="node-file">
+    <div class="title-box"><span>📄</span> Archivo / PDF</div>
+    <div class="box file-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin archivo configurado</em>
+    </div>
+  </div>
+`;
+
+const htmlDelay = `
+  <div class="node-delay">
+    <div class="title-box"><span>⏱</span> Espera</div>
+    <div class="box delay-node-preview">
+      <em style="color:#8492a6; font-size:11px;">Sin duración</em>
+    </div>
+  </div>
+`;
+
 // Registrar nodos estáticos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('card', htmlCard);
 editor.registerNode('action', htmlAction);
 editor.registerNode('input', htmlInput);
+editor.registerNode('carousel', htmlCarousel);
+editor.registerNode('gallery', htmlGallery);
+editor.registerNode('audio', htmlAudio);
+editor.registerNode('video', htmlVideo);
+editor.registerNode('file', htmlFile);
+editor.registerNode('delay', htmlDelay);
 
 // ─────────────────────────────────────────────
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
@@ -303,23 +336,6 @@ function addMessageNode(posX, posY) {
   ];
   
   setTimeout(() => renderBlocksInNode(nodeId), 50);
-  return nodeId;
-}
-
-// ─────────────────────────────────────────────
-// Agregar nodo Carrusel
-// ─────────────────────────────────────────────
-function addCarouselNode(posX, posY) {
-  const tempHtml = `<div class="node-carousel"><div class="title-box" style="background:#8b5cf6;"><span>🎠</span> Carousel</div><div class="box node-carousel-container"></div></div>`;
-  const nodeId = editor.addNode('carousel', 1, 10, posX, posY, 'carousel', { _carousel: '[]' }, tempHtml);
-  
-  nodeCarouselState[nodeId] = {
-    elements: [
-      { id: generateId(), title: 'Nuevo Elemento', subtitle: 'Descripción', image_url: '', buttons: [] }
-    ]
-  };
-  
-  setTimeout(() => renderCarouselInNode(nodeId), 50);
   return nodeId;
 }
 
@@ -347,8 +363,6 @@ id.addEventListener('drop', e => {
     editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
   } else if (type === 'message') {
     addMessageNode(posX, posY);
-  } else if (type === 'carousel') {
-    addCarouselNode(posX, posY);
   } else if (type === 'action') {
     const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
     nodeActionsState[nodeId] = null;
@@ -365,6 +379,30 @@ id.addEventListener('drop', e => {
     const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
     nodeRandomizerState[nodeId] = { paths: 2 };
     setTimeout(() => renderRandomizerNode(nodeId), 50);
+  } else if (type === 'carousel') {
+    const nodeId = editor.addNode('carousel', 1, 1, posX, posY, 'carousel', { _carousel: '{}' }, htmlCarousel);
+    nodeCarouselState[nodeId] = { elements: [] };
+    setTimeout(() => renderCarouselNode(nodeId), 50);
+  } else if (type === 'gallery') {
+    const nodeId = editor.addNode('gallery', 1, 1, posX, posY, 'gallery', { _gallery: '{}' }, htmlGallery);
+    nodeGalleryState[nodeId] = { images: [], delay_between_ms: 300 };
+    setTimeout(() => renderGalleryNode(nodeId), 50);
+  } else if (type === 'audio') {
+    const nodeId = editor.addNode('audio', 1, 1, posX, posY, 'audio', { _audio: '{}' }, htmlAudio);
+    nodeAudioState[nodeId] = { audio_url: '' };
+    setTimeout(() => renderAudioNode(nodeId), 50);
+  } else if (type === 'video') {
+    const nodeId = editor.addNode('video', 1, 1, posX, posY, 'video', { _video: '{}' }, htmlVideo);
+    nodeVideoState[nodeId] = { video_url: '' };
+    setTimeout(() => renderVideoNode(nodeId), 50);
+  } else if (type === 'file') {
+    const nodeId = editor.addNode('file', 1, 1, posX, posY, 'file', { _file: '{}' }, htmlFile);
+    nodeFileState[nodeId] = { file_url: '' };
+    setTimeout(() => renderFileNode(nodeId), 50);
+  } else if (type === 'delay') {
+    const nodeId = editor.addNode('delay', 1, 1, posX, posY, 'delay', { _delay: '{}' }, htmlDelay);
+    nodeDelayState[nodeId] = { seconds: 5 };
+    setTimeout(() => renderDelayNode(nodeId), 50);
   }
 });
 
@@ -374,7 +412,6 @@ id.addEventListener('drop', e => {
 let selectedNodeId = null;
 
 function openInspector(nodeId) {
-  try {
   selectedNodeId = nodeId;
   const node = editor.getNodeFromId(nodeId);
   const panel = document.getElementById('config-panel');
@@ -392,13 +429,19 @@ function openInspector(nodeId) {
     renderRandomizerInspector(nodeId);
   } else if (node.name === 'carousel') {
     renderCarouselInspector(nodeId);
+  } else if (node.name === 'gallery') {
+    renderGalleryInspector(nodeId);
+  } else if (node.name === 'audio') {
+    renderAudioInspector(nodeId);
+  } else if (node.name === 'video') {
+    renderVideoInspector(nodeId);
+  } else if (node.name === 'file') {
+    renderFileInspector(nodeId);
+  } else if (node.name === 'delay') {
+    renderDelayInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
-  }
-  } catch(e) {
-    document.getElementById('config-title').innerText = 'Error!';
-    document.getElementById('config-body').innerHTML = '<div style="color:red; font-size:12px;">' + e.message + '<br><br>' + e.stack + '</div>';
   }
 }
 
@@ -453,7 +496,7 @@ function renderMessageInspector(nodeId) {
     html += `</div>`; // fin bloque gris (#f1f2f6)
 
     // Botón "+ Añadir botón" fuera del bloque gris (como respuesta rápida o botón extra)
-    if ((block.buttons || []).length < 13) {
+    if ((block.buttons || []).length < 3) {
       html += `<div onclick="addButton('${nodeId}', ${idx})" style="border: 1px dashed #b0b8c4; border-radius: 20px; padding: 10px; text-align: center; font-size: 13px; font-weight: 500; color: #b0b8c4; cursor: pointer; margin-top: 10px; transition: color 0.15s, border-color 0.15s;" onmouseover="this.style.color='#0084ff'; this.style.borderColor='#0084ff';" onmouseout="this.style.color='#b0b8c4'; this.style.borderColor='#b0b8c4';">+ Añadir botón</div>`;
     }
     
@@ -507,8 +550,7 @@ function openButtonEditor(nodeId, idx, bIdx) {
     </div>
     <div class="modal-scroll-container" style="padding:20px; overflow-y:auto; max-height:450px;">
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
-      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid ${btn.title.length > 20 ? '#ef4444' : '#0084ff'}; border-radius:8px; font-size:14px; outline:none; font-weight:600; color:${btn.title.length > 20 ? '#ef4444' : '#0084ff'};" />
-      ${btn.title.length > 20 ? '<div style="font-size:11px; color:#ef4444; margin-top:4px; margin-bottom:16px;">⚠️ Instagram truncará este texto (máx 20 caracteres)</div>' : '<div style="margin-bottom:20px;"></div>'}
+      <input type="text" value="${btn.title}" oninput="updateBtnTitle('${nodeId}', ${idx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid #0084ff; border-radius:8px; font-size:14px; outline:none; margin-bottom:20px; font-weight:600; color:#0084ff;" />
       
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Cuando se presiona este botón</label>
       
@@ -831,12 +873,7 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
               btnIndex++;
               return { type: 'postback', title: btn.title, payload };
             });
-            const hasWebUrl = block.buttons.some(b => b.type === 'web_url');
-            if (hasWebUrl) {
-              steps.push({ type: 'template', message: block.content, buttons: templateBtns });
-            } else {
-              steps.push({ type: 'buttons', message: block.content, buttons: templateBtns, buttonType: 'quick_reply' });
-            }
+            steps.push({ type: 'template', message: block.content, buttons: templateBtns });
           }
         } else if (block.type === 'image') {
           const cardData = { image_url: block.url, title: 'Adjunto', subtitle: '', btn_type: 'postback', btn_title: '', btn_url: '' };
@@ -913,6 +950,40 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       }
       currentId = null; // Detenemos la travesía lineal principal porque el Input genera flujos desvinculados basados en los outputs (como los botones)
     }
+    else if (node.name === 'carousel') {
+      const conf = nodeCarouselState[currentId] || JSON.parse(node.data._carousel || '{}');
+      if (conf && conf.elements && conf.elements.length > 0) {
+        steps.push({ type: 'carousel', elements: conf.elements });
+      }
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'gallery') {
+      const conf = nodeGalleryState[currentId] || JSON.parse(node.data._gallery || '{}');
+      if (conf && conf.images && conf.images.length > 0) {
+        steps.push({ type: 'gallery', images: conf.images, delay_between_ms: conf.delay_between_ms || 300 });
+      }
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'audio') {
+      const conf = nodeAudioState[currentId] || JSON.parse(node.data._audio || '{}');
+      if (conf && conf.audio_url) steps.push({ type: 'audio', audio_url: conf.audio_url });
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'video') {
+      const conf = nodeVideoState[currentId] || JSON.parse(node.data._video || '{}');
+      if (conf && conf.video_url) steps.push({ type: 'video', video_url: conf.video_url });
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'file') {
+      const conf = nodeFileState[currentId] || JSON.parse(node.data._file || '{}');
+      if (conf && conf.file_url) steps.push({ type: 'file', file_url: conf.file_url });
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'delay') {
+      const conf = nodeDelayState[currentId] || JSON.parse(node.data._delay || '{}');
+      steps.push({ type: 'delay', seconds: conf.seconds || 5 });
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
     else {
       break; // Trigger o nodo final
     }
@@ -940,6 +1011,36 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       editor.drawflow.drawflow.Home.data[nodeId].data._input = JSON.stringify(nodeInputState[nodeId]);
     }
   }
+  for (const nodeId in nodeCarouselState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._carousel = JSON.stringify(nodeCarouselState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeGalleryState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._gallery = JSON.stringify(nodeGalleryState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeAudioState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._audio = JSON.stringify(nodeAudioState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeVideoState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._video = JSON.stringify(nodeVideoState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeFileState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._file = JSON.stringify(nodeFileState[nodeId]);
+    }
+  }
+  for (const nodeId in nodeDelayState) {
+    if (editor.drawflow.drawflow.Home.data[nodeId]) {
+      editor.drawflow.drawflow.Home.data[nodeId].data._delay = JSON.stringify(nodeDelayState[nodeId]);
+    }
+  }
 
   const data = editor.export();
   const nodes = data.drawflow.Home.data;
@@ -960,22 +1061,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   const btn = document.getElementById('btn-save');
   btn.innerText = "Guardando...";
   try {
-    const res = await fetch('/api/flows', { 
-      method: 'POST', 
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-api-key': adminApiKey || ''
-      }, 
-      body: JSON.stringify(flowsConfig) 
-    });
-    
-    if (res.status === 401) {
-      alert("Error: API Key inválida");
-      sessionStorage.removeItem('ADMIN_API_KEY');
-      location.reload();
-      return;
-    }
-    
+    const res = await fetch('/api/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flowsConfig) });
     if (res.ok) {
       btn.innerText = "¡Guardado con éxito!";
       setTimeout(() => btn.innerText = "Guardar Cambios", 2000);
@@ -1023,6 +1109,30 @@ setTimeout(() => {
        if (node.name === 'randomizer' && node.data._randomizer) {
          nodeRandomizerState[nodeId] = JSON.parse(node.data._randomizer);
          renderRandomizerNode(nodeId);
+       }
+       if (node.name === 'carousel' && node.data._carousel) {
+         nodeCarouselState[nodeId] = JSON.parse(node.data._carousel);
+         renderCarouselNode(nodeId);
+       }
+       if (node.name === 'gallery' && node.data._gallery) {
+         nodeGalleryState[nodeId] = JSON.parse(node.data._gallery);
+         renderGalleryNode(nodeId);
+       }
+       if (node.name === 'audio' && node.data._audio) {
+         nodeAudioState[nodeId] = JSON.parse(node.data._audio);
+         renderAudioNode(nodeId);
+       }
+       if (node.name === 'video' && node.data._video) {
+         nodeVideoState[nodeId] = JSON.parse(node.data._video);
+         renderVideoNode(nodeId);
+       }
+       if (node.name === 'file' && node.data._file) {
+         nodeFileState[nodeId] = JSON.parse(node.data._file);
+         renderFileNode(nodeId);
+       }
+       if (node.name === 'delay' && node.data._delay) {
+         nodeDelayState[nodeId] = JSON.parse(node.data._delay);
+         renderDelayNode(nodeId);
        }
     }
   }
@@ -1127,8 +1237,6 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
     } else if (type === 'message') {
       addMessageNode(posX, posY);
-    } else if (type === 'carousel') {
-      addCarouselNode(posX, posY);
     } else if (type === 'action') {
       const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
       nodeActionsState[nodeId] = null;
@@ -1145,13 +1253,32 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
       nodeRandomizerState[nodeId] = { paths: 2 };
       setTimeout(() => renderRandomizerNode(nodeId), 50);
-
-    } else if (type === 'randomizer') {
-      const nodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
-      nodeRandomizerState[nodeId] = { paths: 2 };
-      setTimeout(() => renderRandomizerNode(nodeId), 50);
+    } else if (type === 'carousel') {
+      const nodeId = editor.addNode('carousel', 1, 1, posX, posY, 'carousel', { _carousel: '{}' }, htmlCarousel);
+      nodeCarouselState[nodeId] = { elements: [] };
+      setTimeout(() => renderCarouselNode(nodeId), 50);
+    } else if (type === 'gallery') {
+      const nodeId = editor.addNode('gallery', 1, 1, posX, posY, 'gallery', { _gallery: '{}' }, htmlGallery);
+      nodeGalleryState[nodeId] = { images: [], delay_between_ms: 300 };
+      setTimeout(() => renderGalleryNode(nodeId), 50);
+    } else if (type === 'audio') {
+      const nodeId = editor.addNode('audio', 1, 1, posX, posY, 'audio', { _audio: '{}' }, htmlAudio);
+      nodeAudioState[nodeId] = { audio_url: '' };
+      setTimeout(() => renderAudioNode(nodeId), 50);
+    } else if (type === 'video') {
+      const nodeId = editor.addNode('video', 1, 1, posX, posY, 'video', { _video: '{}' }, htmlVideo);
+      nodeVideoState[nodeId] = { video_url: '' };
+      setTimeout(() => renderVideoNode(nodeId), 50);
+    } else if (type === 'file') {
+      const nodeId = editor.addNode('file', 1, 1, posX, posY, 'file', { _file: '{}' }, htmlFile);
+      nodeFileState[nodeId] = { file_url: '' };
+      setTimeout(() => renderFileNode(nodeId), 50);
+    } else if (type === 'delay') {
+      const nodeId = editor.addNode('delay', 1, 1, posX, posY, 'delay', { _delay: '{}' }, htmlDelay);
+      nodeDelayState[nodeId] = { seconds: 5 };
+      setTimeout(() => renderDelayNode(nodeId), 50);
     }
-    
+
     ctxMenu.classList.add('ctx-hidden');
   });
 });
@@ -1247,193 +1374,296 @@ function saveRandomizer(nodeId) {
   renderRandomizerNode(nodeId);
 }
 
+// ─────────────────────────────────────────────
+// Carrusel
+// ─────────────────────────────────────────────
+function renderCarouselNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.carousel-node-preview');
+  if (!container) return;
+  const conf = nodeCarouselState[nodeId];
+  const count = conf?.elements?.length || 0;
+  container.innerHTML = count === 0
+    ? '<em style="color:#8492a6; font-size:11px;">Sin tarjetas configuradas</em>'
+    : `<div style="background:#e0f2fe; padding:8px; border-radius:6px; text-align:center; font-size:12px; color:#0369a1; font-weight:600;">🖼️ ${count} tarjeta${count !== 1 ? 's' : ''}</div>`;
+}
 
-// ─────────────────────────────────────────────
-// Inspector: Carrusel
-// ─────────────────────────────────────────────
 function renderCarouselInspector(nodeId) {
   document.getElementById('config-title').innerText = 'Configurar Carrusel';
-  const data = nodeCarouselState[nodeId];
-  if (!data) return;
-  const elements = data.elements || [];
-  
-  let html = '<div class="insp-blocks-list">';
-  
-  elements.forEach((el, idx) => {
+  const conf = nodeCarouselState[nodeId] || { elements: [] };
+  let html = '<div>';
+  conf.elements.forEach((el, i) => {
     html += `
-      <div style="background:#f1f2f6; border-radius:12px; padding:12px; margin-bottom:16px; position:relative;">
-        <button onclick="deleteCarouselElement('${nodeId}', ${idx})" style="position:absolute; top:8px; right:8px; background:none; border:none; color:#ef4444; font-size:16px; cursor:pointer;" title="Eliminar tarjeta">×</button>
-        <h4 style="margin:0 0 10px 0; font-size:13px; color:#374151;">Tarjeta ${idx + 1}</h4>
-        
-        <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:4px;">URL de Imagen *</label>
-        <input type="text" style="width:100%; border:none; border-radius:6px; padding:8px; font-size:12px; margin-bottom:10px; box-sizing:border-box;" placeholder="https://..." value="${el.image_url}" oninput="updateCarouselElementField('${nodeId}', ${idx}, 'image_url', this.value)" />
-        
-        <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:4px;">Título (máx 80)</label>
-        <input type="text" style="width:100%; border:none; border-radius:6px; padding:8px; font-size:12px; margin-bottom:10px; box-sizing:border-box; ${el.title.length > 80 ? 'border:1px solid #ef4444;' : ''}" placeholder="Ej: Zapatos Deportivos" value="${el.title}" oninput="updateCarouselElementField('${nodeId}', ${idx}, 'title', this.value)" />
-        
-        <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:4px;">Subtítulo (máx 80)</label>
-        <input type="text" style="width:100%; border:none; border-radius:6px; padding:8px; font-size:12px; margin-bottom:10px; box-sizing:border-box; ${el.subtitle.length > 80 ? 'border:1px solid #ef4444;' : ''}" placeholder="Ej: Disponibles en talla 40 y 42" value="${el.subtitle}" oninput="updateCarouselElementField('${nodeId}', ${idx}, 'subtitle', this.value)" />
-        
-        <div style="display:flex; flex-direction:column; gap:4px; margin-top:10px;">
-          <label style="font-size:11px; color:#6b7280;">Botones (máx 3)</label>
-    `;
-    
-    (el.buttons || []).forEach((btn, bIdx) => {
-      html += `
-        <div onclick="openCarouselBtnEditor('${nodeId}', ${idx}, ${bIdx})" style="background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:8px; text-align:center; font-size:12px; font-weight:600; color:#0084ff; cursor:pointer;">
-          ${btn.title || 'Nuevo Botón'}
-        </div>
-      `;
-    });
-    
-    if ((el.buttons || []).length < 3) {
-      html += `<div onclick="addCarouselButton('${nodeId}', ${idx})" style="border:1px dashed #b0b8c4; border-radius:6px; padding:8px; text-align:center; font-size:12px; font-weight:500; color:#b0b8c4; cursor:pointer; margin-top:4px;">+ Añadir botón</div>`;
-    }
-    
-    html += `</div></div>`;
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:12px; position:relative;">
+        <button onclick="removeCarouselElement('${nodeId}', ${i})" style="position:absolute;top:8px;right:8px;background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px;">×</button>
+        <div style="font-size:11px; font-weight:600; color:#6b7280; margin-bottom:6px;">TARJETA ${i + 1}</div>
+        <label style="font-size:11px;color:#6b7280;">Título</label>
+        <input class="config-input" value="${el.title || ''}" oninput="updateCarouselEl('${nodeId}',${i},'title',this.value)" placeholder="Título de la tarjeta" style="margin-bottom:6px;">
+        <label style="font-size:11px;color:#6b7280;">Subtítulo</label>
+        <input class="config-input" value="${el.subtitle || ''}" oninput="updateCarouselEl('${nodeId}',${i},'subtitle',this.value)" placeholder="Descripción breve" style="margin-bottom:6px;">
+        <label style="font-size:11px;color:#6b7280;">URL de imagen</label>
+        <input class="config-input" value="${el.image_url || ''}" oninput="updateCarouselEl('${nodeId}',${i},'image_url',this.value)" placeholder="https://..." style="margin-bottom:6px;">
+        <label style="font-size:11px;color:#6b7280;">Botón (opcional)</label>
+        <input class="config-input" value="${el.buttons?.[0]?.title || ''}" oninput="updateCarouselElBtn('${nodeId}',${i},this.value)" placeholder="Texto del botón">
+      </div>`;
   });
-  
-  if (elements.length < 10) {
-    html += `
-      <div style="margin-top:10px;">
-        <button class="btn-primary" style="width:100%; padding:10px;" onclick="addCarouselElement('${nodeId}')">+ Agregar Tarjeta (${elements.length}/10)</button>
-      </div>
-    `;
-  }
-  
-  html += '</div>';
+  html += `<button class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="addCarouselElement('${nodeId}')">+ Agregar tarjeta</button></div>`;
   document.getElementById('config-body').innerHTML = html;
 }
 
-function updateCarouselElementField(nodeId, idx, field, value) {
-  const data = nodeCarouselState[nodeId];
-  if (data && data.elements[idx]) {
-    data.elements[idx][field] = value;
-    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
-    renderCarouselInNode(nodeId);
-    // Para no perder foco, idealmente solo renderizaríamos el nodo visual. 
-    // Pero si el length > 80 necesitamos colorear. Re-renderizar el inspector quita el foco.
-    if (field === 'title' || field === 'subtitle') {
-      const el = event.target;
-      if (value.length > 80) el.style.border = '1px solid #ef4444';
-      else el.style.border = 'none';
-    }
-  }
-}
-
-function deleteCarouselElement(nodeId, idx) {
-  const data = nodeCarouselState[nodeId];
-  if (data && data.elements.length > 1) { // Mínimo 1
-    data.elements.splice(idx, 1);
-    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
-    renderCarouselInNode(nodeId);
-    renderCarouselInspector(nodeId);
-  } else {
-    alert("El carrusel debe tener al menos 1 tarjeta.");
-  }
-}
-
 function addCarouselElement(nodeId) {
-  const data = nodeCarouselState[nodeId];
-  if (data && data.elements.length < 10) {
-    data.elements.push({ id: generateId(), title: 'Nuevo Elemento', subtitle: '', image_url: '', buttons: [] });
-    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
-    renderCarouselInNode(nodeId);
-    renderCarouselInspector(nodeId);
-  }
-}
-
-function addCarouselButton(nodeId, idx) {
-  const data = nodeCarouselState[nodeId];
-  if (data && data.elements[idx].buttons.length < 3) {
-    data.elements[idx].buttons.push({ type: 'postback', title: 'Nuevo Botón' });
-    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
-    renderCarouselInNode(nodeId);
-    renderCarouselInspector(nodeId);
-  }
-}
-
-function openCarouselBtnEditor(nodeId, eIdx, bIdx) {
-  // Reutilizamos modal-edit-btn logic
-  let modal = document.getElementById('btn-edit-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'btn-edit-modal';
-    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; width:340px; border-radius:12px; box-shadow:0 20px 40px rgba(0,0,0,0.15); z-index:10000; display:flex; flex-direction:column; overflow:hidden; font-family:Inter,sans-serif; border: 1px solid #e5e7eb;';
-    document.body.appendChild(modal);
-    
-    const backdrop = document.createElement('div');
-    backdrop.id = 'btn-edit-backdrop';
-    backdrop.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:9999;';
-    backdrop.onclick = () => { document.getElementById('btn-edit-modal').style.display='none'; document.getElementById('btn-edit-backdrop').style.display='none'; };
-    document.body.appendChild(backdrop);
-  }
-  
-  modal.style.display = 'flex';
-  document.getElementById('btn-edit-backdrop').style.display = 'block';
-  
-  const btn = nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx];
-  
-  modal.innerHTML = `
-    <div style="display:flex; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
-      <h3 style="margin:0; font-size:16px; color:#1c1e21;">Editar botón (Carrusel)</h3>
-      <button onclick="document.getElementById('btn-edit-modal').style.display='none'; document.getElementById('btn-edit-backdrop').style.display='none';" style="background:none; border:none; font-size:18px; cursor:pointer; color:#6b7280;">×</button>
-    </div>
-    <div class="modal-scroll-container" style="padding:20px; overflow-y:auto; max-height:450px;">
-      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
-      <input type="text" value="${btn.title}" oninput="updateCarouselBtnTitle('${nodeId}', ${eIdx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid ${btn.title.length > 20 ? '#ef4444' : '#0084ff'}; border-radius:8px; font-size:14px; outline:none; font-weight:600; color:${btn.title.length > 20 ? '#ef4444' : '#0084ff'};" />
-      ${btn.title.length > 20 ? '<div style="font-size:11px; color:#ef4444; margin-top:4px; margin-bottom:16px;">⚠️ Instagram truncará este texto (máx 20 caracteres)</div>' : '<div style="margin-bottom:20px;"></div>'}
-      
-      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Tipo de botón</label>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        <div onclick="updateCarouselBtnType('${nodeId}', ${eIdx}, ${bIdx}, 'postback')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'postback' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'postback' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
-          <span style="font-size:14px; font-weight:500; color:#1c1e21;">Acción de Flujo (Postback)</span>
-        </div>
-        <div onclick="updateCarouselBtnType('${nodeId}', ${eIdx}, ${bIdx}, 'web_url')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'web_url' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'web_url' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
-          <span style="font-size:14px; font-weight:500; color:#1c1e21;">Abrir URL</span>
-        </div>
-      </div>
-      
-      ${btn.type === 'web_url' ? `
-        <div style="margin-bottom:20px;">
-          <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Enlace (URL)</label>
-          <input type="text" value="${btn.url || ''}" placeholder="https://" oninput="updateCarouselBtnUrl('${nodeId}', ${eIdx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;" />
-        </div>
-      ` : ''}
-      
-      <button onclick="removeCarouselBtn('${nodeId}', ${eIdx}, ${bIdx})" style="width:100%; padding:10px; background:#fef2f2; border:1px solid #fecaca; color:#ef4444; border-radius:8px; font-weight:600; cursor:pointer; margin-top:10px;">Eliminar botón</button>
-    </div>
-  `;
-}
-
-function updateCarouselBtnTitle(nodeId, eIdx, bIdx, val) {
-  nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].title = val;
-  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
-  renderCarouselInNode(nodeId);
-  if(document.getElementById('btn-edit-modal').style.display !== 'none') {
-    const ipt = event.target;
-    if(val.length > 20) { ipt.style.borderColor='#ef4444'; ipt.style.color='#ef4444'; }
-    else { ipt.style.borderColor='#0084ff'; ipt.style.color='#0084ff'; }
-  }
-}
-
-function updateCarouselBtnType(nodeId, eIdx, bIdx, type) {
-  nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].type = type;
-  if(type !== 'web_url') delete nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].url;
-  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
-  openCarouselBtnEditor(nodeId, eIdx, bIdx);
-}
-
-function updateCarouselBtnUrl(nodeId, eIdx, bIdx, url) {
-  nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].url = url;
-  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
-}
-
-function removeCarouselBtn(nodeId, eIdx, bIdx) {
-  nodeCarouselState[nodeId].elements[eIdx].buttons.splice(bIdx, 1);
-  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
-  document.getElementById('btn-edit-modal').style.display = 'none';
-  document.getElementById('btn-edit-backdrop').style.display = 'none';
-  renderCarouselInNode(nodeId);
+  if (!nodeCarouselState[nodeId]) nodeCarouselState[nodeId] = { elements: [] };
+  if (nodeCarouselState[nodeId].elements.length >= 10) return alert('Máximo 10 tarjetas');
+  nodeCarouselState[nodeId].elements.push({ title: '', subtitle: '', image_url: '', buttons: [] });
   renderCarouselInspector(nodeId);
+  renderCarouselNode(nodeId);
+}
+
+function removeCarouselElement(nodeId, index) {
+  nodeCarouselState[nodeId].elements.splice(index, 1);
+  renderCarouselInspector(nodeId);
+  renderCarouselNode(nodeId);
+}
+
+function updateCarouselEl(nodeId, index, field, value) {
+  nodeCarouselState[nodeId].elements[index][field] = value;
+  renderCarouselNode(nodeId);
+}
+
+function updateCarouselElBtn(nodeId, index, title) {
+  const el = nodeCarouselState[nodeId].elements[index];
+  el.buttons = title ? [{ type: 'postback', title, payload: `CAROUSEL_${nodeId}_EL${index}_BTN0` }] : [];
+  renderCarouselNode(nodeId);
+}
+
+// ─────────────────────────────────────────────
+// Galería
+// ─────────────────────────────────────────────
+function renderGalleryNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.gallery-node-preview');
+  if (!container) return;
+  const conf = nodeGalleryState[nodeId];
+  const count = conf?.images?.length || 0;
+  container.innerHTML = count === 0
+    ? '<em style="color:#8492a6; font-size:11px;">Sin imágenes</em>'
+    : `<div style="background:#fef3c7; padding:8px; border-radius:6px; text-align:center; font-size:12px; color:#b45309; font-weight:600;">📸 ${count} imagen${count !== 1 ? 'es' : ''}</div>`;
+}
+
+function renderGalleryInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Galería';
+  const conf = nodeGalleryState[nodeId] || { images: [], delay_between_ms: 300 };
+  let html = `<div>
+    <label style="font-size:11px;color:#6b7280;">Delay entre imágenes (ms)</label>
+    <input class="config-input" type="number" value="${conf.delay_between_ms || 300}" min="0" max="5000" oninput="updateGalleryDelay('${nodeId}',this.value)" style="margin-bottom:12px;">`;
+  conf.images.forEach((img, i) => {
+    html += `<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+      <input class="config-input" style="flex:1;" value="${img.url || ''}" oninput="updateGalleryImg('${nodeId}',${i},this.value)" placeholder="https://imagen.jpg">
+      <button onclick="removeGalleryImg('${nodeId}',${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;">×</button>
+    </div>`;
+  });
+  html += `<button class="btn-secondary" style="width:100%" onclick="addGalleryImg('${nodeId}')">+ Agregar imagen</button></div>`;
+  document.getElementById('config-body').innerHTML = html;
+}
+
+function addGalleryImg(nodeId) {
+  if (!nodeGalleryState[nodeId]) nodeGalleryState[nodeId] = { images: [], delay_between_ms: 300 };
+  nodeGalleryState[nodeId].images.push({ url: '' });
+  renderGalleryInspector(nodeId);
+  renderGalleryNode(nodeId);
+}
+
+function removeGalleryImg(nodeId, index) {
+  nodeGalleryState[nodeId].images.splice(index, 1);
+  renderGalleryInspector(nodeId);
+  renderGalleryNode(nodeId);
+}
+
+function updateGalleryImg(nodeId, index, url) {
+  nodeGalleryState[nodeId].images[index].url = url;
+  renderGalleryNode(nodeId);
+}
+
+function updateGalleryDelay(nodeId, value) {
+  nodeGalleryState[nodeId].delay_between_ms = parseInt(value) || 300;
+}
+
+// ─────────────────────────────────────────────
+// Audio
+// ─────────────────────────────────────────────
+function renderAudioNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.audio-node-preview');
+  if (!container) return;
+  const conf = nodeAudioState[nodeId];
+  container.innerHTML = conf?.audio_url
+    ? `<div style="background:#dcfce7; padding:8px; border-radius:6px; font-size:11px; color:#166534;">🎵 ${conf.audio_url.split('/').pop().substring(0, 30)}</div>`
+    : '<em style="color:#8492a6; font-size:11px;">Sin audio configurado</em>';
+}
+
+function renderAudioInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Audio';
+  const conf = nodeAudioState[nodeId] || { audio_url: '' };
+  document.getElementById('config-body').innerHTML = `
+    <div class="config-group">
+      <label class="config-label">URL del Audio</label>
+      <input type="text" class="config-input" id="audio-url" value="${conf.audio_url || ''}" placeholder="https://... mp3, ogg, wav">
+    </div>
+    <div class="config-group">
+      <label class="config-label">O subir archivo</label>
+      <input type="file" class="config-input" accept="audio/*" onchange="uploadMediaFile('${nodeId}','audio',this)">
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveAudio('${nodeId}')">Guardar</button>`;
+}
+
+function saveAudio(nodeId) {
+  const url = document.getElementById('audio-url').value.trim();
+  nodeAudioState[nodeId] = { audio_url: url };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._audio = JSON.stringify(nodeAudioState[nodeId]);
+  renderAudioNode(nodeId);
+}
+
+// ─────────────────────────────────────────────
+// Video
+// ─────────────────────────────────────────────
+function renderVideoNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.video-node-preview');
+  if (!container) return;
+  const conf = nodeVideoState[nodeId];
+  container.innerHTML = conf?.video_url
+    ? `<div style="background:#ede9fe; padding:8px; border-radius:6px; font-size:11px; color:#4c1d95;">🎥 ${conf.video_url.split('/').pop().substring(0, 30)}</div>`
+    : '<em style="color:#8492a6; font-size:11px;">Sin video configurado</em>';
+}
+
+function renderVideoInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Video';
+  const conf = nodeVideoState[nodeId] || { video_url: '' };
+  document.getElementById('config-body').innerHTML = `
+    <div class="config-group">
+      <label class="config-label">URL del Video</label>
+      <input type="text" class="config-input" id="video-url" value="${conf.video_url || ''}" placeholder="https://... mp4, mov, webm">
+    </div>
+    <div class="config-group">
+      <label class="config-label">O subir archivo</label>
+      <input type="file" class="config-input" accept="video/*" onchange="uploadMediaFile('${nodeId}','video',this)">
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveVideo('${nodeId}')">Guardar</button>`;
+}
+
+function saveVideo(nodeId) {
+  const url = document.getElementById('video-url').value.trim();
+  nodeVideoState[nodeId] = { video_url: url };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._video = JSON.stringify(nodeVideoState[nodeId]);
+  renderVideoNode(nodeId);
+}
+
+// ─────────────────────────────────────────────
+// Archivo / PDF
+// ─────────────────────────────────────────────
+function renderFileNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.file-node-preview');
+  if (!container) return;
+  const conf = nodeFileState[nodeId];
+  container.innerHTML = conf?.file_url
+    ? `<div style="background:#fef9c3; padding:8px; border-radius:6px; font-size:11px; color:#713f12;">📄 ${conf.file_url.split('/').pop().substring(0, 30)}</div>`
+    : '<em style="color:#8492a6; font-size:11px;">Sin archivo configurado</em>';
+}
+
+function renderFileInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Archivo / PDF';
+  const conf = nodeFileState[nodeId] || { file_url: '' };
+  document.getElementById('config-body').innerHTML = `
+    <div class="config-group">
+      <label class="config-label">URL del Archivo</label>
+      <input type="text" class="config-input" id="file-url" value="${conf.file_url || ''}" placeholder="https://... pdf, doc, xls, zip">
+    </div>
+    <div class="config-group">
+      <label class="config-label">O subir archivo</label>
+      <input type="file" class="config-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip" onchange="uploadMediaFile('${nodeId}','file',this)">
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveFile('${nodeId}')">Guardar</button>`;
+}
+
+function saveFile(nodeId) {
+  const url = document.getElementById('file-url').value.trim();
+  nodeFileState[nodeId] = { file_url: url };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._file = JSON.stringify(nodeFileState[nodeId]);
+  renderFileNode(nodeId);
+}
+
+// ─────────────────────────────────────────────
+// Delay / Espera
+// ─────────────────────────────────────────────
+function renderDelayNode(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.delay-node-preview');
+  if (!container) return;
+  const conf = nodeDelayState[nodeId];
+  const secs = conf?.seconds || 5;
+  const label = secs >= 60 ? `${Math.floor(secs / 60)} min ${secs % 60 > 0 ? secs % 60 + 's' : ''}` : `${secs}s`;
+  container.innerHTML = `<div style="background:#f0fdf4; padding:8px; border-radius:6px; text-align:center; font-size:13px; color:#15803d; font-weight:600;">⏱ Esperar ${label}</div>`;
+}
+
+function renderDelayInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Espera';
+  const conf = nodeDelayState[nodeId] || { seconds: 5 };
+  document.getElementById('config-body').innerHTML = `
+    <div class="config-group">
+      <label class="config-label">Tiempo de espera (segundos)</label>
+      <input type="number" class="config-input" id="delay-seconds" value="${conf.seconds || 5}" min="1" max="900" placeholder="ej: 5">
+      <p style="font-size:11px; color:#6b7280; margin-top:4px;">Máximo 900 segundos (15 minutos)</p>
+    </div>
+    <button class="btn-primary" style="width:100%" onclick="saveDelay('${nodeId}')">Guardar</button>`;
+}
+
+function saveDelay(nodeId) {
+  const seconds = Math.min(parseInt(document.getElementById('delay-seconds').value) || 5, 900);
+  nodeDelayState[nodeId] = { seconds };
+  const node = editor.getNodeFromId(nodeId);
+  node.data._delay = JSON.stringify(nodeDelayState[nodeId]);
+  renderDelayNode(nodeId);
+}
+
+// ─────────────────────────────────────────────
+// Subida de archivos media (audio/video/file)
+// ─────────────────────────────────────────────
+async function uploadMediaFile(nodeId, type, inputEl) {
+  const file = inputEl.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.url) {
+      if (type === 'audio') {
+        nodeAudioState[nodeId] = { audio_url: data.url };
+        document.getElementById('audio-url').value = data.url;
+        renderAudioNode(nodeId);
+      } else if (type === 'video') {
+        nodeVideoState[nodeId] = { video_url: data.url };
+        document.getElementById('video-url').value = data.url;
+        renderVideoNode(nodeId);
+      } else if (type === 'file') {
+        nodeFileState[nodeId] = { file_url: data.url };
+        document.getElementById('file-url').value = data.url;
+        renderFileNode(nodeId);
+      }
+    } else {
+      alert('Error al subir: ' + (data.error || 'desconocido'));
+    }
+  } catch (e) {
+    alert('Error de red al subir archivo');
+  }
 }

@@ -6,7 +6,7 @@
     <title>Flow Builder - Faroles Genius</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.css">
-    <link rel="stylesheet" href="builder.css?v=17">
+    <link rel="stylesheet" href="builder.css?v=18">
 </head>
 <body>
     <header>
@@ -25,9 +25,6 @@
             <div class="drag-item" draggable="true" data-node="message">
                 <span>💬</span> Enviar Mensaje
             </div>
-            <div class="drag-item" draggable="true" data-node="carousel">
-                <span>🎠</span> Carrusel (Tarjetas)
-            </div>
             <div class="drag-item" draggable="true" data-node="input">
                 <span>📥</span> Pedir Dato
             </div>
@@ -40,6 +37,25 @@
             </div>
             <div class="drag-item" draggable="true" data-node="randomizer">
                 <span>🎲</span> Aleatorio (A/B)
+            </div>
+            <hr style="border:none; border-top:1px solid #e5e7eb; margin:8px 0;">
+            <div class="drag-item" draggable="true" data-node="carousel">
+                <span>🖼️</span> Carrusel
+            </div>
+            <div class="drag-item" draggable="true" data-node="gallery">
+                <span>📸</span> Galería
+            </div>
+            <div class="drag-item" draggable="true" data-node="audio">
+                <span>🎵</span> Audio
+            </div>
+            <div class="drag-item" draggable="true" data-node="video">
+                <span>🎥</span> Video
+            </div>
+            <div class="drag-item" draggable="true" data-node="file">
+                <span>📄</span> Archivo / PDF
+            </div>
+            <div class="drag-item" draggable="true" data-node="delay">
+                <span>⏱</span> Espera (Delay)
             </div>
         </div>
         
@@ -63,19 +79,21 @@
     <div id="context-menu" class="ctx-hidden" style="position: absolute; z-index: 9999; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden; width: 180px;">
         <div class="ctx-item" data-type="trigger" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px;"><span>⚡</span> Palabra Clave</div>
         <div class="ctx-item" data-type="message" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>💬</span> Enviar Mensaje</div>
-        <div class="ctx-item" data-type="carousel" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎠</span> Carrusel (Tarjetas)</div>
         <div class="ctx-item" data-type="input" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📥</span> Pedir Dato</div>
         <div class="ctx-item" data-type="action" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>⚡</span> Acción</div>
         <div class="ctx-item" data-type="condition" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🔀</span> Condición Lógica</div>
         <div class="ctx-item" data-type="randomizer" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎲</span> Aleatorio (A/B)</div>
+        <div style="border-top:1px solid #e5e7eb;"></div>
+        <div class="ctx-item" data-type="carousel" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px;"><span>🖼️</span> Carrusel</div>
+        <div class="ctx-item" data-type="gallery" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📸</span> Galería</div>
+        <div class="ctx-item" data-type="audio" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎵</span> Audio</div>
+        <div class="ctx-item" data-type="video" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎥</span> Video</div>
+        <div class="ctx-item" data-type="file" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📄</span> Archivo / PDF</div>
+        <div class="ctx-item" data-type="delay" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>⏱</span> Espera</div>
     </div>
 
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <script>
-        const script = document.createElement('script');
-        script.src = 'builder.js?v=' + Date.now();
-        document.body.appendChild(script);
-    </script>
+    <script src="builder.js?v=28"></script>
 </body>
 </html>
