@@ -740,6 +740,14 @@ setTimeout(() => {
          nodeInputState[nodeId] = JSON.parse(node.data._input);
          renderInputNode(nodeId);
        }
+       if (node.name === 'condition' && node.data._condition) {
+         nodeConditionState[nodeId] = JSON.parse(node.data._condition);
+         renderConditionNode(nodeId);
+       }
+       if (node.name === 'randomizer' && node.data._randomizer) {
+         nodeRandomizerState[nodeId] = JSON.parse(node.data._randomizer);
+         renderRandomizerNode(nodeId);
+       }
     }
   }
 }, 150);
@@ -940,7 +948,6 @@ function saveCondition(nodeId) {
   nodeConditionState[nodeId] = { field, operator, value };
   const node = editor.getNodeFromId(nodeId);
   node.data._condition = JSON.stringify(nodeConditionState[nodeId]);
-  editor.updateNodeDataFromId(nodeId, node.data);
   renderConditionNode(nodeId);
 }
 
@@ -964,6 +971,5 @@ function saveRandomizer(nodeId) {
   nodeRandomizerState[nodeId] = { paths };
   const node = editor.getNodeFromId(nodeId);
   node.data._randomizer = JSON.stringify(nodeRandomizerState[nodeId]);
-  editor.updateNodeDataFromId(nodeId, node.data);
   renderRandomizerNode(nodeId);
 }
