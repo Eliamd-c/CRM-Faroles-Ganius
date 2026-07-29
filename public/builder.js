@@ -63,36 +63,30 @@ function renderBlocksInNode(nodeId) {
   
   let html = '';
   blocks.forEach(block => {
-    let hasButtons = block.buttons && block.buttons.length > 0;
-    let bubbleClass = hasButtons ? 'has-buttons' : '';
-    
-    html += `<div style="display:flex; flex-direction:column; margin-bottom:12px; width:100%;">`;
-    
+    // Bloque de texto: texto plano, sin burbuja
     if (block.type === 'text') {
-      html += `<div class="mc-bubble ${bubbleClass}">${block.content || '<span style="color:#aeb5bc; font-style:italic;">Escribe algo...</span>'}</div>`;
-    } else if (block.type === 'image') {
-      html += `<div class="mc-image-bubble ${bubbleClass}">${block.url ? `<img src="${block.url}" />` : '<div style="padding:20px; text-align:center; color:#aeb5bc; font-size:12px;">Sin imagen</div>'}</div>`;
+      html += `<div class="nd-text-block">${block.content || '<span class="nd-placeholder">Escribe algo...</span>'}</div>`;
+    }
+    // Bloque de imagen
+    else if (block.type === 'image') {
+      html += `<div class="nd-image-block">${block.url ? `<img src="${block.url}" />` : '<div class="nd-placeholder" style="padding:16px; text-align:center;">📷 Sin imagen</div>'}</div>`;
     }
     
-    if (hasButtons) {
-      html += `<div class="mc-btn-group">`;
+    // Botones como filas de "keyboard"
+    if (block.buttons && block.buttons.length > 0) {
+      html += `<div class="nd-keyboard">`;
       block.buttons.forEach(btn => {
-        html += `<div class="mc-button"><span>${btn.title || 'New Button'}</span><span style="font-size:16px;">›</span></div>`;
+        html += `<div class="nd-kb-btn">${btn.title || 'Nuevo Botón'}</div>`;
       });
       html += `</div>`;
     }
-    
-    html += `</div>`;
   });
 
   if (blocks.length === 0) {
-    html = `<div style="text-align:center; padding: 20px; color: var(--text-muted); font-size:12px;">Empty node</div>`;
+    html = `<div class="nd-placeholder" style="padding:16px; text-align:center;">Vacío — añade bloques en el Inspector</div>`;
   }
 
   container.innerHTML = html;
-  
-  // Posicionar conectores (opcional, hack drawflow)
-  // Dejamos que CSS se encargue del layout general de outputs
 }
 
 
