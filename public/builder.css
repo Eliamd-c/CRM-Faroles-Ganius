@@ -247,23 +247,25 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
 }
 
 /* PUERTOS (Conectores) */
-/* Posicionaremos el output en la parte central derecha pero más grande y estilo Messenger */
 .drawflow .drawflow-node .input, .drawflow .drawflow-node .output {
-    width: 16px;
-    height: 16px;
+    width: 10px;
+    height: 10px;
     background: #ffffff;
-    border: 3px solid #b0b8c4;
+    border: 2px solid #b0b8c4;
     border-radius: 50%;
     transition: 0.2s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: none;
+    opacity: 0.6;
 }
 .drawflow .drawflow-node .input:hover, .drawflow .drawflow-node .output:hover {
     background: var(--primary);
     border-color: #ffffff;
-    transform: scale(1.2);
+    transform: scale(1.4);
+    opacity: 1;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
-.drawflow .drawflow-node .output { right: -8px; }
-.drawflow .drawflow-node .input { left: -8px; }
+.drawflow .drawflow-node .output { right: -5px; }
+.drawflow .drawflow-node .input { left: -5px; }
 
 /* LINEAS SVG (Conexiones) */
 .drawflow .connection .main-path {
