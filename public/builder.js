@@ -20,7 +20,7 @@ const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 const nodeInputState = {}; // { nodeId: { type: 'email', field: 'email', prompt: '', retry: '' } }
 const nodeConditionState = {}; // { nodeId: { field: '', operator: '', value: '' } }
 const nodeRandomizerState = {}; // { nodeId: { paths: 2 } }
-window.nodeCarouselState = {}; // { nodeId: { elements: [ { title, subtitle, image_url, buttons: [] } ] } }
+window.nodeCarouselState = {};
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
@@ -102,7 +102,6 @@ function renderBlocksInNode(nodeId) {
     repositionOutputs(nodeId);
   }, 10);
 }
-
 
 
 function renderCarouselInNode(nodeId) {
@@ -307,7 +306,6 @@ function addMessageNode(posX, posY) {
   return nodeId;
 }
 
-
 // ─────────────────────────────────────────────
 // Agregar nodo Carrusel
 // ─────────────────────────────────────────────
@@ -383,34 +381,7 @@ function openInspector(nodeId) {
 
   if (node.name === 'message') {
     renderMessageInspector(nodeId);
-  } else if (node.name === 'carousel') {
-        nodeCarouselState[nodeId] = { elements: JSON.parse(node.data._carousel || '[]') };
-        setTimeout(() => renderCarouselInNode(nodeId), 50);
-      } else if (node.name === 'carousel') {
-      const data = nodeCarouselState[currentId];
-      if (data && data.elements) {
-        let eIdx = 0;
-        let cBtnIndex = 0;
-        const mappedElements = data.elements.map(el => {
-          const mappedBtns = (el.buttons || []).map(btn => {
-            if (btn.type === 'web_url') return { type: 'web_url', title: btn.title, url: btn.url };
-            const payload = `POSTBACK_${currentId}_CARD${eIdx}_BTN${cBtnIndex}`;
-            const connectedNodeId = node.outputs[`output_${cBtnIndex + 1}`]?.connections[0]?.node;
-            if (connectedNodeId) {
-              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
-              if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Carrusel`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
-            }
-            cBtnIndex++;
-            return { type: 'postback', title: btn.title, payload };
-          });
-          eIdx++;
-          return { title: el.title, subtitle: el.subtitle, image_url: el.image_url, buttons: mappedBtns };
-        });
-        steps.push({ type: 'carousel', elements: mappedElements });
-      }
-      currentId = node.outputs.output_1?.connections[0]?.node;
-    }
-    else if (node.name === 'action') {
+  } else if (node.name === 'action') {
     renderActionInspector(nodeId);
   } else if (node.name === 'input') {
     renderInputInspector(nodeId);
@@ -900,30 +871,6 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       steps.push({ type: 'card', message: '', card: cardData });
       currentId = null;
     }
-    else if (node.name === 'carousel') {
-      const data = nodeCarouselState[currentId];
-      if (data && data.elements) {
-        let eIdx = 0;
-        let cBtnIndex = 0;
-        const mappedElements = data.elements.map(el => {
-          const mappedBtns = (el.buttons || []).map(btn => {
-            if (btn.type === 'web_url') return { type: 'web_url', title: btn.title, url: btn.url };
-            const payload = `POSTBACK_${currentId}_CARD${eIdx}_BTN${cBtnIndex}`;
-            const connectedNodeId = node.outputs[`output_${cBtnIndex + 1}`]?.connections[0]?.node;
-            if (connectedNodeId) {
-              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
-              if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Carrusel`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
-            }
-            cBtnIndex++;
-            return { type: 'postback', title: btn.title, payload };
-          });
-          eIdx++;
-          return { title: el.title, subtitle: el.subtitle, image_url: el.image_url, buttons: mappedBtns };
-        });
-        steps.push({ type: 'carousel', elements: mappedElements });
-      }
-      currentId = node.outputs.output_1?.connections[0]?.node;
-    }
     else if (node.name === 'action') {
       const config = nodeActionsState[currentId] || JSON.parse(node.data._action || 'null');
       if (config) steps.push({ type: 'action', actionType: config.type, params: config.params });
@@ -1176,8 +1123,8 @@ document.querySelectorAll('.ctx-item').forEach(item => {
     } else if (type === 'message') {
       addMessageNode(posX, posY);
     } else if (type === 'carousel') {
-    addCarouselNode(posX, posY);
-  } else if (type === 'action') {
+      addCarouselNode(posX, posY);
+    } else if (type === 'action') {
       const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
       nodeActionsState[nodeId] = null;
       setTimeout(() => renderActionNode(nodeId), 50);
