@@ -23,7 +23,19 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de Multer (Subida de Imágenes)
+// Configuración de Multer (Subida de Archivos)
+const ALLOWED_MIME_TYPES = {
+  'image/jpeg': true, 'image/png': true, 'image/gif': true, 'image/webp': true,
+  'audio/mpeg': true, 'audio/ogg': true, 'audio/wav': true, 'audio/mp4': true, 'audio/aac': true,
+  'video/mp4': true, 'video/quicktime': true, 'video/webm': true, 'video/mpeg': true,
+  'application/pdf': true,
+  'application/msword': true,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': true,
+  'application/vnd.ms-excel': true,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': true,
+  'application/zip': true, 'application/x-zip-compressed': true,
+};
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadPath = path.join(__dirname, 'public', 'uploads');
@@ -32,10 +44,24 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
+    const prefix = file.mimetype.startsWith('audio/') ? 'audio-'
+                 : file.mimetype.startsWith('video/') ? 'video-'
+                 : file.mimetype === 'application/pdf' ? 'file-'
+                 : 'img-';
+    cb(null, prefix + uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES[file.mimetype]) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Tipo de archivo no permitido: ${file.mimetype}`));
+    }
+  }
+});
 
 // Almacén de clientes SSE para el dashboard
 let sseClients = [];
@@ -169,10 +195,10 @@ app.get('/api/flows', (req, res) => {
 });
 
 // Guardar flujos
-app.post('/api/flows', (req, res) => {
+app.post('/api/flows', async (req, res) => {
   try {
     const newFlows = req.body;
-    fs.writeFileSync(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
+    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
     flowsConfig = newFlows; // Actualizar memoria
     console.log('✅ flows.json actualizado desde el Builder');
     res.json({ success: true });
@@ -182,15 +208,20 @@ app.post('/api/flows', (req, res) => {
   }
 });
 
-// Subir imágenes
-app.post('/api/upload', upload.single('image'), (req, res) => {
+// Subir archivos (imágenes, audio, video, PDF)
+app.post('/api/upload', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No se subió ningún archivo' });
   }
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
-  const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-  res.json({ url: imageUrl });
+  const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl, mimetype: req.file.mimetype, originalname: req.file.originalname });
 });
 
 // ─────────────────────────────────────────────
@@ -217,7 +248,7 @@ async function getUserProfile(senderId) {
 // ─────────────────────────────────────────────
 async function handleMessage(event) {
   const senderId     = event.sender?.id;
-  const text         = event.message?.text || event.postback?.payload;
+  const text         = event.message?.quick_reply?.payload || event.postback?.payload || event.message?.text;
   const storyMention = event.message?.story?.mention;
 
   // Ignorar eventos que no tengan ID de origen o sean del propio bot
@@ -325,13 +356,15 @@ async function handleMessage(event) {
   
   if (matchedFlow && matchedFlow.steps) {
     await processFlowSteps(matchedFlow.steps, senderId, senderName);
+  } else if (flowsConfig.defaultFlow?.steps) {
+    await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName);
   }
 }
 
 // ─────────────────────────────────────────────
 // Procesador de Pasos del Flujo
 // ─────────────────────────────────────────────
-async function processFlowSteps(steps, senderId, senderName) {
+async function processFlowSteps(steps, senderId, senderName, _visited = new Set()) {
   let customer = null;
   if (supabase) {
     try {
@@ -383,16 +416,20 @@ async function processFlowSteps(steps, senderId, senderName) {
       else if (step.operator === 'not_contains') conditionMet = (!v1.includes(v2));
       
       const nextFlowId = conditionMet ? step.truePayload : step.falsePayload;
-      if (nextFlowId) {
+      if (nextFlowId && !_visited.has(nextFlowId)) {
+        _visited.add(nextFlowId);
         const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${nextFlowId}`);
-        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName);
+        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName, _visited);
       }
       break; // Detiene el array lineal actual porque la condición bifurca
     } else if (step.type === 'randomizer') {
       if (step.paths && step.paths.length > 0) {
         const randomPayload = step.paths[Math.floor(Math.random() * step.paths.length)];
-        const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${randomPayload}`);
-        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName);
+        if (randomPayload && !_visited.has(randomPayload)) {
+          _visited.add(randomPayload);
+          const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${randomPayload}`);
+          if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName, _visited);
+        }
       }
       break; // Detiene el array lineal actual
     } else if (step.type === 'input') {
@@ -410,6 +447,28 @@ async function processFlowSteps(steps, senderId, senderName) {
         }).eq('instagram_id', senderId);
       }
       break; // Interrumpe la ejecución esperando respuesta
+    } else if (step.type === 'carousel') {
+      await sendCarousel(senderId, step.elements || []);
+    } else if (step.type === 'gallery') {
+      await sendGallery(senderId, step.images || [], step.delay_between_ms || 300);
+    } else if (step.type === 'audio') {
+      await sendAudio(senderId, step.audio_url);
+    } else if (step.type === 'video') {
+      await sendVideo(senderId, step.video_url);
+    } else if (step.type === 'file') {
+      await sendFile(senderId, step.file_url);
+    } else if (step.type === 'delay') {
+      const ms = Math.min((step.seconds || 1) * 1000, 15 * 60 * 1000); // máx 15 min
+      await new Promise(resolve => setTimeout(resolve, ms));
+    } else if (step.type === 'goto') {
+      const targetId = step.flow_id;
+      if (targetId && !_visited.has(targetId)) {
+        _visited.add(targetId);
+        const targetFlow = flowsConfig.flows.find(f => f.id === `flow_${targetId}` || f.id === targetId);
+        if (targetFlow) await processFlowSteps(targetFlow.steps, senderId, senderName, _visited);
+        else broadcastLog('WARNING', `Goto: Flujo no encontrado: ${targetId}`);
+      }
+      break;
     }
   }
 }
@@ -554,18 +613,18 @@ async function handleComment(value) {
     return;
   }
 
-  // 2. Ignorar por coincidencia de texto exacto (eco de nuestra propia respuesta)
-  if (recentReplies.has(text)) {
-    console.log(`[IGNORE] Ignorando eco del propio bot (texto coincidente).`);
-    recentReplies.delete(text); // Lo borramos para no llenar memoria
+  // 2. Ignorar si ya procesamos este comentario (deduplicación por commentId)
+  if (recentReplies.has(commentId)) {
+    console.log(`[IGNORE] Comentario ${commentId} ya procesado.`);
     return;
   }
+  recentReplies.add(commentId);
+  setTimeout(() => recentReplies.delete(commentId), 60_000); // limpiar tras 60s
 
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
   // Respuesta automática al comentario pública
   const replyText = `Gracias @${fromName} por tu comentario! 🙌`;
-  recentReplies.add(replyText);
   await replyComment(commentId, replyText);
 
   // Enviar mensaje privado (DM) a quien comentó
@@ -706,6 +765,134 @@ async function sendCard(recipientId, cardData, textFallback = null) {
 }
 
 // ─────────────────────────────────────────────
+// Enviar Carrusel (Generic Template multi-elemento)
+// DOC: https://developers.facebook.com/docs/messenger-platform/send-messages/template/generic
+// ─────────────────────────────────────────────
+async function sendCarousel(recipientId, elements) {
+  if (!elements || elements.length === 0) return;
+  const formattedElements = elements.slice(0, 10).map(el => {
+    const buttons = (el.buttons || []).slice(0, 3).map(b =>
+      b.type === 'web_url'
+        ? { type: 'web_url', url: b.url, title: b.title }
+        : { type: 'postback', title: b.title, payload: b.payload || b.title }
+    );
+    return {
+      title: el.title || 'Sin título',
+      subtitle: el.subtitle || '',
+      image_url: el.image_url || undefined,
+      buttons: buttons.length > 0 ? buttons : undefined
+    };
+  });
+
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'template',
+            payload: { template_type: 'generic', elements: formattedElements }
+          }
+        }
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    broadcastLog('SYSTEM', `Carrusel (${formattedElements.length} tarjetas) enviado a ${recipientId}`);
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando carrusel:', msg);
+    broadcastLog('ERROR', `Error al enviar carrusel: ${msg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar Galería (múltiples imágenes con delay)
+// ─────────────────────────────────────────────
+async function sendGallery(recipientId, images, delayBetweenMs = 300) {
+  for (const img of images) {
+    try {
+      await axios.post(
+        `${GRAPH_API}/me/messages`,
+        {
+          recipient: { id: recipientId },
+          message: { attachment: { type: 'image', payload: { url: img.url, is_reusable: true } } }
+        },
+        { params: { access_token: PAGE_ACCESS_TOKEN } }
+      );
+    } catch (err) {
+      const msg = err.response?.data?.error?.message || err.message;
+      console.error('❌ Error enviando imagen de galería:', msg);
+    }
+    if (delayBetweenMs > 0) await new Promise(r => setTimeout(r, delayBetweenMs));
+  }
+  broadcastLog('SYSTEM', `Galería (${images.length} imágenes) enviada a ${recipientId}`);
+}
+
+// ─────────────────────────────────────────────
+// Enviar Audio
+// ─────────────────────────────────────────────
+async function sendAudio(recipientId, audioUrl) {
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: true } } }
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    broadcastLog('SYSTEM', `Audio enviado a ${recipientId}`);
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando audio:', msg);
+    broadcastLog('ERROR', `Error al enviar audio: ${msg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar Video
+// ─────────────────────────────────────────────
+async function sendVideo(recipientId, videoUrl) {
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: { attachment: { type: 'video', payload: { url: videoUrl, is_reusable: true } } }
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    broadcastLog('SYSTEM', `Video enviado a ${recipientId}`);
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando video:', msg);
+    broadcastLog('ERROR', `Error al enviar video: ${msg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar Archivo / PDF
+// ─────────────────────────────────────────────
+async function sendFile(recipientId, fileUrl) {
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: { attachment: { type: 'file', payload: { url: fileUrl, is_reusable: true } } }
+      },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    broadcastLog('SYSTEM', `Archivo enviado a ${recipientId}`);
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando archivo:', msg);
+    broadcastLog('ERROR', `Error al enviar archivo: ${msg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
 // Responder comentario
 // DOC: https://developers.facebook.com/docs/instagram-platform/reference/ig-comment
 // ─────────────────────────────────────────────
@@ -747,6 +934,14 @@ async function sendPrivateReply(commentId, text) {
     broadcastLog('ERROR', `Error al enviar DM privado: ${errorMsg}`);
   }
 }
+
+// ─────────────────────────────────────────────
+// Manejador de errores global Express
+// ─────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error('[EXPRESS ERROR]', err.message);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+});
 
 // ─────────────────────────────────────────────
 // Arranque del servidor
