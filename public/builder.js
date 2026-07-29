@@ -1422,36 +1422,36 @@ function openCarouselBtnEditor(nodeId, eIdx, bIdx) {
   
   const btn = nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx];
   
-  modal.innerHTML = \`
+  modal.innerHTML = `
     <div style="display:flex; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
       <h3 style="margin:0; font-size:16px; color:#1c1e21;">Editar botón (Carrusel)</h3>
       <button onclick="document.getElementById('btn-edit-modal').style.display='none'; document.getElementById('btn-edit-backdrop').style.display='none';" style="background:none; border:none; font-size:18px; cursor:pointer; color:#6b7280;">×</button>
     </div>
     <div class="modal-scroll-container" style="padding:20px; overflow-y:auto; max-height:450px;">
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
-      <input type="text" value="\${btn.title}" oninput="updateCarouselBtnTitle('\${nodeId}', \${eIdx}, \${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid \${btn.title.length > 20 ? '#ef4444' : '#0084ff'}; border-radius:8px; font-size:14px; outline:none; font-weight:600; color:\${btn.title.length > 20 ? '#ef4444' : '#0084ff'};" />
-      \${btn.title.length > 20 ? '<div style="font-size:11px; color:#ef4444; margin-top:4px; margin-bottom:16px;">⚠️ Instagram truncará este texto (máx 20 caracteres)</div>' : '<div style="margin-bottom:20px;"></div>'}
+      <input type="text" value="${btn.title}" oninput="updateCarouselBtnTitle('${nodeId}', ${eIdx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid ${btn.title.length > 20 ? '#ef4444' : '#0084ff'}; border-radius:8px; font-size:14px; outline:none; font-weight:600; color:${btn.title.length > 20 ? '#ef4444' : '#0084ff'};" />
+      ${btn.title.length > 20 ? '<div style="font-size:11px; color:#ef4444; margin-top:4px; margin-bottom:16px;">⚠️ Instagram truncará este texto (máx 20 caracteres)</div>' : '<div style="margin-bottom:20px;"></div>'}
       
       <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Tipo de botón</label>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-        <div onclick="updateCarouselBtnType('\${nodeId}', \${eIdx}, \${bIdx}, 'postback')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid \${btn.type === 'postback' ? '#0084ff' : '#d1d5db'}; background:\${btn.type === 'postback' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
+        <div onclick="updateCarouselBtnType('${nodeId}', ${eIdx}, ${bIdx}, 'postback')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'postback' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'postback' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Acción de Flujo (Postback)</span>
         </div>
-        <div onclick="updateCarouselBtnType('\${nodeId}', \${eIdx}, \${bIdx}, 'web_url')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid \${btn.type === 'web_url' ? '#0084ff' : '#d1d5db'}; background:\${btn.type === 'web_url' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
+        <div onclick="updateCarouselBtnType('${nodeId}', ${eIdx}, ${bIdx}, 'web_url')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid ${btn.type === 'web_url' ? '#0084ff' : '#d1d5db'}; background:${btn.type === 'web_url' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
           <span style="font-size:14px; font-weight:500; color:#1c1e21;">Abrir URL</span>
         </div>
       </div>
       
-      \${btn.type === 'web_url' ? \`
+      ${btn.type === 'web_url' ? `
         <div style="margin-bottom:20px;">
           <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Enlace (URL)</label>
-          <input type="text" value="\${btn.url || ''}" placeholder="https://" oninput="updateCarouselBtnUrl('\${nodeId}', \${eIdx}, \${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;" />
+          <input type="text" value="${btn.url || ''}" placeholder="https://" oninput="updateCarouselBtnUrl('${nodeId}', ${eIdx}, ${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;" />
         </div>
-      \` : ''}
+      ` : ''}
       
-      <button onclick="removeCarouselBtn('\${nodeId}', \${eIdx}, \${bIdx})" style="width:100%; padding:10px; background:#fef2f2; border:1px solid #fecaca; color:#ef4444; border-radius:8px; font-weight:600; cursor:pointer; margin-top:10px;">Eliminar botón</button>
+      <button onclick="removeCarouselBtn('${nodeId}', ${eIdx}, ${bIdx})" style="width:100%; padding:10px; background:#fef2f2; border:1px solid #fecaca; color:#ef4444; border-radius:8px; font-weight:600; cursor:pointer; margin-top:10px;">Eliminar botón</button>
     </div>
-  \`;
+  `;
 }
 
 function updateCarouselBtnTitle(nodeId, eIdx, bIdx, val) {
