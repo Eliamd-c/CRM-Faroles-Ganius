@@ -53,7 +53,10 @@ function generateId() {
 // Renderizadores Visuales (Dentro del Nodo)
 // ─────────────────────────────────────────────
 function renderBlocksInNode(nodeId) {
-  const container = document.querySelector(`#node-${nodeId} .node-blocks-container`);
+  let container = document.querySelector(`#node-${nodeId} .node-blocks-container`);
+  if (!container) {
+    container = document.querySelector(`#node-${nodeId} .box`);
+  }
   if (!container) return;
   const blocks = nodeBlocksState[nodeId] || [];
   
@@ -252,7 +255,7 @@ editor.registerNode('input', htmlInput);
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
-  const tempHtml = `<div class="node-message"><div class="title-box">💬 Enviar Mensaje</div><div class="box node-blocks-container" style="padding:16px;"></div></div>`;
+  const tempHtml = `<div class="node-message"><div class="title-box"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
   const nodeId = editor.addNode('message', 1, 20, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
   
   nodeBlocksState[nodeId] = [
