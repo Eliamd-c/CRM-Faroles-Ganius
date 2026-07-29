@@ -528,6 +528,60 @@ function closeButtonEditor() {
   if (backdrop) backdrop.style.display = 'none';
 }
 
+function getGlobalButtonIndex(nodeId, blockIdx, btnIdx) {
+  const blocks = nodeBlocksState[nodeId] || [];
+  let index = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    if (i === blockIdx) {
+      return index + btnIdx;
+    }
+    index += (blocks[i].buttons || []).length;
+  }
+  return index;
+}
+
+function spawnNodeForButton(sourceNodeId, globalBtnIdx, type) {
+  const nodeEl = document.getElementById('node-' + sourceNodeId);
+  const posX = (nodeEl ? parseFloat(nodeEl.style.left) : 0) + 380;
+  const posY = (nodeEl ? parseFloat(nodeEl.style.top) : 0) + (globalBtnIdx * 60);
+
+  const outPort = 'output_' + (globalBtnIdx + 2);
+
+  // Intentar eliminar conexiones existentes en este puerto
+  const nodeData = editor.drawflow.drawflow.Home.data[sourceNodeId];
+  if (nodeData && nodeData.outputs[outPort]) {
+     const connections = nodeData.outputs[outPort].connections;
+     // Hacemos una copia para evitar problemas al iterar y borrar
+     const connsToDrop = [...connections];
+     connsToDrop.forEach(c => {
+       editor.removeSingleConnection(sourceNodeId, c.node, outPort, c.output);
+     });
+  }
+
+  let newNodeId = null;
+  if (type === 'action') {
+    newNodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
+    nodeActionsState[newNodeId] = null;
+    setTimeout(() => renderActionNode(newNodeId), 50);
+  } else if (type === 'condition') {
+    newNodeId = editor.addNode('condition', 1, 2, posX, posY, 'condition', { _condition: '{}' }, htmlCondition);
+    nodeConditionState[newNodeId] = { field: 'email', operator: 'contains', value: '@' };
+    setTimeout(() => renderConditionNode(newNodeId), 50);
+  } else if (type === 'randomizer') {
+    newNodeId = editor.addNode('randomizer', 1, 2, posX, posY, 'randomizer', { _randomizer: '{}' }, htmlRandomizer);
+    nodeRandomizerState[newNodeId] = { paths: 2 };
+    setTimeout(() => renderRandomizerNode(newNodeId), 50);
+  } else if (type === 'instagram' || type === 'postback' || type === 'ai_step' || type === 'smart_delay') {
+    newNodeId = addMessageNode(posX, posY);
+  }
+
+  if (newNodeId) {
+    setTimeout(() => {
+      editor.addConnection(sourceNodeId, newNodeId, outPort, 'input_1');
+    }, 150); // Dar tiempo al DOM de crearse
+  }
+}
+
 // Global window functions for the generated HTML
 window.updateBlockContent = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].content = val; renderBlocksInNode(nodeId); };
 window.updateBlockUrl = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].url = val; renderBlocksInNode(nodeId); };
@@ -536,7 +590,24 @@ window.addBlock = (nodeId, type) => { nodeBlocksState[nodeId].push({id: generate
 window.addButton = (nodeId, idx) => { nodeBlocksState[nodeId][idx].buttons.push({title:'New Button', type:'postback', url:''}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
 window.deleteButton = (nodeId, idx, bIdx) => { nodeBlocksState[nodeId][idx].buttons.splice(bIdx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
 window.updateBtnTitle = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].title = val; renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
-window.updateBtnType = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].type = val; openButtonEditor(nodeId, idx, bIdx); renderBlocksInNode(nodeId); };
+
+window.updateBtnType = (nodeId, idx, bIdx, val) => { 
+  const oldType = nodeBlocksState[nodeId][idx].buttons[bIdx].type;
+  nodeBlocksState[nodeId][idx].buttons[bIdx].type = val; 
+  
+  // Si cambia de tipo y es un nodo que se deba spawnear
+  if (val !== 'web_url' && oldType !== val) {
+    const globalIdx = getGlobalButtonIndex(nodeId, idx, bIdx);
+    spawnNodeForButton(nodeId, globalIdx, val);
+    closeButtonEditor();
+  } else {
+    // Si es web_url o el mismo tipo, mantener el modal abierto
+    openButtonEditor(nodeId, idx, bIdx);
+  }
+  
+  renderBlocksInNode(nodeId); 
+};
+
 window.updateBtnUrl = (nodeId, idx, bIdx, val) => { nodeBlocksState[nodeId][idx].buttons[bIdx].url = val; };
 window.openButtonEditor = openButtonEditor;
 window.closeButtonEditor = closeButtonEditor;
