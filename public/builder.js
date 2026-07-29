@@ -232,7 +232,7 @@ const htmlAction = `
 
 const htmlInput = `
   <div class="node-input">
-    <div class="title-box" style="background: #f59e0b; color: white;">📥 Pedir Dato</div>
+    <div class="title-box">📥 Pedir Dato</div>
     <div class="box" style="padding-bottom:10px;">
       <div class="input-node-preview" style="background:#fef3c7; padding:10px; border-radius:6px; border:1px solid #fcd34d;">
         <span class="anp-empty" style="font-size:12px; color:#b45309;">Selecciona para configurar</span>

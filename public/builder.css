@@ -1,22 +1,23 @@
+
 :root {
     /* Tema Claro Premium (Manychat Style) */
-    --bg-color: #f4f5f7;
+    --bg-color: #f6f8fa;
     --panel-bg: #ffffff;
-    --border-color: #e5e7eb;
-    --text-main: #111827;
-    --text-muted: #6b7280;
-    --primary: #2563eb;
-    --primary-hover: #1d4ed8;
+    --border-color: #dadada;
+    --text-main: #253746;
+    --text-muted: #8492a6;
+    --primary: #0084ff;
+    --primary-hover: #0073e6;
     --node-bg: #ffffff;
-    --node-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.05);
+    --node-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
     
-    /* Colores de cabecera de nodos */
-    --header-message: #fce7f3; /* Rosa suave */
-    --header-text-message: #db2777;
-    --header-action: #dcfce7; /* Verde suave */
-    --header-text-action: #16a34a;
-    --header-trigger: #f3f4f6; /* Gris suave */
-    --header-text-trigger: #4b5563;
+    /* Colores Indicadores de Nodo */
+    --indicator-message: #0084ff; /* Azul Manychat */
+    --indicator-action: #0bcb6b;  /* Verde de confirmación/acción */
+    --indicator-trigger: #f5a623; /* Naranja para disparadores */
+    --indicator-logic: #8b5cf6;   /* Morado para lógica/condición */
+    --indicator-random: #ec4899;  /* Rosa para randomizer */
+    --indicator-input: #f59e0b;   /* Amarillo oscuro para inputs */
 }
 
 * { box-sizing: border-box; }
@@ -61,6 +62,17 @@ header {
     transition: 0.2s;
 }
 .btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary {
+    background: #f9fafb;
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-secondary:hover { background: #f3f4f6; }
 
 .wrapper {
     display: flex;
@@ -68,37 +80,40 @@ header {
     position: relative;
 }
 
+/* SIDEBAR MINIMALISTA */
 .sidebar {
-    width: 280px;
+    width: 260px;
     background: var(--panel-bg);
     border-right: 1px solid var(--border-color);
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     z-index: 5;
-    box-shadow: 1px 0 5px rgba(0,0,0,0.02);
+    box-shadow: 2px 0 10px rgba(0,0,0,0.02);
 }
 
 .drag-item {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
-    padding: 14px;
+    padding: 12px 14px;
     border-radius: 8px;
     cursor: grab;
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 14px;
+    gap: 10px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--text-main);
     transition: all 0.2s ease;
     box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
+.drag-item span { font-size: 16px; }
 .drag-item:hover { 
     border-color: var(--primary); 
-    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 2px 5px rgba(0, 132, 255, 0.1);
     transform: translateY(-1px);
+    color: var(--primary);
 }
 
 .col-right {
@@ -106,28 +121,40 @@ header {
     position: relative;
 }
 
+/* CANVAS DOT PATTERN */
 #drawflow {
     width: 100%;
     height: 100%;
-    background: radial-gradient(circle, #e2e8f0 1.5px, transparent 1.5px);
-    background-size: 24px 24px;
+    background-color: #f6f8fa;
+    background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+    background-size: 20px 20px;
 }
 
-/* Customizing Drawflow nodes (Estilo Manychat) */
+/* NODOS DRAWFLOW (Estilo Manychat) */
 .drawflow-node {
     background: var(--node-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 8px;
     color: var(--text-main);
     min-width: 280px;
     box-shadow: var(--node-shadow);
     padding: 0;
-    overflow: hidden;
-    transition: box-shadow 0.2s ease;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .drawflow-node.selected {
-    box-shadow: 0 0 0 2px var(--primary), var(--node-shadow);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(0, 132, 255, 0.15);
 }
+
+/* Indicadores Laterales */
+.node-trigger    { border-left: 4px solid var(--indicator-trigger); }
+.node-message    { border-left: 4px solid var(--indicator-message); }
+.node-action     { border-left: 4px solid var(--indicator-action); }
+.node-input      { border-left: 4px solid var(--indicator-input); }
+.node-condition  { border-left: 4px solid var(--indicator-logic); }
+.node-randomizer { border-left: 4px solid var(--indicator-random); }
+
+/* Cabecera minimalista del nodo */
 .drawflow-node .title-box {
     padding: 12px 16px;
     font-weight: 600;
@@ -135,63 +162,96 @@ header {
     display: flex;
     align-items: center;
     gap: 8px;
-    border-bottom: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-main);
+    border-bottom: 1px solid #f0f0f0;
 }
+.drawflow-node .title-box span { font-size: 16px; }
+
 .drawflow-node .box {
     padding: 16px;
 }
+
+/* Inputs internos de los nodos */
 .drawflow-node input, .drawflow-node textarea {
     width: 100%;
-    background: #f9fafb;
-    border: 1px solid #d1d5db;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
     color: var(--text-main);
-    padding: 10px;
+    padding: 8px 10px;
     border-radius: 6px;
     font-family: inherit;
     font-size: 13px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     resize: vertical;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 .drawflow-node input:focus, .drawflow-node textarea:focus {
     outline: none;
     border-color: var(--primary);
-    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2);
 }
 
-.node-trigger .title-box  { background: var(--header-trigger); color: var(--header-text-trigger); }
-.node-text .title-box     { background: var(--header-message); color: var(--header-text-message); }
-.node-message .title-box  { background: var(--header-message); color: var(--header-text-message); }
-.node-card .title-box     { background: var(--header-message); color: var(--header-text-message); }
-.node-action .title-box   { background: var(--header-action);  color: var(--header-text-action); }
+/* PUERTOS (Conectores) */
+.drawflow .drawflow-node .input, .drawflow .drawflow-node .output {
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border: 2px solid #b0b8c4;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+.drawflow .drawflow-node .input:hover, .drawflow .drawflow-node .output:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.2);
+}
+.drawflow .drawflow-node .output { right: -8px; }
+.drawflow .drawflow-node .input { left: -8px; }
 
-/* Botones dinámicos dentro del nodo Mensaje */
-.btn-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+/* LINEAS SVG (Conexiones) */
+.drawflow .connection .main-path {
+    stroke: #b0b8c4;
+    stroke-width: 2.5px;
+    transition: stroke 0.2s;
+}
+.drawflow .connection .main-path:hover,
+.drawflow .connection.selected .main-path {
+    stroke: var(--primary);
+    stroke-width: 3px;
+}
+.drawflow .connection .point {
+    stroke: var(--primary);
+    stroke-width: 2;
+    fill: white;
+}
+
+/* BOTONES INTERNOS (Mensajes) */
+.btn-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 
 .btn-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
-.btn-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--primary); }
 .btn-edit-icon {
   background: none;
   border: none;
   cursor: pointer;
   font-size: 13px;
   padding: 0 4px;
-  line-height: 1;
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  color: var(--text-muted);
+  transition: color 0.2s;
 }
-.btn-edit-icon:hover { opacity: 1; }
+.btn-edit-icon:hover { color: #eb5038; }
 
 .btn-add {
   display: flex;
@@ -199,49 +259,39 @@ header {
   justify-content: center;
   width: 100%;
   padding: 8px;
-  border: 1px dashed #d1d5db;
-  background: #f9fafb;
-  color: var(--primary);
-  border-radius: 8px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   transition: 0.2s;
 }
-.btn-add:hover { border-color: var(--primary); background: #eff6ff; }
-
-.drawflow-node select {
-    width: 100%;
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    color: white;
-    padding: 8px;
-    border-radius: 4px;
-    margin-bottom: 5px;
+.btn-add:hover { 
+  border-color: var(--primary); 
+  color: var(--primary); 
+  background: rgba(0,132,255,0.05); 
 }
 
-/* Config Panel */
+/* CONFIG PANEL (Inspector) */
 .config-panel {
     position: absolute;
     top: 0;
     left: 0;
-    width: 340px;
+    width: 320px;
     height: 100%;
     background: var(--panel-bg);
     border-right: 1px solid var(--border-color);
-    box-shadow: 4px 0 15px rgba(0,0,0,0.05);
+    box-shadow: 2px 0 15px rgba(0,0,0,0.04);
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
     z-index: 100;
 }
-.config-panel.hidden {
-    transform: translateX(-100%);
-}
-.config-panel:not(.hidden) {
-    transform: translateX(0);
-}
+.config-panel.hidden { transform: translateX(-100%); }
+.config-panel:not(.hidden) { transform: translateX(0); }
 
 .config-header {
     padding: 16px 20px;
@@ -252,18 +302,19 @@ header {
 }
 .config-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
 }
 .config-header button {
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 24px;
+    font-size: 20px;
     cursor: pointer;
-    line-height: 1;
+    padding: 4px;
+    border-radius: 4px;
 }
-.config-header button:hover { color: #ef4444; }
+.config-header button:hover { background: #f3f4f6; color: var(--text-main); }
 
 .config-body {
     padding: 20px;
@@ -275,23 +326,28 @@ header {
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--text-main);
     margin-bottom: 6px;
 }
 .cfg-input {
     width: 100%;
     background: #ffffff;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     color: var(--text-main);
     padding: 10px;
     border-radius: 6px;
     font-family: inherit;
-    font-size: 14px;
-    margin-bottom: 14px;
-    transition: border-color 0.2s;
+    font-size: 13px;
+    margin-bottom: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
-.cfg-input:focus { outline: none; border-color: var(--primary); }
+.cfg-input:focus { 
+    outline: none; 
+    border-color: var(--primary); 
+    box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.2); 
+}
 
+/* Listas y Botones del Inspector */
 .cfg-type-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .cfg-type-item {
   display: flex;
@@ -299,23 +355,27 @@ header {
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   transition: 0.2s;
 }
 .cfg-type-item:hover { border-color: var(--primary); }
-.cfg-type-item.active { border-color: var(--primary); background: rgba(99,102,241,0.1); color: var(--primary); }
+.cfg-type-item.active { 
+  border-color: var(--primary); 
+  background: rgba(0,132,255,0.05); 
+  color: var(--primary); 
+}
 
-/* ── Nodo de Acción: preview dentro del canvas ── */
-.action-node-preview {
+/* Previsualizadores de nodo (Inputs, Acciones) */
+.action-node-preview, .input-node-preview, .condition-node-preview, .randomizer-node-preview {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
   margin-bottom: 10px;
   min-height: 44px;
 }
@@ -332,7 +392,7 @@ header {
   gap: 6px;
   width: 100%;
   padding: 8px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-color);
   background: #ffffff;
   color: var(--text-main);
   font-weight: 500;
@@ -340,17 +400,12 @@ header {
   cursor: pointer;
   font-size: 13px;
   transition: 0.2s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 .btn-configure-action:hover { border-color: var(--primary); color: var(--primary); }
 
-/* ── Panel de submenú de acciones ── */
-.cfg-cat-tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
+/* Acciones en Inspector */
+.cfg-cat-tabs { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .cfg-cat-tab {
   padding: 10px 14px;
   border-radius: 6px;
@@ -361,8 +416,8 @@ header {
   transition: 0.15s;
   border: 1px solid transparent;
 }
-.cfg-cat-tab:hover { background: #f3f4f6; color: var(--text-main); }
-.cfg-cat-tab.active { background: #eff6ff; color: var(--primary); border-color: #bfdbfe; }
+.cfg-cat-tab:hover { background: #f9fafb; color: var(--text-main); }
+.cfg-cat-tab.active { background: rgba(0,132,255,0.05); color: var(--primary); border-color: rgba(0,132,255,0.2); }
 
 .cfg-actions-list { display: flex; flex-direction: column; gap: 8px; }
 .cfg-action-item {
@@ -370,15 +425,15 @@ header {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   background: #ffffff;
   cursor: pointer;
   transition: all 0.2s;
 }
-.cfg-action-item:hover { border-color: var(--primary); background: #eff6ff; }
-.cfg-action-item.active { border-color: var(--primary); background: #eff6ff; box-shadow: 0 0 0 1px var(--primary); }
-.cfg-action-icon { font-size: 20px; flex-shrink: 0; }
+.cfg-action-item:hover { border-color: var(--primary); box-shadow: 0 2px 5px rgba(0,132,255,0.05); }
+.cfg-action-item.active { border-color: var(--primary); background: rgba(0,132,255,0.05); box-shadow: 0 0 0 1px var(--primary); }
+.cfg-action-icon { font-size: 18px; flex-shrink: 0; }
 .cfg-action-info strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
 .cfg-action-info p { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
 
@@ -390,26 +445,23 @@ header {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   transition: 0.2s;
 }
 #cfg-action-save:hover { background: var(--primary-hover); }
 
-/* Connection line */
-.drawflow .connection .main-path {
-    stroke: var(--primary);
-    stroke-width: 3px;
-}
-
-
-.ctx-item:hover {
-    background-color: #f3f4f6;
-}
+/* UTILIDADES Y FIXES */
 .hidden { display: none !important; }
 .ctx-hidden { display: none !important; }
 
-.drawflow-node.condition { border-left: 5px solid #8b5cf6; }
-.drawflow-node.condition .title-box { background-color: #8b5cf6; }
-.drawflow-node.randomizer { border-left: 5px solid #f59e0b; }
-.drawflow-node.randomizer .title-box { background-color: #f59e0b; }
+/* Menú contextual modernizado */
+#context-menu {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04) !important;
+  border: 1px solid var(--border-color) !important;
+  background: rgba(255,255,255,0.95) !important;
+  backdrop-filter: blur(5px);
+}
+.ctx-item { transition: background 0.2s; }
+.ctx-item:hover { background-color: rgba(0,132,255,0.05) !important; color: var(--primary) !important; }
