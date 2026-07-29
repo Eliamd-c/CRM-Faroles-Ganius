@@ -110,7 +110,7 @@ function repositionOutputs(nodeId) {
   }
 
   // Posicionar las salidas de los botones
-  const btnRows = nodeEl.querySelectorAll('.cb-btn-row');
+  const btnRows = nodeEl.querySelectorAll('.nd-kb-btn');
   const blocks = nodeBlocksState[nodeId] || [];
   let btnIndex = 0;
   
