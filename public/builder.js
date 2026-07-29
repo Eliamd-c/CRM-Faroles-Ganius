@@ -187,9 +187,14 @@ function renderInputNode(nodeId) {
 // ─────────────────────────────────────────────
 const htmlTrigger = `
   <div class="node-trigger">
-    <div class="title-box"><span>⚡</span> Starting Step</div>
+    <div class="title-box"><span>⚡</span> Cuando...</div>
     <div class="box trigger-node-preview">
-      <em style="color:#8492a6; font-size:11px;">Palabra Clave</em>
+      <div style="color: #8592a3; font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+        Un disparador es un evento que inicia tu Automatización.<br>Haz clic para añadir un disparador.
+      </div>
+      <div style="border: 2px dashed #0084ff; border-radius: 8px; padding: 12px; text-align: center; color: #0084ff; font-weight: 600; font-size: 14px; cursor: pointer;">
+        + Nuevo disparador
+      </div>
     </div>
   </div>
 `;
@@ -251,7 +256,7 @@ editor.registerNode('input', htmlInput);
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
   const tempHtml = `<div class="node-message"><div class="title-box"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
-  const nodeId = editor.addNode('message', 1, 20, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
+  const nodeId = editor.addNode('message', 1, 1, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
   
   nodeBlocksState[nodeId] = [
     { id: generateId(), type: 'text', content: '¡Hola! Escribe aquí...', buttons: [] }

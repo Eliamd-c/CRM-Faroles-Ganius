@@ -140,22 +140,22 @@ header {
 /* Título flotante ENCIMA del nodo (como Manychat) */
 .drawflow-node .title-box {
     position: absolute !important;
-    top: -24px !important;
+    top: -26px !important;
     left: 0 !important;
     background: transparent !important;
-    color: var(--text-muted) !important;
+    color: #1c1e21 !important; /* Más oscuro */
     padding: 0 4px !important;
     font-weight: 600 !important;
-    font-size: 11px !important;
+    font-size: 13px !important; /* Más grande */
     letter-spacing: 0.3px;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     border: none !important;
     border-bottom: none !important;
     white-space: nowrap;
 }
-.drawflow-node .title-box span { font-size: 12px !important; }
+.drawflow-node .title-box span { font-size: 16px !important; } /* Icono más grande */
 
 /* Contenedor interno del nodo */
 .drawflow-node .box {
@@ -182,6 +182,9 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
     color: var(--text-main);
     white-space: pre-wrap;
     word-break: break-word;
+    background: #f1f2f6; /* Fondo gris claro */
+    padding: 12px 14px;
+    border-radius: 8px;
 }
 
 /* Placeholder */
@@ -206,8 +209,8 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
 .nd-keyboard {
     display: flex;
     flex-direction: column;
-    margin-top: 10px;
-    border-top: 1px solid var(--border-color);
+    margin-top: 6px;
+    gap: 4px;
 }
 
 /* Botón individual del keyboard */
@@ -218,14 +221,15 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
     font-weight: 600;
     color: var(--primary);
     cursor: pointer;
-    border-bottom: 1px solid var(--border-color);
-    transition: background 0.15s;
-}
-.nd-kb-btn:last-child {
-    border-bottom: none;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: background 0.15s, border-color 0.15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 .nd-kb-btn:hover {
-    background: rgba(0, 132, 255, 0.04);
+    background: #f8f9fa;
+    border-color: #d1d5db;
 }
 
 
