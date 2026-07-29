@@ -87,6 +87,11 @@ function renderBlocksInNode(nodeId) {
   }
 
   container.innerHTML = html;
+  
+  // Call repositionOutputs to align ports to buttons
+  setTimeout(() => {
+    repositionOutputs(nodeId);
+  }, 10);
 }
 
 
@@ -131,6 +136,8 @@ function repositionOutputs(nodeId) {
       btnIndex++;
     });
   });
+  
+  editor.updateConnectionNodes('node-' + nodeId);
 }
 
 function renderActionNode(nodeId) {
@@ -256,7 +263,7 @@ editor.registerNode('input', htmlInput);
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
   const tempHtml = `<div class="node-message"><div class="title-box"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
-  const nodeId = editor.addNode('message', 1, 1, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
+  const nodeId = editor.addNode('message', 1, 10, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
   
   nodeBlocksState[nodeId] = [
     { id: generateId(), type: 'text', content: '¡Hola! Escribe aquí...', buttons: [] }
