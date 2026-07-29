@@ -400,6 +400,13 @@ async function processFlowSteps(steps, senderId, senderName, visitedFlows = new 
     } else if (step.type === 'card') {
       const cardData = { ...step.card, title: interpolate(step.card.title), subtitle: interpolate(step.card.subtitle) };
       await sendCard(senderId, cardData, interpolate(step.message));
+    } else if (step.type === 'carousel') {
+      const formattedElements = step.elements.map(el => ({
+        ...el,
+        title: interpolate(el.title),
+        subtitle: interpolate(el.subtitle)
+      }));
+      await sendCarousel(senderId, formattedElements);
     } else if (step.type === 'action') {
       await executeAction(senderId, senderName, step);
     } else if (step.type === 'condition') {
@@ -710,7 +717,52 @@ async function sendTemplate(recipientId, text, buttons) {
 }
 
 // ─────────────────────────────────────────────
-// Enviar Tarjeta / Carrusel (Generic Template)
+// Enviar Carrusel (Generic Template con múltiples elements)
+// ─────────────────────────────────────────────
+async function sendCarousel(recipientId, elements) {
+  try {
+    const formattedElements = elements.map(el => {
+      const e = {
+        title: el.title ? el.title.substring(0, 80) : 'Elemento',
+        image_url: el.image_url
+      };
+      if (el.subtitle) e.subtitle = el.subtitle.substring(0, 80);
+      
+      if (el.buttons && el.buttons.length > 0) {
+        e.buttons = el.buttons.slice(0, 3).map(b => {
+          if (b.type === 'web_url') return { type: 'web_url', url: b.url, title: b.title.substring(0, 20) };
+          return { type: 'postback', title: b.title.substring(0, 20), payload: b.payload };
+        });
+      }
+      return e;
+    });
+
+    const messagePayload = {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: formattedElements.slice(0, 10)
+        }
+      }
+    };
+
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      { recipient: { id: recipientId }, message: messagePayload },
+      { params: { access_token: PAGE_ACCESS_TOKEN } }
+    );
+    console.log(`✅ Carrusel enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Carrusel enviado a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Carrusel:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar carrusel: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar Tarjeta Individual (Generic Template)
 // ─────────────────────────────────────────────
 async function sendCard(recipientId, cardData, textFallback = null) {
   try {

@@ -20,6 +20,7 @@ const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 const nodeInputState = {}; // { nodeId: { type: 'email', field: 'email', prompt: '', retry: '' } }
 const nodeConditionState = {}; // { nodeId: { field: '', operator: '', value: '' } }
 const nodeRandomizerState = {}; // { nodeId: { paths: 2 } }
+window.nodeCarouselState = {}; // { nodeId: { elements: [ { title, subtitle, image_url, buttons: [] } ] } }
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
@@ -102,6 +103,31 @@ function renderBlocksInNode(nodeId) {
   }, 10);
 }
 
+
+
+function renderCarouselInNode(nodeId) {
+  let container = document.querySelector(`#node-${nodeId} .node-carousel-container`);
+  if (!container) return;
+  const data = nodeCarouselState[nodeId];
+  if (!data || !data.elements) return;
+  
+  let html = '<div style="display:flex; overflow-x:auto; gap:10px; padding-bottom:10px; max-width:260px;">';
+  data.elements.forEach((el, idx) => {
+    html += `
+      <div style="flex: 0 0 160px; background:white; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+        ${el.image_url ? `<img src="${el.image_url}" style="width:100%; height:80px; object-fit:cover;" />` : `<div style="width:100%; height:80px; background:#f3f4f6; display:flex; align-items:center; justify-content:center; color:#9ca3af; font-size:12px;">Sin imagen</div>`}
+        <div style="padding:8px;">
+          <div style="font-size:12px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${el.title || 'Título'}</div>
+          <div style="font-size:10px; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${el.subtitle || ''}</div>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+  
+  setTimeout(() => repositionOutputs(nodeId), 10);
+}
 
 function repositionOutputs(nodeId) {
   const nodeEl = document.querySelector(`#node-${nodeId}`);
@@ -281,6 +307,24 @@ function addMessageNode(posX, posY) {
   return nodeId;
 }
 
+
+// ─────────────────────────────────────────────
+// Agregar nodo Carrusel
+// ─────────────────────────────────────────────
+function addCarouselNode(posX, posY) {
+  const tempHtml = `<div class="node-carousel"><div class="title-box" style="background:#8b5cf6;"><span>🎠</span> Carousel</div><div class="box node-carousel-container"></div></div>`;
+  const nodeId = editor.addNode('carousel', 1, 10, posX, posY, 'carousel', { _carousel: '[]' }, tempHtml);
+  
+  nodeCarouselState[nodeId] = {
+    elements: [
+      { id: generateId(), title: 'Nuevo Elemento', subtitle: 'Descripción', image_url: '', buttons: [] }
+    ]
+  };
+  
+  setTimeout(() => renderCarouselInNode(nodeId), 50);
+  return nodeId;
+}
+
 // ─────────────────────────────────────────────
 // Drag & Drop
 // ─────────────────────────────────────────────
@@ -305,6 +349,8 @@ id.addEventListener('drop', e => {
     editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
   } else if (type === 'message') {
     addMessageNode(posX, posY);
+  } else if (type === 'carousel') {
+    addCarouselNode(posX, posY);
   } else if (type === 'action') {
     const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
     nodeActionsState[nodeId] = null;
@@ -337,7 +383,34 @@ function openInspector(nodeId) {
 
   if (node.name === 'message') {
     renderMessageInspector(nodeId);
-  } else if (node.name === 'action') {
+  } else if (node.name === 'carousel') {
+        nodeCarouselState[nodeId] = { elements: JSON.parse(node.data._carousel || '[]') };
+        setTimeout(() => renderCarouselInNode(nodeId), 50);
+      } else if (node.name === 'carousel') {
+      const data = nodeCarouselState[currentId];
+      if (data && data.elements) {
+        let eIdx = 0;
+        let cBtnIndex = 0;
+        const mappedElements = data.elements.map(el => {
+          const mappedBtns = (el.buttons || []).map(btn => {
+            if (btn.type === 'web_url') return { type: 'web_url', title: btn.title, url: btn.url };
+            const payload = `POSTBACK_${currentId}_CARD${eIdx}_BTN${cBtnIndex}`;
+            const connectedNodeId = node.outputs[`output_${cBtnIndex + 1}`]?.connections[0]?.node;
+            if (connectedNodeId) {
+              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+              if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Carrusel`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
+            }
+            cBtnIndex++;
+            return { type: 'postback', title: btn.title, payload };
+          });
+          eIdx++;
+          return { title: el.title, subtitle: el.subtitle, image_url: el.image_url, buttons: mappedBtns };
+        });
+        steps.push({ type: 'carousel', elements: mappedElements });
+      }
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
+    else if (node.name === 'action') {
     renderActionInspector(nodeId);
   } else if (node.name === 'input') {
     renderInputInspector(nodeId);
@@ -345,6 +418,8 @@ function openInspector(nodeId) {
     renderConditionInspector(nodeId);
   } else if (node.name === 'randomizer') {
     renderRandomizerInspector(nodeId);
+  } else if (node.name === 'carousel') {
+    renderCarouselInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
@@ -825,6 +900,30 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       steps.push({ type: 'card', message: '', card: cardData });
       currentId = null;
     }
+    else if (node.name === 'carousel') {
+      const data = nodeCarouselState[currentId];
+      if (data && data.elements) {
+        let eIdx = 0;
+        let cBtnIndex = 0;
+        const mappedElements = data.elements.map(el => {
+          const mappedBtns = (el.buttons || []).map(btn => {
+            if (btn.type === 'web_url') return { type: 'web_url', title: btn.title, url: btn.url };
+            const payload = `POSTBACK_${currentId}_CARD${eIdx}_BTN${cBtnIndex}`;
+            const connectedNodeId = node.outputs[`output_${cBtnIndex + 1}`]?.connections[0]?.node;
+            if (connectedNodeId) {
+              const hiddenSteps = buildStepsFromNode(connectedNodeId, nodes, flowsConfig);
+              if (hiddenSteps.length > 0) flowsConfig.flows.push({ id: `flow_${payload}`, name: `Ruta Carrusel`, keywords: [payload], matchType: 'contains', steps: hiddenSteps });
+            }
+            cBtnIndex++;
+            return { type: 'postback', title: btn.title, payload };
+          });
+          eIdx++;
+          return { title: el.title, subtitle: el.subtitle, image_url: el.image_url, buttons: mappedBtns };
+        });
+        steps.push({ type: 'carousel', elements: mappedElements });
+      }
+      currentId = node.outputs.output_1?.connections[0]?.node;
+    }
     else if (node.name === 'action') {
       const config = nodeActionsState[currentId] || JSON.parse(node.data._action || 'null');
       if (config) steps.push({ type: 'action', actionType: config.type, params: config.params });
@@ -1076,7 +1175,9 @@ document.querySelectorAll('.ctx-item').forEach(item => {
       editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
     } else if (type === 'message') {
       addMessageNode(posX, posY);
-    } else if (type === 'action') {
+    } else if (type === 'carousel') {
+    addCarouselNode(posX, posY);
+  } else if (type === 'action') {
       const nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: '{}' }, htmlAction);
       nodeActionsState[nodeId] = null;
       setTimeout(() => renderActionNode(nodeId), 50);
@@ -1192,4 +1293,195 @@ function saveRandomizer(nodeId) {
   const node = editor.getNodeFromId(nodeId);
   node.data._randomizer = JSON.stringify(nodeRandomizerState[nodeId]);
   renderRandomizerNode(nodeId);
+}
+
+
+// ─────────────────────────────────────────────
+// Inspector: Carrusel
+// ─────────────────────────────────────────────
+function renderCarouselInspector(nodeId) {
+  document.getElementById('config-title').innerText = 'Configurar Carrusel';
+  const data = nodeCarouselState[nodeId];
+  if (!data) return;
+  const elements = data.elements || [];
+  
+  let html = '<div class="insp-blocks-list">';
+  
+  elements.forEach((el, idx) => {
+    html += `
+      <div style="background:#f1f2f6; border-radius:12px; padding:12px; margin-bottom:16px; position:relative;">
+        <button onclick="deleteCarouselElement('${nodeId}', ${idx})" style="position:absolute; top:8px; right:8px; background:none; border:none; color:#ef4444; font-size:16px; cursor:pointer;" title="Eliminar tarjeta">×</button>
+        <h4 style="margin:0 0 10px 0; font-size:13px; color:#374151;">Tarjeta ${idx + 1}</h4>
+        
+        <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:4px;">URL de Imagen *</label>
+        <input type="text" style="width:100%; border:none; border-radius:6px; padding:8px; font-size:12px; margin-bottom:10px; box-sizing:border-box;" placeholder="https://..." value="${el.image_url}" oninput="updateCarouselElementField('${nodeId}', ${idx}, 'image_url', this.value)" />
+        
+        <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:4px;">Título (máx 80)</label>
+        <input type="text" style="width:100%; border:none; border-radius:6px; padding:8px; font-size:12px; margin-bottom:10px; box-sizing:border-box; ${el.title.length > 80 ? 'border:1px solid #ef4444;' : ''}" placeholder="Ej: Zapatos Deportivos" value="${el.title}" oninput="updateCarouselElementField('${nodeId}', ${idx}, 'title', this.value)" />
+        
+        <label style="font-size:11px; color:#6b7280; display:block; margin-bottom:4px;">Subtítulo (máx 80)</label>
+        <input type="text" style="width:100%; border:none; border-radius:6px; padding:8px; font-size:12px; margin-bottom:10px; box-sizing:border-box; ${el.subtitle.length > 80 ? 'border:1px solid #ef4444;' : ''}" placeholder="Ej: Disponibles en talla 40 y 42" value="${el.subtitle}" oninput="updateCarouselElementField('${nodeId}', ${idx}, 'subtitle', this.value)" />
+        
+        <div style="display:flex; flex-direction:column; gap:4px; margin-top:10px;">
+          <label style="font-size:11px; color:#6b7280;">Botones (máx 3)</label>
+    `;
+    
+    (el.buttons || []).forEach((btn, bIdx) => {
+      html += `
+        <div onclick="openCarouselBtnEditor('${nodeId}', ${idx}, ${bIdx})" style="background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:8px; text-align:center; font-size:12px; font-weight:600; color:#0084ff; cursor:pointer;">
+          ${btn.title || 'Nuevo Botón'}
+        </div>
+      `;
+    });
+    
+    if ((el.buttons || []).length < 3) {
+      html += `<div onclick="addCarouselButton('${nodeId}', ${idx})" style="border:1px dashed #b0b8c4; border-radius:6px; padding:8px; text-align:center; font-size:12px; font-weight:500; color:#b0b8c4; cursor:pointer; margin-top:4px;">+ Añadir botón</div>`;
+    }
+    
+    html += `</div></div>`;
+  });
+  
+  if (elements.length < 10) {
+    html += `
+      <div style="margin-top:10px;">
+        <button class="btn-primary" style="width:100%; padding:10px;" onclick="addCarouselElement('${nodeId}')">+ Agregar Tarjeta (${elements.length}/10)</button>
+      </div>
+    `;
+  }
+  
+  html += '</div>';
+  document.getElementById('config-body').innerHTML = html;
+}
+
+function updateCarouselElementField(nodeId, idx, field, value) {
+  const data = nodeCarouselState[nodeId];
+  if (data && data.elements[idx]) {
+    data.elements[idx][field] = value;
+    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
+    renderCarouselInNode(nodeId);
+    // Para no perder foco, idealmente solo renderizaríamos el nodo visual. 
+    // Pero si el length > 80 necesitamos colorear. Re-renderizar el inspector quita el foco.
+    if (field === 'title' || field === 'subtitle') {
+      const el = event.target;
+      if (value.length > 80) el.style.border = '1px solid #ef4444';
+      else el.style.border = 'none';
+    }
+  }
+}
+
+function deleteCarouselElement(nodeId, idx) {
+  const data = nodeCarouselState[nodeId];
+  if (data && data.elements.length > 1) { // Mínimo 1
+    data.elements.splice(idx, 1);
+    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
+    renderCarouselInNode(nodeId);
+    renderCarouselInspector(nodeId);
+  } else {
+    alert("El carrusel debe tener al menos 1 tarjeta.");
+  }
+}
+
+function addCarouselElement(nodeId) {
+  const data = nodeCarouselState[nodeId];
+  if (data && data.elements.length < 10) {
+    data.elements.push({ id: generateId(), title: 'Nuevo Elemento', subtitle: '', image_url: '', buttons: [] });
+    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
+    renderCarouselInNode(nodeId);
+    renderCarouselInspector(nodeId);
+  }
+}
+
+function addCarouselButton(nodeId, idx) {
+  const data = nodeCarouselState[nodeId];
+  if (data && data.elements[idx].buttons.length < 3) {
+    data.elements[idx].buttons.push({ type: 'postback', title: 'Nuevo Botón' });
+    editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(data.elements);
+    renderCarouselInNode(nodeId);
+    renderCarouselInspector(nodeId);
+  }
+}
+
+function openCarouselBtnEditor(nodeId, eIdx, bIdx) {
+  // Reutilizamos modal-edit-btn logic
+  let modal = document.getElementById('btn-edit-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'btn-edit-modal';
+    modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; width:340px; border-radius:12px; box-shadow:0 20px 40px rgba(0,0,0,0.15); z-index:10000; display:flex; flex-direction:column; overflow:hidden; font-family:Inter,sans-serif; border: 1px solid #e5e7eb;';
+    document.body.appendChild(modal);
+    
+    const backdrop = document.createElement('div');
+    backdrop.id = 'btn-edit-backdrop';
+    backdrop.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:9999;';
+    backdrop.onclick = () => { document.getElementById('btn-edit-modal').style.display='none'; document.getElementById('btn-edit-backdrop').style.display='none'; };
+    document.body.appendChild(backdrop);
+  }
+  
+  modal.style.display = 'flex';
+  document.getElementById('btn-edit-backdrop').style.display = 'block';
+  
+  const btn = nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx];
+  
+  modal.innerHTML = \`
+    <div style="display:flex; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #f3f4f6;">
+      <h3 style="margin:0; font-size:16px; color:#1c1e21;">Editar botón (Carrusel)</h3>
+      <button onclick="document.getElementById('btn-edit-modal').style.display='none'; document.getElementById('btn-edit-backdrop').style.display='none';" style="background:none; border:none; font-size:18px; cursor:pointer; color:#6b7280;">×</button>
+    </div>
+    <div class="modal-scroll-container" style="padding:20px; overflow-y:auto; max-height:450px;">
+      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Título del botón</label>
+      <input type="text" value="\${btn.title}" oninput="updateCarouselBtnTitle('\${nodeId}', \${eIdx}, \${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:2px solid \${btn.title.length > 20 ? '#ef4444' : '#0084ff'}; border-radius:8px; font-size:14px; outline:none; font-weight:600; color:\${btn.title.length > 20 ? '#ef4444' : '#0084ff'};" />
+      \${btn.title.length > 20 ? '<div style="font-size:11px; color:#ef4444; margin-top:4px; margin-bottom:16px;">⚠️ Instagram truncará este texto (máx 20 caracteres)</div>' : '<div style="margin-bottom:20px;"></div>'}
+      
+      <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Tipo de botón</label>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
+        <div onclick="updateCarouselBtnType('\${nodeId}', \${eIdx}, \${bIdx}, 'postback')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid \${btn.type === 'postback' ? '#0084ff' : '#d1d5db'}; background:\${btn.type === 'postback' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
+          <span style="font-size:14px; font-weight:500; color:#1c1e21;">Acción de Flujo (Postback)</span>
+        </div>
+        <div onclick="updateCarouselBtnType('\${nodeId}', \${eIdx}, \${bIdx}, 'web_url')" style="display:flex; align-items:center; gap:10px; padding:12px; border:1px solid \${btn.type === 'web_url' ? '#0084ff' : '#d1d5db'}; background:\${btn.type === 'web_url' ? '#f0f7ff' : '#ffffff'}; border-radius:8px; cursor:pointer; transition: 0.2s;">
+          <span style="font-size:14px; font-weight:500; color:#1c1e21;">Abrir URL</span>
+        </div>
+      </div>
+      
+      \${btn.type === 'web_url' ? \`
+        <div style="margin-bottom:20px;">
+          <label style="font-size:12px; color:#6b7280; font-weight:500; display:block; margin-bottom:8px;">Enlace (URL)</label>
+          <input type="text" value="\${btn.url || ''}" placeholder="https://" oninput="updateCarouselBtnUrl('\${nodeId}', \${eIdx}, \${bIdx}, this.value)" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none;" />
+        </div>
+      \` : ''}
+      
+      <button onclick="removeCarouselBtn('\${nodeId}', \${eIdx}, \${bIdx})" style="width:100%; padding:10px; background:#fef2f2; border:1px solid #fecaca; color:#ef4444; border-radius:8px; font-weight:600; cursor:pointer; margin-top:10px;">Eliminar botón</button>
+    </div>
+  \`;
+}
+
+function updateCarouselBtnTitle(nodeId, eIdx, bIdx, val) {
+  nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].title = val;
+  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
+  renderCarouselInNode(nodeId);
+  if(document.getElementById('btn-edit-modal').style.display !== 'none') {
+    const ipt = event.target;
+    if(val.length > 20) { ipt.style.borderColor='#ef4444'; ipt.style.color='#ef4444'; }
+    else { ipt.style.borderColor='#0084ff'; ipt.style.color='#0084ff'; }
+  }
+}
+
+function updateCarouselBtnType(nodeId, eIdx, bIdx, type) {
+  nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].type = type;
+  if(type !== 'web_url') delete nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].url;
+  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
+  openCarouselBtnEditor(nodeId, eIdx, bIdx);
+}
+
+function updateCarouselBtnUrl(nodeId, eIdx, bIdx, url) {
+  nodeCarouselState[nodeId].elements[eIdx].buttons[bIdx].url = url;
+  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
+}
+
+function removeCarouselBtn(nodeId, eIdx, bIdx) {
+  nodeCarouselState[nodeId].elements[eIdx].buttons.splice(bIdx, 1);
+  editor.getNodeFromId(nodeId).data._carousel = JSON.stringify(nodeCarouselState[nodeId].elements);
+  document.getElementById('btn-edit-modal').style.display = 'none';
+  document.getElementById('btn-edit-backdrop').style.display = 'none';
+  renderCarouselInNode(nodeId);
+  renderCarouselInspector(nodeId);
 }
