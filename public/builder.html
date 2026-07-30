@@ -93,6 +93,52 @@
         </div>
     </div>
 
+    <!-- Modal: Seleccionar Disparador -->
+    <div id="trigger-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9000; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:16px; box-shadow:0 24px 48px rgba(0,0,0,0.18); width:480px; max-width:95vw; overflow:hidden; font-family:inherit;">
+        <div style="padding:24px 28px 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <h2 style="margin:0; font-size:18px; color:#111827;">Inicia automatización cuando...</h2>
+            <button onclick="closeTriggerPicker()" style="background:none; border:none; font-size:22px; color:#9ca3af; cursor:pointer; line-height:1;">×</button>
+          </div>
+          <p style="margin:0 0 20px; font-size:13px; color:#6b7280;">Elige qué evento dispara esta automatización</p>
+        </div>
+        <div style="padding:0 28px 28px; display:flex; flex-direction:column; gap:10px;">
+
+          <!-- Mensaje DM -->
+          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'message')">
+            <div class="tpicker-icon" style="background:#eff6ff; color:#2563eb;">💬</div>
+            <div class="tpicker-info">
+              <strong>Mensaje directo</strong>
+              <span>El usuario envía un mensaje con una palabra clave</span>
+            </div>
+            <div class="tpicker-arrow">›</div>
+          </div>
+
+          <!-- Comentario -->
+          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'comment')">
+            <div class="tpicker-icon" style="background:#f0fdf4; color:#16a34a;">💬</div>
+            <div class="tpicker-info">
+              <strong>Comentario en publicación</strong>
+              <span>El usuario comenta con una palabra clave en tu post o reel</span>
+            </div>
+            <div class="tpicker-arrow">›</div>
+          </div>
+
+          <!-- Mención -->
+          <div class="tpicker-card" style="opacity:0.55; cursor:not-allowed;">
+            <div class="tpicker-icon" style="background:#faf5ff; color:#7c3aed;">@</div>
+            <div class="tpicker-info">
+              <strong>Mención en historia <span style="background:#7c3aed; color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; margin-left:6px; font-weight:600;">Próximamente</span></strong>
+              <span>El usuario menciona tu cuenta en una historia de Instagram</span>
+            </div>
+            <div class="tpicker-arrow">›</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
     <!-- Menú Contextual (Doble Clic) -->
     <div id="context-menu" class="ctx-hidden" style="position: absolute; z-index: 9999; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden; width: 180px;">
         <div class="ctx-item" data-type="trigger" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px;"><span>⚡</span> Palabra Clave</div>
@@ -113,6 +159,6 @@
 
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <script src="builder.js?v=34"></script>
+    <script src="builder.js?v=37"></script>
 </body>
 </html>

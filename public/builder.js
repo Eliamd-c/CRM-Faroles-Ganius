@@ -206,11 +206,8 @@ const htmlTrigger = `
   <div class="node-trigger">
     <div class="title-box"><span>⚡</span> Cuando...</div>
     <div class="box trigger-node-preview">
-      <div style="color: #8592a3; font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
-        Un disparador es un evento que inicia tu Automatización.<br>Haz clic para añadir un disparador.
-      </div>
       <div style="border: 2px dashed #0084ff; border-radius: 8px; padding: 12px; text-align: center; color: #0084ff; font-weight: 600; font-size: 14px; cursor: pointer;">
-        + Nuevo disparador
+        + Elegir disparador
       </div>
     </div>
   </div>
@@ -374,7 +371,8 @@ id.addEventListener('drop', e => {
   const posY = y * (editor.precanvas.clientHeight / (editor.precanvas.clientHeight * editor.zoom)) - (editor.precanvas.getBoundingClientRect().y * (editor.precanvas.clientHeight / (editor.precanvas.clientHeight * editor.zoom)));
 
   if (type === 'trigger') {
-    editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '' }, htmlTrigger);
+    const newTriggerId = editor.addNode('trigger', 0, 1, posX, posY, 'trigger', { keywords: '', triggerType: null }, htmlTrigger);
+    setTimeout(() => openTriggerPicker(newTriggerId), 100);
   } else if (type === 'message') {
     addMessageNode(posX, posY);
   } else if (type === 'action') {
@@ -436,6 +434,11 @@ function openInspector(nodeId) {
   panel.classList.remove('hidden');
 
   if (node.name === 'trigger') {
+    const tData = editor.drawflow.drawflow.Home.data[nodeId]?.data || {};
+    if (!tData.triggerType) {
+      openTriggerPicker(nodeId);
+      return;
+    }
     renderTriggerInspector(nodeId);
   } else if (node.name === 'message') {
     renderMessageInspector(nodeId);
@@ -1270,7 +1273,8 @@ async function loadFlowIntoBuilder(flowId) {
       keywords: (flow.keywords || []).join(', '),
       matchType: flow.matchType || 'contains',
       flowName: flow.name || '',
-      _flowId: flowId
+      _flowId: flowId,
+      triggerType: flow.triggerType || (flow.keywords?.length ? 'message' : null)
     };
     const triggerId = editor.addNode('trigger', 0, 1, 100, 200, 'trigger', triggerData, htmlTrigger);
 
@@ -1973,17 +1977,58 @@ function saveGoto(nodeId) {
 // ─────────────────────────────────────────────
 // Trigger Inspector (matchType + keywords + nombre)
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// Trigger Picker Modal
+// ─────────────────────────────────────────────
+function openTriggerPicker(nodeId) {
+  window._pickerNodeId = nodeId;
+  const overlay = document.getElementById('trigger-picker-overlay');
+  overlay.style.display = 'flex';
+}
+
+function closeTriggerPicker() {
+  document.getElementById('trigger-picker-overlay').style.display = 'none';
+}
+
+function selectTriggerType(nodeId, type) {
+  closeTriggerPicker();
+  // Escribir directamente en la store de Drawflow (getNodeFromId retorna copia)
+  if (editor.drawflow.drawflow.Home.data[nodeId]) {
+    editor.drawflow.drawflow.Home.data[nodeId].data.triggerType = type;
+  }
+  renderTriggerNode(nodeId);
+  openInspector(nodeId);
+}
+
+document.getElementById('trigger-picker-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeTriggerPicker();
+});
+
+// ─────────────────────────────────────────────
+// Inspector: Trigger
+// ─────────────────────────────────────────────
 function renderTriggerInspector(nodeId) {
-  document.getElementById('config-title').innerText = 'Configurar Trigger';
-  const node = editor.getNodeFromId(nodeId);
+  const data = editor.drawflow.drawflow.Home.data[nodeId]?.data || {};
+  const triggerType = data.triggerType || 'message';
+
+  if (triggerType === 'message') {
+    renderTriggerMessageInspector(nodeId, data);
+  } else if (triggerType === 'comment') {
+    renderTriggerCommentInspector(nodeId, data);
+  }
+}
+
+function renderTriggerMessageInspector(nodeId, data) {
+  const node = { data };
+  document.getElementById('config-title').innerText = '💬 Disparador: Mensaje';
   const keywords = node.data.keywords || '';
   const matchType = node.data.matchType || 'contains';
-  const flowName = node.data.flowName || '';
 
   document.getElementById('config-body').innerHTML = `
-    <div class="config-group">
-      <label class="config-label">Nombre del flujo</label>
-      <input type="text" class="config-input" id="trigger-flow-name" value="${flowName}" placeholder="ej: Flujo de precios">
+    <div style="margin-bottom:16px;">
+      <button onclick="openTriggerPicker('${nodeId}')" style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:6px 12px; font-size:12px; color:#6b7280; cursor:pointer; display:flex; align-items:center; gap:6px;">
+        ⚡ Cambiar tipo de disparador
+      </button>
     </div>
     <div class="config-group">
       <label class="config-label">Palabras clave (separadas por coma)</label>
@@ -1997,37 +2042,91 @@ function renderTriggerInspector(nodeId) {
         <option value="starts_with" ${matchType === 'starts_with' ? 'selected' : ''}>Empieza con</option>
         <option value="regex" ${matchType === 'regex' ? 'selected' : ''}>Expresión regular (avanzado)</option>
       </select>
-      <p style="font-size:11px; color:#6b7280; margin-top:4px;">
-        ${matchType === 'contains' ? 'El mensaje del usuario debe contener alguna de las palabras.' :
-          matchType === 'exact' ? 'El mensaje debe ser exactamente igual a la palabra clave.' :
-          matchType === 'starts_with' ? 'El mensaje debe empezar con la palabra clave.' :
-          'Usa regex para patrones avanzados. Ej: ^hola.*mundo$'}
-      </p>
     </div>
-    <button class="btn-primary" style="width:100%" onclick="saveTrigger('${nodeId}')">Guardar Trigger</button>`;
+    <button class="btn-primary" style="width:100%; margin-top:8px;" onclick="saveTrigger('${nodeId}')">Aplicar</button>`;
+}
+
+function renderTriggerCommentInspector(nodeId, data) {
+  document.getElementById('config-title').innerText = '💬 Disparador: Comentario';
+  const keyword = data.commentKeyword || '';
+  const publicReply = data.commentPublicReply || '';
+  const privateReply = data.commentPrivateReply !== false;
+
+  document.getElementById('config-body').innerHTML = `
+    <div style="margin-bottom:16px;">
+      <button onclick="openTriggerPicker('${nodeId}')" style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:6px 12px; font-size:12px; color:#6b7280; cursor:pointer;">
+        ⚡ Cambiar tipo de disparador
+      </button>
+    </div>
+    <div class="config-group">
+      <label class="config-label">Palabra clave en el comentario</label>
+      <input type="text" class="config-input" id="comment-keyword" value="${keyword}" placeholder='ej: QUIERO, INFO, PRECIO'>
+      <p style="font-size:11px; color:#6b7280; margin-top:4px;">Deja vacío para responder a cualquier comentario.</p>
+    </div>
+    <hr style="border:0; border-top:1px solid #f3f4f6; margin:16px 0;">
+    <div class="config-group">
+      <label class="config-label">Respuesta pública al comentario (opcional)</label>
+      <textarea class="config-input" id="comment-public-reply" style="min-height:60px;" placeholder="ej: ¡Gracias! Te envié los detalles por DM 📩">${publicReply}</textarea>
+      <p style="font-size:11px; color:#6b7280; margin-top:4px;">Se publicará como respuesta visible debajo del comentario.</p>
+    </div>
+    <div class="config-group" style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+      <input type="checkbox" id="comment-private-reply" ${privateReply ? 'checked' : ''} style="width:16px; height:16px; accent-color: var(--primary);">
+      <label for="comment-private-reply" style="font-size:13px; color:#374151; cursor:pointer;">Enviar el flujo por mensaje directo (DM)</label>
+    </div>
+    <button class="btn-primary" style="width:100%; margin-top:16px;" onclick="saveTriggerComment('${nodeId}')">Aplicar</button>`;
 }
 
 function saveTrigger(nodeId) {
-  const node = editor.getNodeFromId(nodeId);
-  node.data.keywords = document.getElementById('trigger-keywords').value.trim();
-  node.data.matchType = document.getElementById('trigger-match-type').value;
-  node.data.flowName = document.getElementById('trigger-flow-name').value.trim();
+  const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
+  if (!d) return;
+  d.keywords = document.getElementById('trigger-keywords').value.trim();
+  d.matchType = document.getElementById('trigger-match-type').value;
   renderTriggerNode(nodeId);
 }
+
+window.saveTriggerComment = function(nodeId) {
+  const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
+  if (!d) return;
+  d.commentKeyword = document.getElementById('comment-keyword').value.trim();
+  d.commentPublicReply = document.getElementById('comment-public-reply').value.trim();
+  d.commentPrivateReply = document.getElementById('comment-private-reply').checked;
+  renderTriggerNode(nodeId);
+  closeInspector();
+};
 
 function renderTriggerNode(nodeId) {
   const nodeEl = document.getElementById('node-' + nodeId);
   if (!nodeEl) return;
   const container = nodeEl.querySelector('.trigger-node-preview');
   if (!container) return;
-  const node = editor.getNodeFromId(nodeId);
-  const kw = node.data.keywords || '';
-  const matchType = node.data.matchType || 'contains';
-  const matchLabels = { contains: 'Contiene', exact: 'Exacto', starts_with: 'Empieza con', regex: 'Regex' };
-  if (kw) {
-    container.innerHTML = `<div style="background:#e8f5e9; padding:8px; border-radius:6px; font-size:11px;">
-      <div style="color:#2e7d32; font-weight:600; margin-bottom:4px;">${matchLabels[matchType] || 'Contiene'}</div>
-      <div style="color:#1b5e20;">${kw}</div>
-    </div>`;
+  const data = editor.drawflow.drawflow.Home.data[nodeId]?.data || {};
+  const triggerType = data.triggerType || 'message';
+
+  if (triggerType === 'message') {
+    const kw = data.keywords || '';
+    const matchType = data.matchType || 'contains';
+    const matchLabels = { contains: 'Contiene', exact: 'Exacto', starts_with: 'Empieza con', regex: 'Regex' };
+    if (kw) {
+      container.innerHTML = `
+        <div class="trigger-type-badge">💬 Mensaje directo</div>
+        <div style="background:#eff6ff; padding:8px; border-radius:6px; font-size:11px;">
+          <div style="color:#1d4ed8; font-weight:600; margin-bottom:3px;">${matchLabels[matchType] || 'Contiene'}</div>
+          <div style="color:#1e40af;">${kw}</div>
+        </div>`;
+    } else {
+      container.innerHTML = `
+        <div class="trigger-type-badge">💬 Mensaje directo</div>
+        <div style="color:#9ca3af; font-size:12px;">Sin palabras clave aún</div>`;
+    }
+  } else if (triggerType === 'comment') {
+    const kw = data.commentKeyword || '';
+    const pub = data.commentPublicReply || '';
+    container.innerHTML = `
+      <div class="trigger-type-badge comment">💬 Comentario</div>
+      ${kw ? `<div style="background:#f0fdf4; padding:8px; border-radius:6px; font-size:11px; color:#15803d; font-weight:600; margin-bottom:6px;">Palabra clave: "${kw}"</div>` : '<div style="font-size:11px; color:#9ca3af; margin-bottom:6px;">Cualquier comentario</div>'}
+      ${pub ? `<div style="font-size:11px; color:#6b7280;">↩ Responde: "${pub.substring(0,40)}${pub.length>40?'...':''}"</div>` : ''}
+      ${data.commentPrivateReply !== false ? '<div style="font-size:11px; color:#6b7280;">📩 Envía flujo por DM</div>' : ''}`;
+  } else {
+    container.innerHTML = `<div style="border:2px dashed #0084ff; border-radius:8px; padding:12px; text-align:center; color:#0084ff; font-weight:600; font-size:14px; cursor:pointer;" onclick="openTriggerPicker('${nodeId}')">+ Elegir disparador</div>`;
   }
 }
