@@ -7,9 +7,13 @@ const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY ||
 
 let supabase = null;
 
-if (supabaseUrl && supabaseKey) {
-    supabase = createClient(supabaseUrl, supabaseKey);
-    console.log('✅ Supabase conectado (URL detectada)');
+if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+        console.log('✅ Supabase conectado (URL detectada)');
+    } catch (err) {
+        console.warn('⚠️ Error inicializando Supabase:', err.message);
+    }
 } else {
     console.warn('⚠️ Supabase no está conectado: Faltan las variables SUPABASE_URL y SUPABASE_KEY. Hostinger las proveerá automáticamente en el despliegue.');
 }
