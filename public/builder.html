@@ -23,58 +23,171 @@
     <!-- Drawflow -->
     <link rel="stylesheet" href="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.css">
 
-    <!-- Legacy builder styles (se mantiene para compat con builder.js) -->
+    <!-- Builder CSS (compat legacy) -->
     <link rel="stylesheet" href="builder.css?v=20">
 </head>
 <body>
 
     <!-- ══════════════════════════════════════════
-         HEADER
+         HEADER — HTML estático para compat con builder.js
+         Los IDs btn-save, btn-publish, btn-arrange, flow-header-center,
+         flow-name-display, flow-name-input, flow-status-chip son leídos
+         directamente por builder.js al nivel del módulo.
     ══════════════════════════════════════════ -->
     <header id="app-header" class="app-header">
-        <!-- Renderizado por HeaderComponent -->
+        <div class="header-left">
+            <a href="/" class="header-logo" title="Ir al inicio">
+                <span class="header-logo-name">Faroles Genius</span>
+                <span class="header-logo-sub">Flow Builder</span>
+            </a>
+            <nav class="header-nav" aria-label="Navegación principal">
+                <a href="/" class="header-nav-link" id="nav-monitor">📊 Monitor</a>
+                <a href="/automations.html" class="header-nav-link" id="nav-automations">🤖 Automatizaciones</a>
+                <a href="/builder.html" class="header-nav-link active" id="nav-builder">⚡ Builder</a>
+            </nav>
+        </div>
+
+        <!-- Centro: nombre del flujo + status — usado por builder.js -->
+        <div id="flow-header-center" class="flow-header-center" style="display:none;">
+            <div class="flow-name-wrapper">
+                <span id="flow-name-display" class="flow-name-display"></span>
+                <input id="flow-name-input" class="flow-name-input" type="text" style="display:none;" maxlength="80" aria-label="Editar nombre del flujo" />
+            </div>
+            <span id="flow-status-chip" class="flow-status-chip"></span>
+        </div>
+
+        <!-- Acciones — IDs requeridos por builder.js -->
+        <div class="actions header-actions">
+            <button id="btn-arrange" class="btn btn-secondary" title="Auto-organizar nodos">✨ Organizar</button>
+            <button id="btn-save"    class="btn btn-primary"   title="Guardar cambios (Ctrl+S)">💾 Guardar</button>
+            <button id="btn-publish" class="btn btn-publish"   title="Publicar flujo" style="display:none;">🚀 Publicar</button>
+        </div>
     </header>
 
     <!-- ══════════════════════════════════════════
-         MAIN CONTAINER
+         MAIN LAYOUT
     ══════════════════════════════════════════ -->
-    <div class="app-container">
+    <div class="wrapper">
 
-        <!-- Sidebar -->
-        <aside id="app-sidebar" class="app-sidebar">
-            <!-- Renderizado por SidebarComponent -->
-        </aside>
+        <!-- Sidebar — HTML estático con todos los nodos (compat builder.js drag) -->
+        <div class="sidebar" id="app-sidebar">
+            <div class="sidebar-section-header">Disparadores</div>
+            <div class="drag-item" draggable="true" data-node="trigger">
+                <span class="drag-icon">⚡</span>
+                <span class="drag-label">Palabra Clave</span>
+                <span class="drag-tooltip">⚡ Palabra Clave</span>
+            </div>
+
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-header">Contenido</div>
+
+            <div class="drag-item" draggable="true" data-node="message">
+                <span class="drag-icon">💬</span>
+                <span class="drag-label">Enviar Mensaje</span>
+                <span class="drag-tooltip">💬 Enviar Mensaje</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="input">
+                <span class="drag-icon">📥</span>
+                <span class="drag-label">Pedir Dato</span>
+                <span class="drag-tooltip">📥 Pedir Dato</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="carousel">
+                <span class="drag-icon">🖼️</span>
+                <span class="drag-label">Carrusel</span>
+                <span class="drag-tooltip">🖼️ Carrusel</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="gallery">
+                <span class="drag-icon">📸</span>
+                <span class="drag-label">Galería</span>
+                <span class="drag-tooltip">📸 Galería</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="audio">
+                <span class="drag-icon">🎵</span>
+                <span class="drag-label">Audio</span>
+                <span class="drag-tooltip">🎵 Audio</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="video">
+                <span class="drag-icon">🎥</span>
+                <span class="drag-label">Video</span>
+                <span class="drag-tooltip">🎥 Video</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="file">
+                <span class="drag-icon">📄</span>
+                <span class="drag-label">Archivo / PDF</span>
+                <span class="drag-tooltip">📄 Archivo / PDF</span>
+            </div>
+
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-header">Lógica</div>
+
+            <div class="drag-item" draggable="true" data-node="action">
+                <span class="drag-icon">⚡</span>
+                <span class="drag-label">Realizar Acciones</span>
+                <span class="drag-tooltip">⚡ Realizar Acciones</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="condition">
+                <span class="drag-icon">🔀</span>
+                <span class="drag-label">Condición Lógica</span>
+                <span class="drag-tooltip">🔀 Condición Lógica</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="randomizer">
+                <span class="drag-icon">🎲</span>
+                <span class="drag-label">Aleatorio (A/B)</span>
+                <span class="drag-tooltip">🎲 Aleatorio (A/B)</span>
+            </div>
+            <div class="drag-item" draggable="true" data-node="delay">
+                <span class="drag-icon">⏱</span>
+                <span class="drag-label">Espera (Delay)</span>
+                <span class="drag-tooltip">⏱ Espera (Delay)</span>
+            </div>
+
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-header">Avanzado</div>
+
+            <div class="drag-item" draggable="true" data-node="goto">
+                <span class="drag-icon">↗️</span>
+                <span class="drag-label">Goto / Saltar</span>
+                <span class="drag-tooltip">↗️ Goto / Saltar</span>
+            </div>
+
+            <!-- Toggle colapsar (nuevo) -->
+            <div class="sidebar-toggle">
+                <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Colapsar sidebar" aria-label="Colapsar sidebar">
+                    <span class="toggle-icon">«</span>
+                </button>
+            </div>
+        </div>
 
         <!-- Canvas -->
-        <main class="app-main">
+        <div class="col-right app-main">
             <div id="drawflow"></div>
 
-            <!-- Canvas zoom toolbar -->
-            <div class="canvas-toolbar" aria-label="Controles del canvas">
-                <button class="canvas-toolbar-btn" id="canvas-zoom-in"  title="Zoom in"   aria-label="Acercar">+</button>
-                <button class="canvas-toolbar-btn" id="canvas-zoom-out" title="Zoom out"  aria-label="Alejar">−</button>
-                <button class="canvas-toolbar-btn" id="canvas-fit"      title="Ajustar vista" aria-label="Ajustar">⊡</button>
-            </div>
-        </main>
-
-        <!-- Config panel (Inspector lateral) -->
-        <div id="config-panel" class="config-panel hidden">
-            <div class="config-header" id="config-header">
-                <div class="config-header-inner">
-                    <span class="config-header-icon" id="config-header-icon"></span>
-                    <h3 id="config-title">Configuración</h3>
-                </div>
-                <button id="close-config" aria-label="Cerrar panel">×</button>
-            </div>
-            <div id="config-body" class="config-body">
-                <!-- Inyectado por builder.js -->
+            <!-- Zoom toolbar (nuevo) -->
+            <div class="canvas-toolbar" aria-label="Controles de zoom">
+                <button class="canvas-toolbar-btn" id="canvas-zoom-in"  title="Acercar"  aria-label="Acercar">+</button>
+                <button class="canvas-toolbar-btn" id="canvas-zoom-out" title="Alejar"   aria-label="Alejar">−</button>
+                <button class="canvas-toolbar-btn" id="canvas-fit"      title="Ajustar"  aria-label="Ajustar">⊡</button>
             </div>
         </div>
 
     </div>
 
     <!-- ══════════════════════════════════════════
-         TRIGGER PICKER MODAL (legacy — ahora ModalManager lo maneja también)
+         CONFIG PANEL (Inspector lateral)
+    ══════════════════════════════════════════ -->
+    <div id="config-panel" class="config-panel hidden">
+        <div class="config-header" id="config-header">
+            <div class="config-header-inner">
+                <span class="config-header-icon" id="config-header-icon"></span>
+                <h3 id="config-title">Configuración</h3>
+            </div>
+            <button id="close-config" aria-label="Cerrar panel">×</button>
+        </div>
+        <div id="config-body" class="config-body"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TRIGGER PICKER MODAL (legacy — usado por builder.js)
     ══════════════════════════════════════════ -->
     <div id="trigger-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; backdrop-filter:blur(2px);">
       <div style="background:#fff; border-radius:16px; box-shadow:0 24px 48px rgba(0,0,0,0.18); width:480px; max-width:95vw; overflow:hidden; font-family:inherit;">
@@ -86,9 +199,7 @@
           <p style="margin:0 0 20px; font-size:13px; color:#6b7280;">Elige qué evento dispara esta automatización</p>
         </div>
         <div style="padding:0 28px 28px; display:flex; flex-direction:column; gap:10px;">
-
-          <!-- Mensaje DM -->
-          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'message')" role="button" tabindex="0" aria-label="Mensaje directo">
+          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'message')" role="button" tabindex="0">
             <div class="tpicker-icon" style="background:#eff6ff; color:#2563eb;">💬</div>
             <div class="tpicker-info">
               <strong>Mensaje directo</strong>
@@ -96,9 +207,7 @@
             </div>
             <div class="tpicker-arrow">›</div>
           </div>
-
-          <!-- Comentario -->
-          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'comment')" role="button" tabindex="0" aria-label="Comentario en publicación">
+          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'comment')" role="button" tabindex="0">
             <div class="tpicker-icon" style="background:#f0fdf4; color:#16a34a;">💬</div>
             <div class="tpicker-info">
               <strong>Comentario en publicación</strong>
@@ -106,8 +215,6 @@
             </div>
             <div class="tpicker-arrow">›</div>
           </div>
-
-          <!-- Mención (Próximamente) -->
           <div class="tpicker-card" style="opacity:0.55; cursor:not-allowed;" aria-disabled="true">
             <div class="tpicker-icon" style="background:#faf5ff; color:#7c3aed;">@</div>
             <div class="tpicker-info">
@@ -116,7 +223,6 @@
             </div>
             <div class="tpicker-arrow">›</div>
           </div>
-
         </div>
       </div>
     </div>
@@ -124,7 +230,7 @@
     <!-- ══════════════════════════════════════════
          CONTEXT MENU (doble clic en canvas)
     ══════════════════════════════════════════ -->
-    <div id="context-menu" class="ctx-hidden" style="position:absolute; z-index:9999;" role="menu" aria-label="Menú contextual">
+    <div id="context-menu" class="ctx-hidden" style="position:absolute; z-index:9999;" role="menu">
         <div class="ctx-item" data-type="trigger"    role="menuitem">⚡ Palabra Clave</div>
         <div class="ctx-item" data-type="message"    role="menuitem">💬 Enviar Mensaje</div>
         <div class="ctx-item" data-type="input"      role="menuitem">📥 Pedir Dato</div>
@@ -142,79 +248,77 @@
     </div>
 
     <!-- ══════════════════════════════════════════
-         NOTIFICATIONS CONTAINER
+         NOTIFICATIONS CONTAINER (nuevo)
     ══════════════════════════════════════════ -->
     <div id="notifications-container" class="notifications-container" aria-live="polite" aria-atomic="false"></div>
 
     <!-- ══════════════════════════════════════════
          SCRIPTS — Orden: utils → components → libs → app
+         CRÍTICO: builder.js debe ir DESPUÉS de utils/components
+         para que DOMUtils, StorageUtils, EventBus, Toast estén disponibles.
+         builder.js accede al DOM al nivel del módulo, por eso el HTML
+         de header/sidebar está estático arriba (no generado por JS).
     ══════════════════════════════════════════ -->
+
     <!-- Utils -->
     <script src="utils/dom.js"></script>
     <script src="utils/storage.js"></script>
     <script src="utils/events.js"></script>
 
-    <!-- Components -->
+    <!-- Components (antes de builder.js para que Toast esté disponible) -->
     <script src="components/notifications.js"></script>
     <script src="components/validators.js"></script>
-    <script src="components/header.js"></script>
-    <script src="components/sidebar.js"></script>
     <script src="components/modals.js"></script>
 
     <!-- External libs -->
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
 
-    <!-- App -->
+    <!-- App (accede al DOM al nivel del módulo — necesita el HTML estático de arriba) -->
     <script src="builder.js?v=40"></script>
 
-    <!-- Initialize new components (after builder.js to avoid conflicts) -->
+    <!-- Post-init: enriquecer UI con nuevos comportamientos (después de builder.js) -->
     <script>
-      document.addEventListener('DOMContentLoaded', function () {
-        // Init Header
-        if (window.HeaderComponent) {
-          HeaderComponent.init('app-header', {
-            flowName: 'Sin Título',
-            flowStatus: 'draft',
-            onSave: function () {
-              if (window.saveFlow) saveFlow();
-            },
-            onPublish: function (currentStatus) {
-              if (window.publishFlow) publishFlow();
-            },
-            onArrange: function () {
-              if (window.autoArrange) autoArrange();
-              else if (window.Toast) Toast.info('Auto-organizar disponible pronto');
-            },
-            onFlowNameChange: function (newName) {
-              // Sync with builder.js if it has a flow name state
-              if (window._currentFlowName !== undefined) window._currentFlowName = newName;
-            }
+      (function () {
+        // ── Sidebar: toggle colapsar/expandir ──────────────────
+        var STORAGE_KEY = 'fg_builder_sidebar_collapsed';
+
+        function getSidebarState() {
+          try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) === true; } catch(e) { return false; }
+        }
+        function saveSidebarState(v) {
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); } catch(e) {}
+        }
+
+        var sidebar = document.querySelector('.sidebar');
+        var toggleBtn = document.getElementById('sidebar-toggle-btn');
+
+        if (sidebar && toggleBtn) {
+          // Restaurar estado
+          if (getSidebarState()) sidebar.classList.add('collapsed');
+
+          toggleBtn.addEventListener('click', function () {
+            var isCollapsed = sidebar.classList.toggle('collapsed');
+            saveSidebarState(isCollapsed);
+            toggleBtn.title = isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar';
           });
         }
 
-        // Init Sidebar (replace old .sidebar content)
-        if (window.SidebarComponent) {
-          SidebarComponent.init('app-sidebar');
-        }
+        // ── Canvas zoom controls ───────────────────────────────
+        document.addEventListener('DOMContentLoaded', function () {
+          var zoomIn  = document.getElementById('canvas-zoom-in');
+          var zoomOut = document.getElementById('canvas-zoom-out');
+          var fit     = document.getElementById('canvas-fit');
 
-        // Canvas zoom controls
-        var zoomIn  = document.getElementById('canvas-zoom-in');
-        var zoomOut = document.getElementById('canvas-zoom-out');
-        var fit     = document.getElementById('canvas-fit');
+          if (zoomIn)  zoomIn.addEventListener('click',  function () { if (window.editor) editor.zoom_in();   });
+          if (zoomOut) zoomOut.addEventListener('click',  function () { if (window.editor) editor.zoom_out();  });
+          if (fit)     fit.addEventListener('click',      function () { if (window.editor) editor.zoom_reset(); });
+        });
 
-        if (zoomIn)  zoomIn.addEventListener('click',  function () { if (window.editor) editor.zoom_in();  });
-        if (zoomOut) zoomOut.addEventListener('click',  function () { if (window.editor) editor.zoom_out(); });
-        if (fit)     fit.addEventListener('click',      function () { if (window.editor) editor.zoom_reset(); });
+        // ── Expose Toast globalmente por si builder.js lo usa ──
+        // (ya está disponible como window.Toast desde notifications.js)
 
-        // EventBus: sidebar node add from keyboard
-        if (window.EventBus) {
-          EventBus.on('sidebar:addNode', function (data) {
-            // Add node at center of canvas
-            if (window.addNodeAtCenter) addNodeAtCenter(data.type);
-          });
-        }
-      });
+      })();
     </script>
 
 </body>
