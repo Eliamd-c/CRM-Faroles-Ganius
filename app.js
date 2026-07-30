@@ -213,6 +213,20 @@ app.get('/api/flows', (req, res) => {
   res.json(flowsConfig);
 });
 
+// Obtener publicaciones recientes de Instagram para selector de comentarios
+app.get('/api/instagram/media', async (req, res) => {
+  try {
+    const token = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN;
+    if (!token) return res.status(503).json({ error: 'No access token configured' });
+    const url = `https://graph.facebook.com/v21.0/me/media?fields=id,media_type,thumbnail_url,media_url,caption,timestamp,permalink&limit=12&access_token=${token}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Guardar flujos
 app.post('/api/flows', async (req, res) => {
   try {
@@ -501,6 +515,9 @@ async function handleMessage(event) {
   }
   
   if (matchedFlow && matchedFlow.steps) {
+    matchedFlow.executionCount = (matchedFlow.executionCount || 0) + 1;
+    matchedFlow.lastExecutedAt = new Date().toISOString();
+    saveFlowsConfig().catch(() => {});
     await processFlowSteps(matchedFlow.steps, senderId, senderName);
   } else if (flowsConfig.defaultFlow?.steps) {
     await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName);
@@ -797,7 +814,11 @@ async function handleComment(value) {
   }
 
   if (matched) {
-    if (matched.publicReply) await replyComment(commentId, matched.publicReply.replace('{username}', fromName));
+    const replyPool = matched.commentPublicReplies?.length ? matched.commentPublicReplies : (matched.publicReply ? [matched.publicReply] : []);
+    if (replyPool.length) {
+      const pick = replyPool[Math.floor(Math.random() * replyPool.length)];
+      await replyComment(commentId, pick.replace('{username}', fromName));
+    }
     if (matched.privateReply) await sendPrivateReply(commentId, matched.privateReply.replace('{username}', fromName));
     if (matched.dmFlowId) {
       const flow = flowsConfig.flows.find(f => f.id === matched.dmFlowId);

@@ -2118,8 +2118,16 @@ function renderTriggerMessageInspector(nodeId, data) {
 function renderTriggerCommentInspector(nodeId, data) {
   document.getElementById('config-title').innerText = '💬 Disparador: Comentario';
   const keyword = data.commentKeyword || '';
-  const publicReply = data.commentPublicReply || '';
+  const replies = data.commentPublicReplies || (data.commentPublicReply ? [data.commentPublicReply] : ['']);
   const privateReply = data.commentPrivateReply !== false;
+  const selectedMedia = data.commentMediaId || '';
+  const selectedMediaThumb = data.commentMediaThumb || '';
+
+  const repliesHtml = replies.map((r, i) => `
+    <div style="display:flex; gap:6px; margin-bottom:6px;" id="reply-row-${i}">
+      <textarea class="config-input comment-public-reply-item" style="min-height:50px; flex:1; resize:vertical;" placeholder="ej: ¡Gracias! Te escribimos por DM 📩">${r}</textarea>
+      ${replies.length > 1 ? `<button onclick="removeCommentReply('${nodeId}',${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;padding:0 4px;align-self:flex-start;margin-top:4px;">×</button>` : ''}
+    </div>`).join('');
 
   document.getElementById('config-body').innerHTML = `
     <div style="margin-bottom:16px;">
@@ -2127,23 +2135,117 @@ function renderTriggerCommentInspector(nodeId, data) {
         ⚡ Cambiar tipo de disparador
       </button>
     </div>
+
+    <!-- Publicación específica -->
+    <div class="config-group">
+      <label class="config-label">Publicación (opcional)</label>
+      <div id="comment-media-preview" style="margin-bottom:8px;">
+        ${selectedMedia
+          ? `<div style="display:flex;align-items:center;gap:8px;background:#f3f4f6;padding:8px;border-radius:8px;">
+               ${selectedMediaThumb ? `<img src="${selectedMediaThumb}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">` : '🖼️'}
+               <span style="font-size:12px;color:#374151;flex:1">Publicación seleccionada</span>
+               <button onclick="clearCommentMedia('${nodeId}')" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:16px;">×</button>
+             </div>`
+          : `<div style="font-size:12px;color:#9ca3af;">Responde a comentarios en cualquier publicación</div>`}
+      </div>
+      <button id="btn-load-media" onclick="loadInstagramMedia('${nodeId}')" style="background:none;border:1px dashed #d1d5db;border-radius:8px;padding:7px 12px;font-size:12px;color:#6b7280;cursor:pointer;width:100%;">
+        📸 Elegir publicación específica
+      </button>
+      <div id="media-grid" style="display:none; margin-top:10px;"></div>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #f3f4f6; margin:14px 0;">
+
+    <!-- Keyword -->
     <div class="config-group">
       <label class="config-label">Palabra clave en el comentario</label>
       <input type="text" class="config-input" id="comment-keyword" value="${keyword}" placeholder='ej: QUIERO, INFO, PRECIO'>
       <p style="font-size:11px; color:#6b7280; margin-top:4px;">Deja vacío para responder a cualquier comentario.</p>
     </div>
-    <hr style="border:0; border-top:1px solid #f3f4f6; margin:16px 0;">
+
+    <hr style="border:0; border-top:1px solid #f3f4f6; margin:14px 0;">
+
+    <!-- Respuestas aleatorias -->
     <div class="config-group">
-      <label class="config-label">Respuesta pública al comentario (opcional)</label>
-      <textarea class="config-input" id="comment-public-reply" style="min-height:60px;" placeholder="ej: ¡Gracias! Te envié los detalles por DM 📩">${publicReply}</textarea>
-      <p style="font-size:11px; color:#6b7280; margin-top:4px;">Se publicará como respuesta visible debajo del comentario.</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <label class="config-label" style="margin:0;">Respuestas públicas <span style="background:#e0e7ff;color:#3730a3;font-size:10px;padding:2px 7px;border-radius:10px;margin-left:4px;">aleatorias</span></label>
+        <button onclick="addCommentReply('${nodeId}')" style="background:none;border:1px solid #d1d5db;border-radius:6px;padding:3px 10px;font-size:12px;color:#374151;cursor:pointer;">+ Añadir variante</button>
+      </div>
+      <div id="replies-container">${repliesHtml}</div>
+      <p style="font-size:11px; color:#6b7280; margin-top:4px;">Si hay varias, el bot elige una al azar para sonar más natural.</p>
     </div>
+
+    <!-- DM -->
     <div class="config-group" style="display:flex; align-items:center; gap:10px; margin-top:4px;">
       <input type="checkbox" id="comment-private-reply" ${privateReply ? 'checked' : ''} style="width:16px; height:16px; accent-color: var(--primary);">
       <label for="comment-private-reply" style="font-size:13px; color:#374151; cursor:pointer;">Enviar el flujo por mensaje directo (DM)</label>
     </div>
     <button class="btn-primary" style="width:100%; margin-top:16px;" onclick="saveTriggerComment('${nodeId}')">Aplicar</button>`;
 }
+
+// Cargar publicaciones de Instagram
+window.loadInstagramMedia = async function(nodeId) {
+  const grid = document.getElementById('media-grid');
+  const btn = document.getElementById('btn-load-media');
+  if (!grid) return;
+  btn.textContent = '⏳ Cargando...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/instagram/media');
+    const data = await res.json();
+    const items = data.data || [];
+
+    if (items.length === 0) {
+      grid.innerHTML = '<p style="font-size:12px;color:#9ca3af;text-align:center;">No se encontraron publicaciones.</p>';
+    } else {
+      grid.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+        ${items.map(item => {
+          const thumb = item.thumbnail_url || item.media_url || '';
+          return `<div onclick="selectCommentMedia('${nodeId}','${item.id}','${thumb}')"
+            style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;aspect-ratio:1;position:relative;transition:border-color .15s;"
+            onmouseover="this.style.borderColor='#0084ff'" onmouseout="this.style.borderColor='#e5e7eb'">
+            ${thumb ? `<img src="${thumb}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">` : '<div style="width:100%;height:100%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🖼️</div>'}
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+    grid.style.display = 'block';
+  } catch(e) {
+    grid.innerHTML = '<p style="font-size:12px;color:#ef4444;">Error al cargar publicaciones. Verifica el token.</p>';
+    grid.style.display = 'block';
+  }
+  btn.textContent = '📸 Elegir publicación específica';
+  btn.disabled = false;
+};
+
+window.selectCommentMedia = function(nodeId, mediaId, thumb) {
+  const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
+  if (d) { d.commentMediaId = mediaId; d.commentMediaThumb = thumb; }
+  renderTriggerCommentInspector(nodeId, editor.drawflow.drawflow.Home.data[nodeId]?.data || {});
+};
+
+window.clearCommentMedia = function(nodeId) {
+  const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
+  if (d) { d.commentMediaId = ''; d.commentMediaThumb = ''; }
+  renderTriggerCommentInspector(nodeId, editor.drawflow.drawflow.Home.data[nodeId]?.data || {});
+};
+
+window.addCommentReply = function(nodeId) {
+  const items = Array.from(document.querySelectorAll('.comment-public-reply-item')).map(t => t.value);
+  items.push('');
+  const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
+  if (d) d.commentPublicReplies = items;
+  renderTriggerCommentInspector(nodeId, editor.drawflow.drawflow.Home.data[nodeId]?.data || {});
+};
+
+window.removeCommentReply = function(nodeId, idx) {
+  const items = Array.from(document.querySelectorAll('.comment-public-reply-item')).map(t => t.value);
+  items.splice(idx, 1);
+  const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
+  if (d) d.commentPublicReplies = items.length ? items : [''];
+  renderTriggerCommentInspector(nodeId, editor.drawflow.drawflow.Home.data[nodeId]?.data || {});
+};
 
 function saveTrigger(nodeId) {
   const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
@@ -2157,7 +2259,9 @@ window.saveTriggerComment = function(nodeId) {
   const d = editor.drawflow.drawflow.Home.data[nodeId]?.data;
   if (!d) return;
   d.commentKeyword = document.getElementById('comment-keyword').value.trim();
-  d.commentPublicReply = document.getElementById('comment-public-reply').value.trim();
+  const replyItems = Array.from(document.querySelectorAll('.comment-public-reply-item')).map(t => t.value.trim()).filter(Boolean);
+  d.commentPublicReplies = replyItems.length ? replyItems : [];
+  d.commentPublicReply = replyItems[0] || '';
   d.commentPrivateReply = document.getElementById('comment-private-reply').checked;
   renderTriggerNode(nodeId);
   closeInspector();

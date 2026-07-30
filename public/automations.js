@@ -97,6 +97,11 @@ function renderFlows(flows) {
         <span class="step-count">${total}</span>
         <span style="font-size:12px;margin-left:4px">${stepTypeIcons(types)}</span>
       </td>
+      <td data-label="Ejecutados">
+        ${flow.executionCount > 0
+          ? `<span style="font-weight:600;color:var(--text-main)">${flow.executionCount}</span><span style="font-size:11px;color:var(--text-muted);margin-left:3px">veces</span>`
+          : `<span style="color:var(--text-muted);font-size:12px">—</span>`}
+      </td>
       <td data-label="Modificado" class="date-cell">${timeAgo(flow.updatedAt)}</td>
       <td data-label="Acciones">
         <div class="actions-cell">

@@ -493,6 +493,54 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
 }
 .btn-publish.live-state:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
 
+/* ── Etiquetas de salida de nodos ── */
+.drawflow-node .output_1 {
+  position: relative;
+}
+.drawflow-node .output_1::before {
+  content: "Siguiente →";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+  pointer-events: none;
+  letter-spacing: 0.3px;
+}
+.drawflow-node.trigger .output_1::before {
+  content: "Entonces →";
+  color: #fb923c;
+}
+.drawflow-node.condition .output_1::before { content: "Sí →"; color: #16a34a; }
+.drawflow-node.condition .output_2::before {
+  content: "No →";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-weight: 600;
+  color: #dc2626;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.drawflow-node.input .output_1::before { content: "Correcto →"; color: #16a34a; }
+.drawflow-node.input .output_2::before {
+  content: "Incorrecto →";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-weight: 600;
+  color: #dc2626;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* ── Paleta de bloques en cuadrícula ── */
 .block-palette {
   display: grid;
