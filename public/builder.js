@@ -1128,6 +1128,103 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────
+// Header: nombre editable + estado + publicar
+// ─────────────────────────────────────────────
+let currentFlowEnabled = false;
+
+function updateFlowHeader(flow) {
+  const center = document.getElementById('flow-header-center');
+  const nameDisplay = document.getElementById('flow-name-display');
+  const nameInput = document.getElementById('flow-name-input');
+  const chip = document.getElementById('flow-status-chip');
+  const btnPublish = document.getElementById('btn-publish');
+  if (!center) return;
+
+  currentFlowEnabled = flow.enabled !== false;
+  center.style.display = 'flex';
+
+  nameDisplay.textContent = flow.name || currentLoadedFlowId;
+  nameInput.value = flow.name || '';
+
+  refreshStatusChip(chip, btnPublish);
+
+  // Edición inline del nombre
+  nameDisplay.onclick = () => {
+    nameDisplay.style.display = 'none';
+    nameInput.style.display = 'block';
+    nameInput.focus();
+    nameInput.select();
+  };
+
+  nameInput.onblur = () => commitFlowName(nameDisplay, nameInput);
+  nameInput.onkeydown = e => {
+    if (e.key === 'Enter') nameInput.blur();
+    if (e.key === 'Escape') { nameInput.value = nameDisplay.textContent; nameInput.blur(); }
+  };
+}
+
+function commitFlowName(nameDisplay, nameInput) {
+  const newName = nameInput.value.trim() || nameDisplay.textContent;
+  nameDisplay.textContent = newName;
+  nameInput.style.display = 'none';
+  nameDisplay.style.display = '';
+
+  // Actualizar el nodo trigger con el nuevo nombre
+  const nodes = editor.drawflow.drawflow.Home.data;
+  for (const nid in nodes) {
+    if (nodes[nid].name === 'trigger') {
+      nodes[nid].data.flowName = newName;
+      break;
+    }
+  }
+}
+
+function refreshStatusChip(chip, btnPublish) {
+  if (!chip) return;
+  if (currentFlowEnabled) {
+    chip.textContent = '● En Vivo';
+    chip.className = 'flow-status-chip live';
+    if (btnPublish) {
+      btnPublish.textContent = 'Pausar';
+      btnPublish.className = 'btn-publish live-state';
+      btnPublish.style.display = '';
+    }
+  } else {
+    chip.textContent = '○ Borrador';
+    chip.className = 'flow-status-chip draft';
+    if (btnPublish) {
+      btnPublish.textContent = '▶ Publicar';
+      btnPublish.className = 'btn-publish';
+      btnPublish.style.display = '';
+    }
+  }
+}
+
+// Botón Publicar / Pausar
+document.getElementById('btn-publish')?.addEventListener('click', async () => {
+  if (!currentLoadedFlowId) return;
+  const btn = document.getElementById('btn-publish');
+  const wasEnabled = currentFlowEnabled;
+  btn.disabled = true;
+  btn.textContent = wasEnabled ? 'Pausando...' : 'Publicando...';
+
+  const res = await fetch(`/api/flows/${encodeURIComponent(currentLoadedFlowId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: !wasEnabled })
+  });
+
+  if (res.ok) {
+    currentFlowEnabled = !wasEnabled;
+    refreshStatusChip(
+      document.getElementById('flow-status-chip'),
+      document.getElementById('btn-publish')
+    );
+  }
+  btn.disabled = false;
+});
+
+// ─────────────────────────────────────────────
 // Cargar flujo desde backend (reverse converter)
 // ─────────────────────────────────────────────
 function createMessageNodeFromStep(posX, posY, step) {
@@ -1165,12 +1262,7 @@ async function loadFlowIntoBuilder(flowId) {
     const flow = await res.json();
 
     currentLoadedFlowId = flowId;
-    const badge = document.getElementById('flow-name-badge');
-
-    if (badge) {
-      badge.textContent = '✏️ ' + (flow.name || flowId);
-      badge.style.display = 'inline-block';
-    }
+    updateFlowHeader(flow);
 
     editor.clear();
 

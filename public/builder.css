@@ -41,6 +41,7 @@ header {
     padding: 0 20px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     z-index: 10;
+    position: relative;
 }
 
 .logo { font-size: 1.2rem; font-weight: 600; }
@@ -377,3 +378,91 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
 }
 .nav-bar a:hover { background: #f3f4f6; color: var(--text-main); }
 .nav-bar a.active { background: #eff6ff; color: var(--primary); }
+
+/* ── Flow header center (nombre + estado) ── */
+.flow-header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.flow-name-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.flow-name-display {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: text;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow-name-display:hover {
+  border-color: var(--border-color);
+  background: #f9fafb;
+}
+
+.flow-name-input {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  border: 2px solid var(--primary);
+  border-radius: 6px;
+  padding: 3px 8px;
+  outline: none;
+  width: 220px;
+  font-family: inherit;
+}
+
+.flow-status-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.flow-status-chip.live {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+.flow-status-chip.draft {
+  background: #fef9c3;
+  color: #a16207;
+  border: 1px solid #fde68a;
+}
+
+/* ── Botón Publicar ── */
+.btn-publish {
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: background 0.15s;
+}
+.btn-publish:hover { background: #15803d; }
+.btn-publish.live-state {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+.btn-publish.live-state:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }

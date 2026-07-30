@@ -18,10 +18,17 @@
                 <a href="/builder.html" class="active">Builder</a>
             </nav>
         </div>
+        <div id="flow-header-center" class="flow-header-center" style="display:none;">
+            <div class="flow-name-wrapper">
+                <span id="flow-name-display" class="flow-name-display"></span>
+                <input id="flow-name-input" class="flow-name-input" type="text" style="display:none;" />
+            </div>
+            <span id="flow-status-chip" class="flow-status-chip"></span>
+        </div>
         <div class="actions">
-            <span id="flow-name-badge" style="display:none; font-size:13px; color:#6b7280; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:6px; padding:5px 10px; margin-right:8px;"></span>
             <button id="btn-arrange" class="btn-secondary" style="margin-right:10px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db;">✨ Auto-Organizar</button>
             <button id="btn-save" class="btn-primary">Guardar Cambios</button>
+            <button id="btn-publish" class="btn-publish" style="display:none;">Publicar</button>
         </div>
     </header>
 
@@ -106,6 +113,6 @@
 
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <script src="builder.js?v=33"></script>
+    <script src="builder.js?v=34"></script>
 </body>
 </html>
