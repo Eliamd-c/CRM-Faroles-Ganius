@@ -198,6 +198,15 @@ app.get('/api/flows', (req, res) => {
 app.post('/api/flows', async (req, res) => {
   try {
     const newFlows = req.body;
+    
+    // PRESERVE defaultFlow and welcomeFlow if builder drops them
+    if (!newFlows.defaultFlow && flowsConfig.defaultFlow) {
+      newFlows.defaultFlow = flowsConfig.defaultFlow;
+    }
+    if (!newFlows.welcomeFlow && flowsConfig.welcomeFlow) {
+      newFlows.welcomeFlow = flowsConfig.welcomeFlow;
+    }
+
     await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
     flowsConfig = newFlows; // Actualizar memoria
     console.log('✅ flows.json actualizado desde el Builder');
@@ -248,15 +257,16 @@ async function getUserProfile(senderId) {
 // ─────────────────────────────────────────────
 async function handleMessage(event) {
   const senderId     = event.sender?.id;
-  const text         = event.message?.quick_reply?.payload || event.postback?.payload || event.message?.text;
+  const text         = event.message?.quick_reply?.payload || event.postback?.payload || event.message?.text || "";
   const storyMention = event.message?.story?.mention;
+  const hasAttachments = event.message?.attachments && event.message.attachments.length > 0;
 
   // Ignorar eventos que no tengan ID de origen o sean del propio bot
   if (!senderId) return;
   if (String(senderId).trim() === String(INSTAGRAM_ACCOUNT_ID).trim()) return;
 
-  // Si no hay texto ni es una mención en historia, ignoramos
-  if (!text && !storyMention) return;
+  // Si no hay texto, ni mención, ni adjuntos, ignoramos
+  if (!text && !storyMention && !hasAttachments) return;
 
   const profile = await getUserProfile(senderId);
   const senderName = profile?.name || senderId;
