@@ -3,113 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Flow Builder - Faroles Genius CRM. Crea automatizaciones visuales con arrastrar y soltar.">
     <title>Flow Builder - Faroles Genius</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Design System (orden importa) -->
+    <link rel="stylesheet" href="styles/variables.css">
+    <link rel="stylesheet" href="styles/reset.css">
+    <link rel="stylesheet" href="styles/animations.css">
+    <link rel="stylesheet" href="styles/header.css">
+    <link rel="stylesheet" href="styles/sidebar.css">
+    <link rel="stylesheet" href="styles/modals.css">
+    <link rel="stylesheet" href="styles/notifications.css">
+    <link rel="stylesheet" href="styles/canvas.css">
+    <link rel="stylesheet" href="styles/responsive.css">
+
+    <!-- Drawflow -->
     <link rel="stylesheet" href="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.css">
-    <link rel="stylesheet" href="builder.css?v=19">
+
+    <!-- Legacy builder styles (se mantiene para compat con builder.js) -->
+    <link rel="stylesheet" href="builder.css?v=20">
 </head>
 <body>
-    <header>
-        <div class="header-left">
-            <div class="logo">Faroles Genius <span>Flow Builder</span></div>
-            <nav class="nav-bar">
-                <a href="/">Monitor</a>
-                <a href="/automations.html">Automatizaciones</a>
-                <a href="/builder.html" class="active">Builder</a>
-            </nav>
-        </div>
-        <div id="flow-header-center" class="flow-header-center" style="display:none;">
-            <div class="flow-name-wrapper">
-                <span id="flow-name-display" class="flow-name-display"></span>
-                <input id="flow-name-input" class="flow-name-input" type="text" style="display:none;" />
-            </div>
-            <span id="flow-status-chip" class="flow-status-chip"></span>
-        </div>
-        <div class="actions">
-            <button id="btn-arrange" class="btn-secondary" style="margin-right:10px; background:#f3f4f6; color:#374151; border:1px solid #d1d5db;">✨ Auto-Organizar</button>
-            <button id="btn-save" class="btn-primary">Guardar Cambios</button>
-            <button id="btn-publish" class="btn-publish" style="display:none;">Publicar</button>
-        </div>
+
+    <!-- ══════════════════════════════════════════
+         HEADER
+    ══════════════════════════════════════════ -->
+    <header id="app-header" class="app-header">
+        <!-- Renderizado por HeaderComponent -->
     </header>
 
-    <div class="wrapper">
-        <div class="sidebar">
-            <div class="drag-item" draggable="true" data-node="trigger">
-                <span>⚡</span> Palabra Clave (Trigger)
-            </div>
-            <div class="drag-item" draggable="true" data-node="message">
-                <span>💬</span> Enviar Mensaje
-            </div>
-            <div class="drag-item" draggable="true" data-node="input">
-                <span>📥</span> Pedir Dato
-            </div>
+    <!-- ══════════════════════════════════════════
+         MAIN CONTAINER
+    ══════════════════════════════════════════ -->
+    <div class="app-container">
 
-            <div class="drag-item" draggable="true" data-node="action">
-                <span>⚡</span> Realizar Acciones
-            </div>
-            <div class="drag-item" draggable="true" data-node="condition">
-                <span>🔀</span> Condición Lógica
-            </div>
-            <div class="drag-item" draggable="true" data-node="randomizer">
-                <span>🎲</span> Aleatorio (A/B)
-            </div>
-            <hr style="border:none; border-top:1px solid #e5e7eb; margin:8px 0;">
-            <div class="drag-item" draggable="true" data-node="carousel">
-                <span>🖼️</span> Carrusel
-            </div>
-            <div class="drag-item" draggable="true" data-node="gallery">
-                <span>📸</span> Galería
-            </div>
-            <div class="drag-item" draggable="true" data-node="audio">
-                <span>🎵</span> Audio
-            </div>
-            <div class="drag-item" draggable="true" data-node="video">
-                <span>🎥</span> Video
-            </div>
-            <div class="drag-item" draggable="true" data-node="file">
-                <span>📄</span> Archivo / PDF
-            </div>
-            <div class="drag-item" draggable="true" data-node="delay">
-                <span>⏱</span> Espera (Delay)
-            </div>
-            <div class="drag-item" draggable="true" data-node="goto">
-                <span>↗️</span> Goto / Saltar
-            </div>
-        </div>
-        
-        <div class="col-right">
+        <!-- Sidebar -->
+        <aside id="app-sidebar" class="app-sidebar">
+            <!-- Renderizado por SidebarComponent -->
+        </aside>
+
+        <!-- Canvas -->
+        <main class="app-main">
             <div id="drawflow"></div>
-        </div>
-    </div>
 
-    <!-- Panel lateral derecho para configuraciones detalladas -->
-    <div id="config-panel" class="config-panel hidden">
-        <div class="config-header" id="config-header">
-            <div class="config-header-inner">
-                <span class="config-header-icon" id="config-header-icon"></span>
-                <h3 id="config-title">Configuración</h3>
+            <!-- Canvas zoom toolbar -->
+            <div class="canvas-toolbar" aria-label="Controles del canvas">
+                <button class="canvas-toolbar-btn" id="canvas-zoom-in"  title="Zoom in"   aria-label="Acercar">+</button>
+                <button class="canvas-toolbar-btn" id="canvas-zoom-out" title="Zoom out"  aria-label="Alejar">−</button>
+                <button class="canvas-toolbar-btn" id="canvas-fit"      title="Ajustar vista" aria-label="Ajustar">⊡</button>
             </div>
-            <button id="close-config">×</button>
+        </main>
+
+        <!-- Config panel (Inspector lateral) -->
+        <div id="config-panel" class="config-panel hidden">
+            <div class="config-header" id="config-header">
+                <div class="config-header-inner">
+                    <span class="config-header-icon" id="config-header-icon"></span>
+                    <h3 id="config-title">Configuración</h3>
+                </div>
+                <button id="close-config" aria-label="Cerrar panel">×</button>
+            </div>
+            <div id="config-body" class="config-body">
+                <!-- Inyectado por builder.js -->
+            </div>
         </div>
-        <div id="config-body" class="config-body">
-            <!-- Los inputs se inyectarán aquí -->
-        </div>
+
     </div>
 
-    <!-- Modal: Seleccionar Disparador -->
-    <div id="trigger-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9000; align-items:center; justify-content:center;">
+    <!-- ══════════════════════════════════════════
+         TRIGGER PICKER MODAL (legacy — ahora ModalManager lo maneja también)
+    ══════════════════════════════════════════ -->
+    <div id="trigger-picker-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9000; align-items:center; justify-content:center; backdrop-filter:blur(2px);">
       <div style="background:#fff; border-radius:16px; box-shadow:0 24px 48px rgba(0,0,0,0.18); width:480px; max-width:95vw; overflow:hidden; font-family:inherit;">
         <div style="padding:24px 28px 0;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <h2 style="margin:0; font-size:18px; color:#111827;">Inicia automatización cuando...</h2>
-            <button onclick="closeTriggerPicker()" style="background:none; border:none; font-size:22px; color:#9ca3af; cursor:pointer; line-height:1;">×</button>
+            <button onclick="closeTriggerPicker()" style="background:none; border:none; font-size:22px; color:#9ca3af; cursor:pointer; line-height:1; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;" aria-label="Cerrar">×</button>
           </div>
           <p style="margin:0 0 20px; font-size:13px; color:#6b7280;">Elige qué evento dispara esta automatización</p>
         </div>
         <div style="padding:0 28px 28px; display:flex; flex-direction:column; gap:10px;">
 
           <!-- Mensaje DM -->
-          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'message')">
+          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'message')" role="button" tabindex="0" aria-label="Mensaje directo">
             <div class="tpicker-icon" style="background:#eff6ff; color:#2563eb;">💬</div>
             <div class="tpicker-info">
               <strong>Mensaje directo</strong>
@@ -119,7 +98,7 @@
           </div>
 
           <!-- Comentario -->
-          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'comment')">
+          <div class="tpicker-card" onclick="selectTriggerType(window._pickerNodeId, 'comment')" role="button" tabindex="0" aria-label="Comentario en publicación">
             <div class="tpicker-icon" style="background:#f0fdf4; color:#16a34a;">💬</div>
             <div class="tpicker-info">
               <strong>Comentario en publicación</strong>
@@ -128,8 +107,8 @@
             <div class="tpicker-arrow">›</div>
           </div>
 
-          <!-- Mención -->
-          <div class="tpicker-card" style="opacity:0.55; cursor:not-allowed;">
+          <!-- Mención (Próximamente) -->
+          <div class="tpicker-card" style="opacity:0.55; cursor:not-allowed;" aria-disabled="true">
             <div class="tpicker-icon" style="background:#faf5ff; color:#7c3aed;">@</div>
             <div class="tpicker-info">
               <strong>Mención en historia <span style="background:#7c3aed; color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; margin-left:6px; font-weight:600;">Próximamente</span></strong>
@@ -142,26 +121,101 @@
       </div>
     </div>
 
-    <!-- Menú Contextual (Doble Clic) -->
-    <div id="context-menu" class="ctx-hidden" style="position: absolute; z-index: 9999; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; overflow: hidden; width: 180px;">
-        <div class="ctx-item" data-type="trigger" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px;"><span>⚡</span> Palabra Clave</div>
-        <div class="ctx-item" data-type="message" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>💬</span> Enviar Mensaje</div>
-        <div class="ctx-item" data-type="input" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📥</span> Pedir Dato</div>
-        <div class="ctx-item" data-type="action" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>⚡</span> Acción</div>
-        <div class="ctx-item" data-type="condition" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🔀</span> Condición Lógica</div>
-        <div class="ctx-item" data-type="randomizer" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎲</span> Aleatorio (A/B)</div>
-        <div style="border-top:1px solid #e5e7eb;"></div>
-        <div class="ctx-item" data-type="carousel" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px;"><span>🖼️</span> Carrusel</div>
-        <div class="ctx-item" data-type="gallery" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📸</span> Galería</div>
-        <div class="ctx-item" data-type="audio" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎵</span> Audio</div>
-        <div class="ctx-item" data-type="video" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>🎥</span> Video</div>
-        <div class="ctx-item" data-type="file" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>📄</span> Archivo / PDF</div>
-        <div class="ctx-item" data-type="delay" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>⏱</span> Espera</div>
-        <div class="ctx-item" data-type="goto" style="padding: 10px 15px; cursor: pointer; font-size: 13px; color: #374151; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f3f4f6;"><span>↗️</span> Goto / Saltar</div>
+    <!-- ══════════════════════════════════════════
+         CONTEXT MENU (doble clic en canvas)
+    ══════════════════════════════════════════ -->
+    <div id="context-menu" class="ctx-hidden" style="position:absolute; z-index:9999;" role="menu" aria-label="Menú contextual">
+        <div class="ctx-item" data-type="trigger"    role="menuitem">⚡ Palabra Clave</div>
+        <div class="ctx-item" data-type="message"    role="menuitem">💬 Enviar Mensaje</div>
+        <div class="ctx-item" data-type="input"      role="menuitem">📥 Pedir Dato</div>
+        <div class="ctx-item" data-type="action"     role="menuitem">⚡ Acción</div>
+        <div class="ctx-item" data-type="condition"  role="menuitem">🔀 Condición Lógica</div>
+        <div class="ctx-item" data-type="randomizer" role="menuitem">🎲 Aleatorio (A/B)</div>
+        <div style="border-top:1px solid #e5e7eb; margin:4px 0;"></div>
+        <div class="ctx-item" data-type="carousel"   role="menuitem">🖼️ Carrusel</div>
+        <div class="ctx-item" data-type="gallery"    role="menuitem">📸 Galería</div>
+        <div class="ctx-item" data-type="audio"      role="menuitem">🎵 Audio</div>
+        <div class="ctx-item" data-type="video"      role="menuitem">🎥 Video</div>
+        <div class="ctx-item" data-type="file"       role="menuitem">📄 Archivo / PDF</div>
+        <div class="ctx-item" data-type="delay"      role="menuitem">⏱ Espera</div>
+        <div class="ctx-item" data-type="goto"       role="menuitem">↗️ Goto / Saltar</div>
     </div>
 
+    <!-- ══════════════════════════════════════════
+         NOTIFICATIONS CONTAINER
+    ══════════════════════════════════════════ -->
+    <div id="notifications-container" class="notifications-container" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- ══════════════════════════════════════════
+         SCRIPTS — Orden: utils → components → libs → app
+    ══════════════════════════════════════════ -->
+    <!-- Utils -->
+    <script src="utils/dom.js"></script>
+    <script src="utils/storage.js"></script>
+    <script src="utils/events.js"></script>
+
+    <!-- Components -->
+    <script src="components/notifications.js"></script>
+    <script src="components/validators.js"></script>
+    <script src="components/header.js"></script>
+    <script src="components/sidebar.js"></script>
+    <script src="components/modals.js"></script>
+
+    <!-- External libs -->
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <script src="builder.js?v=39"></script>
+
+    <!-- App -->
+    <script src="builder.js?v=40"></script>
+
+    <!-- Initialize new components (after builder.js to avoid conflicts) -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        // Init Header
+        if (window.HeaderComponent) {
+          HeaderComponent.init('app-header', {
+            flowName: 'Sin Título',
+            flowStatus: 'draft',
+            onSave: function () {
+              if (window.saveFlow) saveFlow();
+            },
+            onPublish: function (currentStatus) {
+              if (window.publishFlow) publishFlow();
+            },
+            onArrange: function () {
+              if (window.autoArrange) autoArrange();
+              else if (window.Toast) Toast.info('Auto-organizar disponible pronto');
+            },
+            onFlowNameChange: function (newName) {
+              // Sync with builder.js if it has a flow name state
+              if (window._currentFlowName !== undefined) window._currentFlowName = newName;
+            }
+          });
+        }
+
+        // Init Sidebar (replace old .sidebar content)
+        if (window.SidebarComponent) {
+          SidebarComponent.init('app-sidebar');
+        }
+
+        // Canvas zoom controls
+        var zoomIn  = document.getElementById('canvas-zoom-in');
+        var zoomOut = document.getElementById('canvas-zoom-out');
+        var fit     = document.getElementById('canvas-fit');
+
+        if (zoomIn)  zoomIn.addEventListener('click',  function () { if (window.editor) editor.zoom_in();  });
+        if (zoomOut) zoomOut.addEventListener('click',  function () { if (window.editor) editor.zoom_out(); });
+        if (fit)     fit.addEventListener('click',      function () { if (window.editor) editor.zoom_reset(); });
+
+        // EventBus: sidebar node add from keyboard
+        if (window.EventBus) {
+          EventBus.on('sidebar:addNode', function (data) {
+            // Add node at center of canvas
+            if (window.addNodeAtCenter) addNodeAtCenter(data.type);
+          });
+        }
+      });
+    </script>
+
 </body>
 </html>

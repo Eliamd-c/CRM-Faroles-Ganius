@@ -1,0 +1,226 @@
+/* ============================================
+   FAROLES GENIUS — SIDEBAR STYLES
+   ============================================ */
+
+/* ── Base Sidebar ── */
+.app-sidebar {
+  width: var(--sidebar-width);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-sidebar);
+  box-shadow: var(--shadow-xs);
+  transition: width var(--transition-sidebar);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.app-sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* ── Scroll container ── */
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--spacing-3) 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+/* ── Section Header ── */
+.sidebar-section-header {
+  padding: var(--spacing-3) var(--spacing-4) var(--spacing-1) var(--spacing-4);
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity var(--transition-normal), height var(--transition-normal), padding var(--transition-normal);
+}
+
+.app-sidebar.collapsed .sidebar-section-header {
+  opacity: 0;
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+/* ── Divider ── */
+.sidebar-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--spacing-2) var(--spacing-4);
+  transition: margin var(--transition-normal), opacity var(--transition-normal);
+}
+
+.app-sidebar.collapsed .sidebar-divider {
+  margin-left: var(--spacing-3);
+  margin-right: var(--spacing-3);
+}
+
+/* ── Drag Item ── */
+.drag-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: 10px var(--spacing-4);
+  border-radius: var(--radius-md);
+  margin: 1px var(--spacing-2);
+  cursor: grab;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast),
+              box-shadow var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+.drag-item:hover {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  transform: translateX(2px);
+}
+
+.drag-item:active {
+  cursor: grabbing;
+  background: var(--color-primary-light);
+  transform: scale(0.98);
+}
+
+.drag-item .drag-icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.drag-item .drag-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity var(--transition-normal), max-width var(--transition-normal);
+}
+
+/* ── Collapsed state: hide label ── */
+.app-sidebar.collapsed .drag-label {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+}
+
+/* ── Tooltip (collapsed mode) ── */
+.drag-item .drag-tooltip {
+  position: absolute;
+  left: calc(var(--sidebar-collapsed-width) + var(--spacing-2));
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-text);
+  color: #fff;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-semibold);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  z-index: var(--z-tooltip);
+  box-shadow: var(--shadow-md);
+  transition: opacity var(--transition-fast);
+}
+
+.drag-item .drag-tooltip::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: var(--color-text);
+  border-left: 0;
+}
+
+.app-sidebar.collapsed .drag-item:hover .drag-tooltip {
+  opacity: 1;
+  animation: tooltipAppear var(--transition-fast) both;
+}
+
+/* ── Drag preview ghost ── */
+.drag-item.dragging {
+  opacity: 0.4;
+}
+
+/* ── Toggle button ── */
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3) 0;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar-toggle-btn .toggle-icon {
+  display: inline-block;
+  transition: transform var(--transition-normal);
+}
+
+.app-sidebar.collapsed .sidebar-toggle-btn .toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* ── Drag feedback on canvas (drop indicator) ── */
+.drag-over-indicator {
+  position: absolute;
+  pointer-events: none;
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-md);
+  background: rgba(59, 130, 246, 0.05);
+  animation: pulse 1.5s ease-in-out infinite;
+  z-index: 10;
+}
