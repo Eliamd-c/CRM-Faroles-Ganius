@@ -1114,10 +1114,150 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────
-// Carga Inicial (Ejemplo)
+// Cargar flujo desde backend (reverse converter)
 // ─────────────────────────────────────────────
-setTimeout(() => {
-  if (Object.keys(editor.drawflow.drawflow.Home.data).length === 0) {
+function createMessageNodeFromStep(posX, posY, step) {
+  const tempHtml = `<div class="node-message"><div class="title-box"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
+  const nodeId = editor.addNode('message', 1, 10, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
+
+  if (step.type === 'text') {
+    nodeBlocksState[nodeId] = [{ id: generateId(), type: 'text', content: step.message || '', buttons: [] }];
+  } else if (step.type === 'template') {
+    const buttons = (step.buttons || []).map(btn => ({
+      title: btn.title || '',
+      type: btn.type === 'web_url' ? 'web_url' : 'postback',
+      url: btn.url || ''
+    }));
+    nodeBlocksState[nodeId] = [{ id: generateId(), type: 'text', content: step.message || '', buttons }];
+  } else if (step.type === 'card') {
+    const blocks = [{ id: generateId(), type: 'image', content: '', url: step.card?.image_url || '', buttons: [] }];
+    if (step.card?.btn_title) {
+      blocks[0].buttons.push({
+        title: step.card.btn_title,
+        type: step.card.btn_type === 'web_url' ? 'web_url' : 'postback',
+        url: step.card.btn_url || ''
+      });
+    }
+    nodeBlocksState[nodeId] = blocks;
+  }
+
+  return nodeId;
+}
+
+async function loadFlowIntoBuilder(flowId) {
+  try {
+    const res = await fetch(`/api/flows/${encodeURIComponent(flowId)}`);
+    if (!res.ok) return false;
+    const flow = await res.json();
+
+    editor.clear();
+
+    const triggerData = {
+      keywords: (flow.keywords || []).join(', '),
+      matchType: flow.matchType || 'contains',
+      flowName: flow.name || ''
+    };
+    const triggerId = editor.addNode('trigger', 0, 1, 100, 200, 'trigger', triggerData, htmlTrigger);
+
+    let prevNodeId = triggerId;
+    let prevOutput = 'output_1';
+    const steps = flow.steps || [];
+    const createdNodeIds = [];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const posX = 100 + (i + 1) * 350;
+      const posY = 200;
+      let nodeId = null;
+
+      if (step.type === 'text' || step.type === 'template' || step.type === 'card') {
+        nodeId = createMessageNodeFromStep(posX, posY, step);
+      } else if (step.type === 'delay') {
+        nodeId = editor.addNode('delay', 1, 1, posX, posY, 'delay', { _delay: JSON.stringify({ seconds: step.seconds || 5 }) }, htmlDelay);
+        nodeDelayState[nodeId] = { seconds: step.seconds || 5 };
+      } else if (step.type === 'carousel') {
+        nodeId = editor.addNode('carousel', 1, 1, posX, posY, 'carousel', { _carousel: JSON.stringify({ elements: step.elements || [] }) }, htmlCarousel);
+        nodeCarouselState[nodeId] = { elements: step.elements || [] };
+      } else if (step.type === 'gallery') {
+        nodeId = editor.addNode('gallery', 1, 1, posX, posY, 'gallery', { _gallery: JSON.stringify({ images: step.images || [], delay_between_ms: step.delay_between_ms || 300 }) }, htmlGallery);
+        nodeGalleryState[nodeId] = { images: step.images || [], delay_between_ms: step.delay_between_ms || 300 };
+      } else if (step.type === 'audio') {
+        nodeId = editor.addNode('audio', 1, 1, posX, posY, 'audio', { _audio: JSON.stringify({ audio_url: step.audio_url || '' }) }, htmlAudio);
+        nodeAudioState[nodeId] = { audio_url: step.audio_url || '' };
+      } else if (step.type === 'video') {
+        nodeId = editor.addNode('video', 1, 1, posX, posY, 'video', { _video: JSON.stringify({ video_url: step.video_url || '' }) }, htmlVideo);
+        nodeVideoState[nodeId] = { video_url: step.video_url || '' };
+      } else if (step.type === 'file') {
+        nodeId = editor.addNode('file', 1, 1, posX, posY, 'file', { _file: JSON.stringify({ file_url: step.file_url || '' }) }, htmlFile);
+        nodeFileState[nodeId] = { file_url: step.file_url || '' };
+      } else if (step.type === 'action') {
+        const actionConf = { type: step.actionType, params: step.params || {} };
+        nodeId = editor.addNode('action', 1, 1, posX, posY, 'action', { _action: JSON.stringify(actionConf) }, htmlAction);
+        nodeActionsState[nodeId] = actionConf;
+      } else if (step.type === 'input') {
+        const inputConf = { type: step.inputType || 'text', field: step.field || '', prompt: step.prompt || '', retry: step.retryMessage || '' };
+        nodeId = editor.addNode('input', 1, 2, posX, posY, 'input', { _input: JSON.stringify(inputConf) }, htmlInput);
+        nodeInputState[nodeId] = inputConf;
+      } else if (step.type === 'goto') {
+        nodeId = editor.addNode('goto', 1, 0, posX, posY, 'goto', { _goto: JSON.stringify({ flow_id: step.flow_id || '' }) }, htmlGoto);
+        nodeGotoState[nodeId] = { flow_id: step.flow_id || '' };
+      }
+
+      if (nodeId) {
+        createdNodeIds.push(nodeId);
+        if (prevNodeId) {
+          editor.addConnection(prevNodeId, nodeId, prevOutput, 'input_1');
+        }
+        prevNodeId = nodeId;
+        prevOutput = 'output_1';
+      }
+    }
+
+    setTimeout(() => {
+      renderTriggerNode(triggerId);
+      createdNodeIds.forEach(nid => {
+        const node = editor.getNodeFromId(nid);
+        if (!node) return;
+        if (node.name === 'message') renderBlocksInNode(nid);
+        else if (node.name === 'delay') renderDelayNode(nid);
+        else if (node.name === 'carousel') renderCarouselNode(nid);
+        else if (node.name === 'gallery') renderGalleryNode(nid);
+        else if (node.name === 'audio') renderAudioNode(nid);
+        else if (node.name === 'video') renderVideoNode(nid);
+        else if (node.name === 'file') renderFileNode(nid);
+        else if (node.name === 'action') renderActionNode(nid);
+        else if (node.name === 'input') renderInputNode(nid);
+        else if (node.name === 'goto') renderGotoNode(nid);
+      });
+
+      // Auto-layout with Dagre
+      if (typeof dagre !== 'undefined' && createdNodeIds.length > 0) {
+        setTimeout(() => {
+          document.getElementById('btn-arrange').click();
+        }, 200);
+      }
+    }, 100);
+
+    return true;
+  } catch (err) {
+    console.error('Error loading flow:', err);
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Carga Inicial
+// ─────────────────────────────────────────────
+setTimeout(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const flowId = params.get('flowId');
+
+  if (flowId) {
+    const loaded = await loadFlowIntoBuilder(flowId);
+    if (!loaded) {
+      console.warn('Could not load flow:', flowId);
+    }
+  } else if (Object.keys(editor.drawflow.drawflow.Home.data).length === 0) {
     editor.addNode('trigger', 0, 1, 100, 200, 'trigger', { keywords: 'precio, valor' }, htmlTrigger);
     const msgId = addMessageNode(450, 200);
     setTimeout(() => {
@@ -1128,58 +1268,21 @@ setTimeout(() => {
       }
     }, 100);
   } else {
-    // Restaurar los estados desde Drawflow si ya habían datos guardados (en un entorno de carga real)
     const nodes = editor.drawflow.drawflow.Home.data;
     for (const nodeId in nodes) {
        const node = nodes[nodeId];
-       if (node.name === 'message' && node.data._blocks) {
-         nodeBlocksState[nodeId] = JSON.parse(node.data._blocks);
-         renderBlocksInNode(nodeId);
-       }
-       if (node.name === 'action' && node.data._action) {
-         nodeActionsState[nodeId] = JSON.parse(node.data._action);
-         renderActionNode(nodeId);
-       }
-       if (node.name === 'input' && node.data._input) {
-         nodeInputState[nodeId] = JSON.parse(node.data._input);
-         renderInputNode(nodeId);
-       }
-       if (node.name === 'condition' && node.data._condition) {
-         nodeConditionState[nodeId] = JSON.parse(node.data._condition);
-         renderConditionNode(nodeId);
-       }
-       if (node.name === 'randomizer' && node.data._randomizer) {
-         nodeRandomizerState[nodeId] = JSON.parse(node.data._randomizer);
-         renderRandomizerNode(nodeId);
-       }
-       if (node.name === 'carousel' && node.data._carousel) {
-         nodeCarouselState[nodeId] = JSON.parse(node.data._carousel);
-         renderCarouselNode(nodeId);
-       }
-       if (node.name === 'gallery' && node.data._gallery) {
-         nodeGalleryState[nodeId] = JSON.parse(node.data._gallery);
-         renderGalleryNode(nodeId);
-       }
-       if (node.name === 'audio' && node.data._audio) {
-         nodeAudioState[nodeId] = JSON.parse(node.data._audio);
-         renderAudioNode(nodeId);
-       }
-       if (node.name === 'video' && node.data._video) {
-         nodeVideoState[nodeId] = JSON.parse(node.data._video);
-         renderVideoNode(nodeId);
-       }
-       if (node.name === 'file' && node.data._file) {
-         nodeFileState[nodeId] = JSON.parse(node.data._file);
-         renderFileNode(nodeId);
-       }
-       if (node.name === 'delay' && node.data._delay) {
-         nodeDelayState[nodeId] = JSON.parse(node.data._delay);
-         renderDelayNode(nodeId);
-       }
-       if (node.name === 'goto' && node.data._goto) {
-         nodeGotoState[nodeId] = JSON.parse(node.data._goto);
-         renderGotoNode(nodeId);
-       }
+       if (node.name === 'message' && node.data._blocks) { nodeBlocksState[nodeId] = JSON.parse(node.data._blocks); renderBlocksInNode(nodeId); }
+       if (node.name === 'action' && node.data._action) { nodeActionsState[nodeId] = JSON.parse(node.data._action); renderActionNode(nodeId); }
+       if (node.name === 'input' && node.data._input) { nodeInputState[nodeId] = JSON.parse(node.data._input); renderInputNode(nodeId); }
+       if (node.name === 'condition' && node.data._condition) { nodeConditionState[nodeId] = JSON.parse(node.data._condition); renderConditionNode(nodeId); }
+       if (node.name === 'randomizer' && node.data._randomizer) { nodeRandomizerState[nodeId] = JSON.parse(node.data._randomizer); renderRandomizerNode(nodeId); }
+       if (node.name === 'carousel' && node.data._carousel) { nodeCarouselState[nodeId] = JSON.parse(node.data._carousel); renderCarouselNode(nodeId); }
+       if (node.name === 'gallery' && node.data._gallery) { nodeGalleryState[nodeId] = JSON.parse(node.data._gallery); renderGalleryNode(nodeId); }
+       if (node.name === 'audio' && node.data._audio) { nodeAudioState[nodeId] = JSON.parse(node.data._audio); renderAudioNode(nodeId); }
+       if (node.name === 'video' && node.data._video) { nodeVideoState[nodeId] = JSON.parse(node.data._video); renderVideoNode(nodeId); }
+       if (node.name === 'file' && node.data._file) { nodeFileState[nodeId] = JSON.parse(node.data._file); renderFileNode(nodeId); }
+       if (node.name === 'delay' && node.data._delay) { nodeDelayState[nodeId] = JSON.parse(node.data._delay); renderDelayNode(nodeId); }
+       if (node.name === 'goto' && node.data._goto) { nodeGotoState[nodeId] = JSON.parse(node.data._goto); renderGotoNode(nodeId); }
     }
   }
 }, 150);
