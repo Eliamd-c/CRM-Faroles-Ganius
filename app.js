@@ -216,19 +216,31 @@ app.get('/api/flows', (req, res) => {
 // Guardar flujos
 app.post('/api/flows', async (req, res) => {
   try {
-    const newFlows = req.body;
-    
-    // PRESERVE defaultFlow and welcomeFlow if builder drops them
-    if (!newFlows.defaultFlow && flowsConfig.defaultFlow) {
-      newFlows.defaultFlow = flowsConfig.defaultFlow;
-    }
-    if (!newFlows.welcomeFlow && flowsConfig.welcomeFlow) {
-      newFlows.welcomeFlow = flowsConfig.welcomeFlow;
-    }
+    const incoming = req.body;
 
-    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(newFlows, null, 2));
-    flowsConfig = newFlows; // Actualizar memoria
-    console.log('✅ flows.json actualizado desde el Builder');
+    // Preserve defaultFlow and welcomeFlow
+    if (!incoming.defaultFlow && flowsConfig.defaultFlow) incoming.defaultFlow = flowsConfig.defaultFlow;
+    if (!incoming.welcomeFlow && flowsConfig.welcomeFlow) incoming.welcomeFlow = flowsConfig.welcomeFlow;
+
+    // MERGE: upsert incoming flows into existing list instead of replacing
+    const incomingIds = new Set((incoming.flows || []).map(f => f.id));
+    const merged = flowsConfig.flows.filter(f => !incomingIds.has(f.id));
+    const now = new Date().toISOString();
+    for (const f of (incoming.flows || [])) {
+      const existing = flowsConfig.flows.find(e => e.id === f.id);
+      merged.push({
+        ...(existing || {}),
+        ...f,
+        enabled: existing ? existing.enabled : (f.enabled !== false),
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+      });
+    }
+    incoming.flows = merged;
+
+    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(incoming, null, 2));
+    flowsConfig = incoming;
+    console.log('✅ flows.json actualizado desde el Builder (merge)');
     res.json({ success: true });
   } catch (err) {
     console.error('❌ Error guardando flows.json', err);

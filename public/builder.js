@@ -7,6 +7,7 @@ editor.start();
 // ─────────────────────────────────────────────
 // Estado global
 // ─────────────────────────────────────────────
+let currentLoadedFlowId = null; // ID del flujo cargado via ?flowId=
 const nodeBlocksState = {}; // { nodeId: [ { id: 'b1', type: 'text', content: '', url: '', buttons: [] } ] }
 const nodeActionsState  = {}; // { nodeId: { type: 'add_tag', params: {} } }
 const nodeInputState = {}; // { nodeId: { type: 'email', field: 'email', prompt: '', retry: '' } }
@@ -1093,7 +1094,8 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       const keywordsRaw = node.data.keywords || '';
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
       const matchType = node.data.matchType || 'contains';
-      const newFlow = { id: `flow_${nodeId}`, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
+      const flowId = node.data._flowId || currentLoadedFlowId || `flow_${nodeId}`;
+      const newFlow = { id: flowId, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
       const nextNodeId = node.outputs.output_1?.connections[0]?.node;
       if (nextNodeId) newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
       if (keywordsList.length > 0) flowsConfig.flows.push(newFlow);
@@ -1101,15 +1103,27 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   }
 
   const btn = document.getElementById('btn-save');
+  btn.disabled = true;
   btn.innerText = "Guardando...";
   try {
     const res = await fetch('/api/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flowsConfig) });
     if (res.ok) {
-      btn.innerText = "¡Guardado con éxito!";
-      setTimeout(() => btn.innerText = "Guardar Cambios", 2000);
+      btn.innerText = "✓ Guardado";
+      btn.style.background = '#16a34a';
+      setTimeout(() => {
+        btn.innerText = "Guardar Cambios";
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 2000);
+    } else {
+      btn.innerText = "Error al guardar";
+      btn.style.background = '#dc2626';
+      setTimeout(() => { btn.innerText = "Guardar Cambios"; btn.style.background = ''; btn.disabled = false; }, 2500);
     }
   } catch(e) {
-    btn.innerText = "Error al guardar";
+    btn.innerText = "Sin conexión";
+    btn.style.background = '#dc2626';
+    setTimeout(() => { btn.innerText = "Guardar Cambios"; btn.style.background = ''; btn.disabled = false; }, 2500);
   }
 });
 
@@ -1150,12 +1164,21 @@ async function loadFlowIntoBuilder(flowId) {
     if (!res.ok) return false;
     const flow = await res.json();
 
+    currentLoadedFlowId = flowId;
+    const badge = document.getElementById('flow-name-badge');
+
+    if (badge) {
+      badge.textContent = '✏️ ' + (flow.name || flowId);
+      badge.style.display = 'inline-block';
+    }
+
     editor.clear();
 
     const triggerData = {
       keywords: (flow.keywords || []).join(', '),
       matchType: flow.matchType || 'contains',
-      flowName: flow.name || ''
+      flowName: flow.name || '',
+      _flowId: flowId
     };
     const triggerId = editor.addNode('trigger', 0, 1, 100, 200, 'trigger', triggerData, htmlTrigger);
 

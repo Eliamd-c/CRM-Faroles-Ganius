@@ -1,28 +1,6 @@
 {
   "flows": [
     {
-      "id": "flow_welcome",
-      "name": "Mensaje de Bienvenida",
-      "keywords": [
-        "hola",
-        "buenas",
-        "saludos",
-        "buenos dias",
-        "buenas tardes",
-        "buenas noches"
-      ],
-      "matchType": "contains",
-      "steps": [
-        {
-          "type": "text",
-          "message": "¡Hola, {username}! 👋 Bienvenido a Faroles Genius. ¿En qué podemos ayudarte hoy?"
-        }
-      ],
-      "enabled": true,
-      "createdAt": "2026-07-30T02:40:41.511Z",
-      "updatedAt": "2026-07-30T02:42:30.036Z"
-    },
-    {
       "id": "flow_price",
       "name": "Información de Precios",
       "keywords": [
@@ -246,6 +224,28 @@
       "enabled": true,
       "createdAt": "2026-07-30T02:40:41.520Z",
       "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_welcome",
+      "name": "Mensaje de Bienvenida",
+      "keywords": [
+        "hola",
+        "buenas",
+        "saludos",
+        "buenos dias",
+        "buenas tardes",
+        "buenas noches"
+      ],
+      "matchType": "contains",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Hola, {username}! 👋 Bienvenido a Faroles Genius. ¿En qué podemos ayudarte hoy?"
+        }
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.511Z",
+      "updatedAt": "2026-07-30T11:26:59.667Z"
     }
   ],
   "defaultFlow": {
