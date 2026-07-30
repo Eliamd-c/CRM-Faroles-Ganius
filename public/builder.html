@@ -84,8 +84,11 @@
 
     <!-- Panel lateral derecho para configuraciones detalladas -->
     <div id="config-panel" class="config-panel hidden">
-        <div class="config-header">
-            <h3 id="config-title">Configuración</h3>
+        <div class="config-header" id="config-header">
+            <div class="config-header-inner">
+                <span class="config-header-icon" id="config-header-icon"></span>
+                <h3 id="config-title">Configuración</h3>
+            </div>
             <button id="close-config">×</button>
         </div>
         <div id="config-body" class="config-body">
@@ -159,6 +162,6 @@
 
     <script src="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-    <script src="builder.js?v=37"></script>
+    <script src="builder.js?v=38"></script>
 </body>
 </html>

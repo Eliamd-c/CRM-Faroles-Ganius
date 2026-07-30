@@ -427,11 +427,37 @@ id.addEventListener('drop', e => {
 // ─────────────────────────────────────────────
 let selectedNodeId = null;
 
+const NODE_META = {
+  trigger:    { icon: '⚡', cls: 'type-trigger' },
+  message:    { icon: '💬', cls: 'type-message' },
+  action:     { icon: '⚡', cls: 'type-action' },
+  input:      { icon: '📥', cls: 'type-input' },
+  condition:  { icon: '🔀', cls: 'type-condition' },
+  randomizer: { icon: '🎲', cls: 'type-randomizer' },
+  carousel:   { icon: '🖼️', cls: 'type-carousel' },
+  gallery:    { icon: '📸', cls: 'type-gallery' },
+  audio:      { icon: '🎵', cls: 'type-audio' },
+  video:      { icon: '🎥', cls: 'type-video' },
+  delay:      { icon: '⏱', cls: 'type-delay' },
+  goto:       { icon: '↗️', cls: 'type-goto' },
+  file:       { icon: '📄', cls: 'type-file' },
+};
+
 function openInspector(nodeId) {
   selectedNodeId = nodeId;
   const node = editor.getNodeFromId(nodeId);
   const panel = document.getElementById('config-panel');
   panel.classList.remove('hidden');
+
+  // Color del header por tipo
+  const header = document.getElementById('config-header');
+  const iconEl = document.getElementById('config-header-icon');
+  if (header) {
+    header.className = 'config-header';
+    const meta = NODE_META[node.name];
+    if (meta) header.classList.add(meta.cls);
+    if (iconEl) iconEl.textContent = meta?.icon || '';
+  }
 
   if (node.name === 'trigger') {
     const tData = editor.drawflow.drawflow.Home.data[nodeId]?.data || {};
@@ -531,11 +557,27 @@ function renderMessageInspector(nodeId) {
   html += `</div>`; // .insp-blocks-list
   
   html += `
-    <div style="margin-top:20px; padding:15px; border-radius:8px; background:#f3f4f6;">
-      <label class="cfg-label" style="text-align:center; display:block; margin-bottom:10px;">Añadir bloque de contenido:</label>
-      <div style="display:flex; gap:10px;">
-        <button class="btn-primary" onclick="addBlock('${nodeId}', 'text')" style="flex:1; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:500;">📝 Texto</button>
-        <button class="btn-primary" onclick="addBlock('${nodeId}', 'image')" style="flex:1; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:500;">🖼️ Imagen</button>
+    <div style="margin-top:20px;">
+      <label class="cfg-label" style="margin-bottom:8px; display:block;">Añadir bloque</label>
+      <div class="block-palette">
+        <div class="block-palette-item" onclick="addBlock('${nodeId}', 'text')">
+          <span class="bpi-icon">📝</span>Texto
+        </div>
+        <div class="block-palette-item" onclick="addBlock('${nodeId}', 'image')">
+          <span class="bpi-icon">🖼️</span>Imagen
+        </div>
+        <div class="block-palette-item" onclick="addBlockNode('${nodeId}', 'audio')">
+          <span class="bpi-icon">🎵</span>Audio
+        </div>
+        <div class="block-palette-item" onclick="addBlockNode('${nodeId}', 'video')">
+          <span class="bpi-icon">🎥</span>Video
+        </div>
+        <div class="block-palette-item" onclick="addBlockNode('${nodeId}', 'file')">
+          <span class="bpi-icon">📄</span>Archivo
+        </div>
+        <div class="block-palette-item" onclick="addBlockNode('${nodeId}', 'delay')">
+          <span class="bpi-icon">⏱️</span>Espera
+        </div>
       </div>
     </div>
   `;
@@ -710,6 +752,33 @@ function spawnNodeForButton(sourceNodeId, globalBtnIdx, type) {
 }
 
 // Global window functions for the generated HTML
+window.addBlockNode = function(sourceNodeId, type) {
+  const nodeEl = document.getElementById('node-' + sourceNodeId);
+  const posX = (nodeEl ? parseFloat(nodeEl.style.left) : 200) + 350;
+  const posY = nodeEl ? parseFloat(nodeEl.style.top) : 200;
+  let newId = null;
+  if (type === 'audio') {
+    newId = editor.addNode('audio', 1, 1, posX, posY, 'audio', { _audio: '{}' }, htmlAudio);
+    nodeAudioState[newId] = { audio_url: '' };
+    setTimeout(() => renderAudioNode(newId), 50);
+  } else if (type === 'video') {
+    newId = editor.addNode('video', 1, 1, posX, posY, 'video', { _video: '{}' }, htmlVideo);
+    nodeVideoState[newId] = { video_url: '' };
+    setTimeout(() => renderVideoNode(newId), 50);
+  } else if (type === 'file') {
+    newId = editor.addNode('file', 1, 1, posX, posY, 'file', { _file: '{}' }, htmlFile);
+    nodeFileState[newId] = { file_url: '' };
+    setTimeout(() => renderFileNode(newId), 50);
+  } else if (type === 'delay') {
+    newId = editor.addNode('delay', 1, 1, posX, posY, 'delay', { _delay: '{}' }, htmlDelay);
+    nodeDelayState[newId] = { seconds: 5 };
+    setTimeout(() => renderDelayNode(newId), 50);
+  }
+  if (newId) {
+    setTimeout(() => editor.addConnection(sourceNodeId, newId, 'output_1', 'input_1'), 100);
+  }
+};
+
 window.updateBlockContent = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].content = val; renderBlocksInNode(nodeId); };
 window.updateBlockUrl = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].url = val; renderBlocksInNode(nodeId); };
 window.deleteBlock = (nodeId, idx) => { nodeBlocksState[nodeId].splice(idx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };

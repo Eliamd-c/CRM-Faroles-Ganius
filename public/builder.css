@@ -311,13 +311,39 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
 .config-panel:not(.hidden) { transform: translateX(0); }
 
 .config-header {
-    padding: 16px 20px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-top: 4px solid transparent;
+    transition: border-color 0.2s;
 }
-.config-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+/* Colores pastel por tipo de nodo */
+.config-header.type-message  { border-top-color: #60a5fa; background: #eff6ff; }
+.config-header.type-trigger  { border-top-color: #fb923c; background: #fff7ed; }
+.config-header.type-action   { border-top-color: #34d399; background: #f0fdf4; }
+.config-header.type-input    { border-top-color: #fbbf24; background: #fffbeb; }
+.config-header.type-condition{ border-top-color: #a78bfa; background: #f5f3ff; }
+.config-header.type-randomizer{ border-top-color: #f472b6; background: #fdf2f8; }
+.config-header.type-carousel { border-top-color: #38bdf8; background: #f0f9ff; }
+.config-header.type-gallery  { border-top-color: #818cf8; background: #eef2ff; }
+.config-header.type-audio    { border-top-color: #4ade80; background: #f0fdf4; }
+.config-header.type-video    { border-top-color: #f87171; background: #fef2f2; }
+.config-header.type-delay    { border-top-color: #94a3b8; background: #f8fafc; }
+.config-header.type-goto     { border-top-color: #2dd4bf; background: #f0fdfa; }
+.config-header.type-file     { border-top-color: #a3a3a3; background: #fafafa; }
+
+.config-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.config-header-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+.config-header h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .config-header button { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); }
 
 .config-body { padding: 20px; overflow-y: auto; flex: 1; }
@@ -466,6 +492,41 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
   border: 1px solid #d1d5db;
 }
 .btn-publish.live-state:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+/* ── Paleta de bloques en cuadrícula ── */
+.block-palette {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.block-palette-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 6px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  text-align: center;
+  user-select: none;
+}
+.block-palette-item:hover {
+  border-color: var(--primary);
+  background: #eff6ff;
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+.block-palette-item .bpi-icon {
+  font-size: 20px;
+  line-height: 1;
+}
 
 /* ── Trigger Picker Modal ── */
 .tpicker-card {
