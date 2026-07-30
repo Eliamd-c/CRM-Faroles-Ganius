@@ -3,44 +3,73 @@
     {
       "id": "flow_welcome",
       "name": "Mensaje de Bienvenida",
-      "keywords": ["hola", "buenas", "saludos", "buenos dias", "buenas tardes", "buenas noches"],
+      "keywords": [
+        "hola",
+        "buenas",
+        "saludos",
+        "buenos dias",
+        "buenas tardes",
+        "buenas noches"
+      ],
       "matchType": "contains",
       "steps": [
         {
           "type": "text",
           "message": "¡Hola, {username}! 👋 Bienvenido a Faroles Genius. ¿En qué podemos ayudarte hoy?"
         }
-      ]
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.511Z",
+      "updatedAt": "2026-07-30T02:42:30.036Z"
     },
     {
       "id": "flow_price",
       "name": "Información de Precios",
-      "keywords": ["precio", "cuanto vale", "cuanto cuesta", "valor", "costo"],
+      "keywords": [
+        "precio",
+        "cuanto vale",
+        "cuanto cuesta",
+        "valor",
+        "costo"
+      ],
       "matchType": "contains",
       "steps": [
         {
           "type": "text",
           "message": "¡Claro que sí! 💰 Nuestros faroles tienen diferentes precios según el tamaño y el estilo. ¿Estás buscando algo para interior o exterior?"
         }
-      ]
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
     },
     {
       "id": "flow_info",
       "name": "Información General",
-      "keywords": ["info", "informacion", "ubicacion", "donde estan", "direccion"],
+      "keywords": [
+        "info",
+        "informacion",
+        "ubicacion",
+        "donde estan",
+        "direccion"
+      ],
       "matchType": "contains",
       "steps": [
         {
           "type": "text",
           "message": "📍 Nos especializamos en la fabricación de faroles artesanales de alta calidad. Hacemos envíos a todo el país. ¿Te gustaría ver nuestro catálogo?"
         }
-      ]
-    }
-    ,
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
     {
       "id": "flow_prueba",
       "name": "Flujo de Prueba Completo",
-      "keywords": ["prueba"],
+      "keywords": [
+        "prueba"
+      ],
       "matchType": "exact",
       "steps": [
         {
@@ -59,9 +88,21 @@
           "type": "template",
           "message": "Paso 3: Elige una opción con botones:",
           "buttons": [
-            { "type": "postback", "title": "Opción A", "payload": "PRUEBA_OPCION_A" },
-            { "type": "postback", "title": "Opción B", "payload": "PRUEBA_OPCION_B" },
-            { "type": "web_url", "title": "Visitar web", "url": "https://faroles-genius.com" }
+            {
+              "type": "postback",
+              "title": "Opción A",
+              "payload": "PRUEBA_OPCION_A"
+            },
+            {
+              "type": "postback",
+              "title": "Opción B",
+              "payload": "PRUEBA_OPCION_B"
+            },
+            {
+              "type": "web_url",
+              "title": "Visitar web",
+              "url": "https://faroles-genius.com"
+            }
           ]
         },
         {
@@ -72,7 +113,11 @@
               "subtitle": "Descripción del primer producto de ejemplo",
               "image_url": "https://picsum.photos/400/300?random=1",
               "buttons": [
-                { "type": "postback", "title": "Ver más", "payload": "PRUEBA_PROD_1" }
+                {
+                  "type": "postback",
+                  "title": "Ver más",
+                  "payload": "PRUEBA_PROD_1"
+                }
               ]
             },
             {
@@ -80,7 +125,11 @@
               "subtitle": "Descripción del segundo producto de ejemplo",
               "image_url": "https://picsum.photos/400/300?random=2",
               "buttons": [
-                { "type": "postback", "title": "Ver más", "payload": "PRUEBA_PROD_2" }
+                {
+                  "type": "postback",
+                  "title": "Ver más",
+                  "payload": "PRUEBA_PROD_2"
+                }
               ]
             },
             {
@@ -88,7 +137,11 @@
               "subtitle": "Descripción del tercer producto de ejemplo",
               "image_url": "https://picsum.photos/400/300?random=3",
               "buttons": [
-                { "type": "postback", "title": "Ver más", "payload": "PRUEBA_PROD_3" }
+                {
+                  "type": "postback",
+                  "title": "Ver más",
+                  "payload": "PRUEBA_PROD_3"
+                }
               ]
             }
           ]
@@ -101,26 +154,51 @@
           "type": "text",
           "message": "Paso 5: Prueba completada. Todos los bloques funcionaron correctamente."
         }
-      ]
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
     },
     {
       "id": "flow_PRUEBA_OPCION_A",
       "name": "Ruta Opción A",
-      "keywords": ["PRUEBA_OPCION_A"],
+      "keywords": [
+        "PRUEBA_OPCION_A"
+      ],
       "matchType": "exact",
       "steps": [
-        { "type": "text", "message": "Elegiste la Opción A. Este es un sub-flujo activado por postback." },
-        { "type": "action", "actionType": "add_tag", "params": { "tag": "prueba_opcion_a" } },
-        { "type": "text", "message": "Se te asignó la etiqueta 'prueba_opcion_a'." }
-      ]
+        {
+          "type": "text",
+          "message": "Elegiste la Opción A. Este es un sub-flujo activado por postback."
+        },
+        {
+          "type": "action",
+          "actionType": "add_tag",
+          "params": {
+            "tag": "prueba_opcion_a"
+          }
+        },
+        {
+          "type": "text",
+          "message": "Se te asignó la etiqueta 'prueba_opcion_a'."
+        }
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
     },
     {
       "id": "flow_PRUEBA_OPCION_B",
       "name": "Ruta Opción B",
-      "keywords": ["PRUEBA_OPCION_B"],
+      "keywords": [
+        "PRUEBA_OPCION_B"
+      ],
       "matchType": "exact",
       "steps": [
-        { "type": "text", "message": "Elegiste la Opción B. Ahora te pediremos un dato." },
+        {
+          "type": "text",
+          "message": "Elegiste la Opción B. Ahora te pediremos un dato."
+        },
         {
           "type": "input",
           "inputType": "email",
@@ -130,25 +208,44 @@
           "successPayload": "PRUEBA_INPUT_OK",
           "failPayload": "PRUEBA_INPUT_FAIL"
         }
-      ]
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
     },
     {
       "id": "flow_PRUEBA_INPUT_OK",
       "name": "Input Prueba OK",
-      "keywords": ["PRUEBA_INPUT_OK"],
+      "keywords": [
+        "PRUEBA_INPUT_OK"
+      ],
       "matchType": "exact",
       "steps": [
-        { "type": "text", "message": "Email capturado correctamente. Dato guardado en campo 'email_prueba'." }
-      ]
+        {
+          "type": "text",
+          "message": "Email capturado correctamente. Dato guardado en campo 'email_prueba'."
+        }
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
     },
     {
       "id": "flow_PRUEBA_INPUT_FAIL",
       "name": "Input Prueba Fallo",
-      "keywords": ["PRUEBA_INPUT_FAIL"],
+      "keywords": [
+        "PRUEBA_INPUT_FAIL"
+      ],
       "matchType": "exact",
       "steps": [
-        { "type": "text", "message": "No se pudo capturar el email después de 3 intentos. No te preocupes, puedes intentarlo más tarde." }
-      ]
+        {
+          "type": "text",
+          "message": "No se pudo capturar el email después de 3 intentos. No te preocupes, puedes intentarlo más tarde."
+        }
+      ],
+      "enabled": true,
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
     }
   ],
   "defaultFlow": {

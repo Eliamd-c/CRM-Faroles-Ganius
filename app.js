@@ -15,8 +15,25 @@ try {
   const rawData = fs.readFileSync(path.join(__dirname, 'flows.json'));
   flowsConfig = JSON.parse(rawData);
   console.log('✅ Flujos cargados correctamente.');
+  let migrated = false;
+  for (const flow of (flowsConfig.flows || [])) {
+    if (flow.enabled === undefined) { flow.enabled = true; migrated = true; }
+    if (!flow.createdAt) { flow.createdAt = new Date().toISOString(); migrated = true; }
+    if (!flow.updatedAt) { flow.updatedAt = new Date().toISOString(); migrated = true; }
+  }
+  if (migrated) {
+    fs.writeFileSync(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    console.log('✅ flows.json migrado: campos enabled/createdAt/updatedAt añadidos');
+  }
 } catch (err) {
   console.error('❌ Error al cargar flows.json', err);
+}
+
+async function saveFlowsConfig() {
+  await fs.promises.writeFile(
+    path.join(__dirname, 'flows.json'),
+    JSON.stringify(flowsConfig, null, 2)
+  );
 }
 
 const app = express();
@@ -219,6 +236,65 @@ app.post('/api/flows', async (req, res) => {
   }
 });
 
+// Obtener un flujo por ID
+app.get('/api/flows/:id', (req, res) => {
+  const flow = flowsConfig.flows.find(f => f.id === req.params.id);
+  if (!flow) return res.status(404).json({ error: 'Flow not found' });
+  res.json(flow);
+});
+
+// Actualizar campos de un flujo
+app.patch('/api/flows/:id', async (req, res) => {
+  try {
+    const idx = flowsConfig.flows.findIndex(f => f.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Flow not found' });
+    const allowed = ['name', 'enabled', 'keywords', 'matchType', 'steps'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) flowsConfig.flows[idx][key] = req.body[key];
+    }
+    flowsConfig.flows[idx].updatedAt = new Date().toISOString();
+    await saveFlowsConfig();
+    res.json(flowsConfig.flows[idx]);
+  } catch (err) {
+    console.error('Error updating flow:', err);
+    res.status(500).json({ error: 'Failed to update flow' });
+  }
+});
+
+// Eliminar un flujo
+app.delete('/api/flows/:id', async (req, res) => {
+  try {
+    const idx = flowsConfig.flows.findIndex(f => f.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Flow not found' });
+    flowsConfig.flows.splice(idx, 1);
+    await saveFlowsConfig();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting flow:', err);
+    res.status(500).json({ error: 'Failed to delete flow' });
+  }
+});
+
+// Duplicar un flujo
+app.post('/api/flows/:id/duplicate', async (req, res) => {
+  try {
+    const original = flowsConfig.flows.find(f => f.id === req.params.id);
+    if (!original) return res.status(404).json({ error: 'Flow not found' });
+    const clone = JSON.parse(JSON.stringify(original));
+    clone.id = 'flow_' + Date.now();
+    clone.name = (original.name || 'Flow') + ' (Copia)';
+    clone.enabled = false;
+    clone.createdAt = new Date().toISOString();
+    clone.updatedAt = new Date().toISOString();
+    flowsConfig.flows.push(clone);
+    await saveFlowsConfig();
+    res.json(clone);
+  } catch (err) {
+    console.error('Error duplicating flow:', err);
+    res.status(500).json({ error: 'Failed to duplicate flow' });
+  }
+});
+
 // Subir archivos (imágenes, audio, video, PDF)
 app.post('/api/upload', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
@@ -382,6 +458,7 @@ async function handleMessage(event) {
   let matchedFlow = null;
 
   for (const flow of flowsConfig.flows) {
+    if (flow.enabled === false) continue;
     if (!flow.keywords || flow.keywords.length === 0) continue;
     const matchType = flow.matchType || 'contains';
 

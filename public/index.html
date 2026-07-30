@@ -173,11 +173,31 @@
             border: 1px dashed var(--border-color);
             border-radius: 12px;
         }
+        .header-left { display: flex; align-items: center; gap: 24px; }
+        .nav-bar { display: flex; gap: 4px; }
+        .nav-bar a {
+            padding: 6px 14px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        .nav-bar a:hover { background: rgba(255,255,255,0.08); color: var(--text-main); }
+        .nav-bar a.active { background: rgba(138, 43, 226, 0.15); color: #b175ff; }
     </style>
 </head>
 <body>
     <header>
-        <h1>🤖 CRM 2.0 Monitor</h1>
+        <div class="header-left">
+            <h1>🤖 CRM 2.0 Monitor</h1>
+            <nav class="nav-bar">
+                <a href="/" class="active">Monitor</a>
+                <a href="/automations.html">Automatizaciones</a>
+                <a href="/builder.html">Builder</a>
+            </nav>
+        </div>
         <div class="status-badge">
             <div class="pulse"></div>
             Escuchando a Instagram API

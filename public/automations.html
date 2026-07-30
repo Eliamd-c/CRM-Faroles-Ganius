@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automatizaciones - Faroles Genius</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="automations.css?v=1">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <div class="logo">Faroles Genius <span>CRM</span></div>
+            <nav class="nav-bar">
+                <a href="/">Monitor</a>
+                <a href="/automations.html" class="active">Automatizaciones</a>
+                <a href="/builder.html">Builder</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="page-content">
+        <div class="page-header">
+            <h1>Mis Automatizaciones <span class="flow-count" id="flow-count"></span></h1>
+            <button class="btn-primary" onclick="window.location='/builder.html?new=1'">+ Nueva Automatizacion</button>
+        </div>
+
+        <div class="flows-table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Estado</th>
+                        <th>Palabras Clave</th>
+                        <th>Pasos</th>
+                        <th>Modificado</th>
+                        <th style="text-align:right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="flows-body">
+                </tbody>
+            </table>
+            <div class="empty-state" id="empty-state" style="display:none">
+                <div class="icon">⚡</div>
+                <h3>No hay automatizaciones</h3>
+                <p>Crea tu primera automatizacion desde el Builder</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal">
+            <h3>Eliminar automatizacion</h3>
+            <p>Estas seguro de que quieres eliminar <strong id="delete-flow-name"></strong>? Esta accion no se puede deshacer.</p>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+                <button class="btn-danger" id="btn-confirm-delete">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="automations.js?v=1"></script>
+</body>
+</html>

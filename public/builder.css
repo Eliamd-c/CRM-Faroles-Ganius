@@ -362,3 +362,18 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
   margin-bottom: 2px;
 }
 .ctx-item:hover { background-color: #f0f2f5 !important; }
+
+/* ── Navigation ── */
+.header-left { display: flex; align-items: center; gap: 24px; }
+.nav-bar { display: flex; gap: 4px; }
+.nav-bar a {
+  padding: 6px 14px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.nav-bar a:hover { background: #f3f4f6; color: var(--text-main); }
+.nav-bar a.active { background: #eff6ff; color: var(--primary); }
