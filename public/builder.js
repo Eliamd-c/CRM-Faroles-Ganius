@@ -203,8 +203,8 @@ function renderInputNode(nodeId) {
 // Definición de Nodos HTML
 // ─────────────────────────────────────────────
 const htmlTrigger = `
-  <div class="node-trigger">
-    <div class="title-box"><span>⚡</span> Cuando...</div>
+  <div class="mc-node mc-trigger">
+    <div class="mc-header"><span>⚡</span> Cuando...</div>
     <div class="box trigger-node-preview">
       <div style="border: 2px dashed #0084ff; border-radius: 8px; padding: 12px; text-align: center; color: #0084ff; font-weight: 600; font-size: 14px; cursor: pointer;">
         + Elegir disparador
@@ -215,8 +215,8 @@ const htmlTrigger = `
 
 // Nodo Legacy de Tarjeta (para compatibilidad)
 const htmlCard = `
-  <div class="node-card">
-    <div class="title-box">🖼️ Tarjeta (Legacy)</div>
+  <div class="mc-node mc-content">
+    <div class="mc-header"><span>🖼️</span> Tarjeta (Legacy)</div>
     <div class="box">
       <p style="font-size:11px; color:#888;">Nodo antiguo, por favor usa el Inspector.</p>
     </div>
@@ -224,8 +224,8 @@ const htmlCard = `
 `;
 
 const htmlCondition = `
-  <div class="node-condition">
-    <div class="title-box"><span>🔀</span> Condition</div>
+  <div class="mc-node mc-logic">
+    <div class="mc-header"><span>🔀</span> Condition</div>
     <div class="box condition-node-preview">
       <em style="color:#8492a6; font-size:11px;">Configura en el panel...</em>
     </div>
@@ -233,8 +233,8 @@ const htmlCondition = `
 `;
 
 const htmlRandomizer = `
-  <div class="node-randomizer">
-    <div class="title-box"><span>🎲</span> Randomizer</div>
+  <div class="mc-node mc-logic">
+    <div class="mc-header"><span>🎲</span> Randomizer</div>
     <div class="box randomizer-node-preview">
       <em style="color:#8492a6; font-size:11px;">Configura salidas en el panel...</em>
     </div>
@@ -242,8 +242,8 @@ const htmlRandomizer = `
 `;
 
 const htmlAction = `
-  <div class="node-action">
-    <div class="title-box"><span>⚡</span> Action</div>
+  <div class="mc-node mc-action">
+    <div class="mc-header"><span>⚡</span> Action</div>
     <div class="box action-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin configurar</em>
     </div>
@@ -251,8 +251,8 @@ const htmlAction = `
 `;
 
 const htmlInput = `
-  <div class="node-input">
-    <div class="title-box"><span>📥</span> User Input</div>
+  <div class="mc-node mc-action">
+    <div class="mc-header"><span>📥</span> User Input</div>
     <div class="box input-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin configurar</em>
     </div>
@@ -260,8 +260,8 @@ const htmlInput = `
 `;
 
 const htmlCarousel = `
-  <div class="node-carousel">
-    <div class="title-box"><span>🖼️</span> Carrusel</div>
+  <div class="mc-node mc-content">
+    <div class="mc-header"><span>🖼️</span> Carrusel</div>
     <div class="box carousel-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin tarjetas configuradas</em>
     </div>
@@ -269,8 +269,8 @@ const htmlCarousel = `
 `;
 
 const htmlGallery = `
-  <div class="node-gallery">
-    <div class="title-box"><span>📸</span> Galería</div>
+  <div class="mc-node mc-content">
+    <div class="mc-header"><span>📸</span> Galería</div>
     <div class="box gallery-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin imágenes</em>
     </div>
@@ -278,8 +278,8 @@ const htmlGallery = `
 `;
 
 const htmlAudio = `
-  <div class="node-audio">
-    <div class="title-box"><span>🎵</span> Audio</div>
+  <div class="mc-node mc-content">
+    <div class="mc-header"><span>🎵</span> Audio</div>
     <div class="box audio-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin audio configurado</em>
     </div>
@@ -287,8 +287,8 @@ const htmlAudio = `
 `;
 
 const htmlVideo = `
-  <div class="node-video">
-    <div class="title-box"><span>🎥</span> Video</div>
+  <div class="mc-node mc-content">
+    <div class="mc-header"><span>🎥</span> Video</div>
     <div class="box video-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin video configurado</em>
     </div>
@@ -296,8 +296,8 @@ const htmlVideo = `
 `;
 
 const htmlFile = `
-  <div class="node-file">
-    <div class="title-box"><span>📄</span> Archivo / PDF</div>
+  <div class="mc-node mc-content">
+    <div class="mc-header"><span>📄</span> Archivo / PDF</div>
     <div class="box file-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin archivo configurado</em>
     </div>
@@ -305,8 +305,8 @@ const htmlFile = `
 `;
 
 const htmlDelay = `
-  <div class="node-delay">
-    <div class="title-box"><span>⏱</span> Espera</div>
+  <div class="mc-node mc-action">
+    <div class="mc-header"><span>⏱</span> Espera</div>
     <div class="box delay-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin duración</em>
     </div>
@@ -314,8 +314,8 @@ const htmlDelay = `
 `;
 
 const htmlGoto = `
-  <div class="node-goto">
-    <div class="title-box"><span>↗️</span> Goto / Saltar</div>
+  <div class="mc-node mc-logic">
+    <div class="mc-header"><span>↗️</span> Goto / Saltar</div>
     <div class="box goto-node-preview">
       <em style="color:#8492a6; font-size:11px;">Sin destino</em>
     </div>
@@ -339,7 +339,7 @@ editor.registerNode('goto', htmlGoto);
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
 // ─────────────────────────────────────────────
 function addMessageNode(posX, posY) {
-  const tempHtml = `<div class="node-message"><div class="title-box"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
+  const tempHtml = `<div class="mc-node mc-content"><div class="mc-header"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
   const nodeId = editor.addNode('message', 1, 10, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
   
   nodeBlocksState[nodeId] = [
@@ -1300,7 +1300,7 @@ document.getElementById('btn-publish')?.addEventListener('click', async () => {
 // Cargar flujo desde backend (reverse converter)
 // ─────────────────────────────────────────────
 function createMessageNodeFromStep(posX, posY, step) {
-  const tempHtml = `<div class="node-message"><div class="title-box"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
+  const tempHtml = `<div class="mc-node mc-content"><div class="mc-header"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
   const nodeId = editor.addNode('message', 1, 10, posX, posY, 'message', { _blocks: '[]' }, tempHtml);
 
   if (step.type === 'text') {

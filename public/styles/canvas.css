@@ -18,126 +18,76 @@
   background-size: 22px 22px;
 }
 
-/* ── Node Base ── */
+/* ── Node Base (ManyChat Style) ── */
 .drawflow-node {
-  background: var(--color-surface) !important;
-  border: 1.5px solid var(--color-border) !important;
-  border-radius: var(--radius-lg) !important;
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
   color: var(--color-text);
-  width: 268px !important;
-  min-width: 268px !important;
+  width: 250px !important;
+  min-width: 250px !important;
   height: auto !important;
   min-height: unset !important;
-  box-shadow: var(--shadow-node) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
   padding: 0 !important;
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
-  overflow: visible !important;
+  overflow: hidden !important; /* To respect border-radius with header */
 }
 
 .drawflow-node:hover {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-2px);
 }
 
 .drawflow-node.selected {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-node) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), 0 8px 16px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* ── Node title floating above ── */
-.drawflow-node .title-box {
-  position: absolute !important;
-  top: -26px !important;
-  left: 0 !important;
-  background: transparent !important;
-  color: var(--color-text) !important;
-  padding: 0 4px !important;
-  font-weight: var(--font-semibold) !important;
-  font-size: var(--font-size-sm) !important;
-  letter-spacing: 0.2px;
+/* ── ManyChat Node Structure ── */
+.mc-node {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface);
+}
+
+/* ── Headers ── */
+.mc-header {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: var(--spacing-1);
-  border: none !important;
-  border-bottom: none !important;
-  white-space: nowrap;
+  gap: 8px;
+  color: white;
 }
 
-.drawflow-node .title-box span {
-  font-size: 16px !important;
+.mc-header span {
+  font-size: 16px; /* Icon size */
 }
 
-/* ── Inner box ── */
+/* ── Colors by Type ── */
+/* Trigger: Red */
+.mc-trigger .mc-header { background: #E63946; }
+/* Content: Blue */
+.mc-content .mc-header { background: #457B9D; }
+/* Action: Teal/Green */
+.mc-action .mc-header { background: #2A9D8F; }
+/* Logic: Orange */
+.mc-logic .mc-header { background: #F77F00; }
+
+/* ── Body ── */
 .drawflow-node .box {
-  padding: var(--spacing-3) var(--spacing-3) !important;
+  padding: 12px !important;
   background: var(--color-surface) !important;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  gap: 8px;
   height: auto !important;
   min-height: unset !important;
-  border-radius: var(--radius-lg) !important;
 }
-
-/* ── Node color strips (left border by type) ── */
-.drawflow-node.trigger {
-  border-left: 3px solid var(--color-node-trigger-border) !important;
-}
-
-.drawflow-node.message {
-  border-left: 3px solid var(--color-node-message-border) !important;
-}
-
-.drawflow-node.action {
-  border-left: 3px solid var(--color-node-action-border) !important;
-}
-
-.drawflow-node.condition {
-  border-left: 3px solid var(--color-node-condition-border) !important;
-}
-
-.drawflow-node.input {
-  border-left: 3px solid var(--color-node-input-border) !important;
-}
-
-.drawflow-node.delay {
-  border-left: 3px solid var(--color-node-delay-border) !important;
-}
-
-.drawflow-node.goto {
-  border-left: 3px solid var(--color-node-goto-border) !important;
-}
-
-.drawflow-node.carousel {
-  border-left: 3px solid var(--color-node-carousel-border) !important;
-}
-
-.drawflow-node.randomizer {
-  border-left: 3px solid var(--color-node-randomizer-border) !important;
-}
-
-/* ── Node type header pill ── */
-.node-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-1);
-  font-size: 10px;
-  font-weight: var(--font-bold);
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  margin-bottom: var(--spacing-2);
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-}
-
-.trigger  .node-type-badge { background: var(--color-node-trigger-bg); color: var(--color-node-trigger-text); }
-.message  .node-type-badge { background: var(--color-node-message-bg); color: var(--color-node-message-text); }
-.action   .node-type-badge { background: var(--color-node-action-bg);  color: var(--color-node-action-text);  }
-.condition .node-type-badge { background: var(--color-node-condition-bg); color: var(--color-node-condition-text); }
-.input    .node-type-badge { background: var(--color-node-input-bg);   color: var(--color-node-input-text);   }
-.delay    .node-type-badge { background: var(--color-node-delay-bg);   color: var(--color-node-delay-text);   }
-.goto     .node-type-badge { background: var(--color-node-goto-bg);    color: var(--color-node-goto-text);    }
-.randomizer .node-type-badge { background: var(--color-node-randomizer-bg); color: var(--color-node-randomizer-text); }
-.carousel .node-type-badge { background: var(--color-node-carousel-bg); color: var(--color-node-carousel-text); }
 
 /* ── Content blocks ── */
 .nd-text-block {
@@ -414,4 +364,17 @@
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+/* ── Connections (ManyChat Style) ── */
+.connection .main-path {
+  stroke: #B8BCC5 !important;
+  stroke-width: 3px !important;
+  transition: stroke 0.2s, stroke-width 0.2s;
+}
+
+.connection .main-path:hover,
+.connection.selected .main-path {
+  stroke: var(--color-primary) !important;
+  stroke-width: 4px !important;
 }
