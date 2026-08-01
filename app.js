@@ -3,9 +3,10 @@
 
 require('dotenv').config();
 const express = require('express');
-const axios = require('axios');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const axios = require('axios');
 const multer = require('multer');
 const supabase = require('./db');
 
@@ -140,8 +141,38 @@ const AI_TOOLS = [
 
 const app = express();
 app.set('trust proxy', true);
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ─────────────────────────────────────────────
+// Middleware de Autenticación de API
+// ─────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  // Ignorar autenticación en el webhook de instagram
+  if (req.path === '/webhook' || req.path === '/chat-init') return next();
+  
+  // El token estático se lee del entorno o se usa uno por defecto en desarrollo
+  const validToken = process.env.API_SECRET || 'farolesgenius_dev_secret';
+  
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Falta Token de Autorización' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  if (token !== validToken) {
+    return res.status(403).json({ error: 'Token Inválido' });
+  }
+  
+  next();
+}
+
+// Proteger todas las rutas /api/
+app.use('/api', requireAuth);
 
 // Configuración de Multer (Subida de Archivos)
 const ALLOWED_MIME_TYPES = {
@@ -283,6 +314,23 @@ app.get('/webhook', (req, res) => {
 // POST /webhook  — Recepción de eventos en tiempo real
 // ─────────────────────────────────────────────
 app.post('/webhook', async (req, res) => {
+  // Verificación de Firma (Seguridad)
+  const signature = req.headers['x-hub-signature-256'];
+  const appSecret = process.env.META_APP_SECRET;
+  
+  if (appSecret && signature) {
+    const expectedSignature = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
+    if (signature !== expectedSignature) {
+      console.warn('❌ Firma de webhook inválida');
+      return res.status(403).send('Invalid signature');
+    }
+  } else if (!appSecret) {
+    console.warn('⚠️ META_APP_SECRET no configurado, omitiendo validación de firma.');
+  } else if (!signature) {
+    console.warn('❌ Petición sin firma X-Hub-Signature-256');
+    return res.status(403).send('Missing signature');
+  }
+
   // Responder 200 inmediatamente para que Meta no reintente
   res.sendStatus(200);
 
@@ -445,17 +493,20 @@ app.post('/api/upload', (req, res, next) => {
 // ─────────────────────────────────────────────
 const aiRateLimits = new Map();
 const MAX_AI_CALLS_PER_HOUR = 10;
-setInterval(() => aiRateLimits.clear(), 3600000); // Limpiar caché cada hora
+// setInterval(() => aiRateLimits.clear(), 3600000); eliminado
 function checkAiRateLimit(key) {
   if (!key) return true;
   const now = Date.now();
-  let data = aiRateLimits.get(key);
-  if (!data || (now - data.timestamp) > 3600000) {
-    data = { count: 0, timestamp: now };
+  let timestamps = aiRateLimits.get(key) || [];
+  // Limpiar timestamps más antiguos de 1 hora
+  timestamps = timestamps.filter(ts => now - ts < 3600000);
+  
+  if (timestamps.length >= MAX_AI_CALLS_PER_HOUR) {
+    aiRateLimits.set(key, timestamps); // Guardar el array limpio
+    return false;
   }
-  if (data.count >= MAX_AI_CALLS_PER_HOUR) return false;
-  data.count++;
-  aiRateLimits.set(key, data);
+  timestamps.push(now);
+  aiRateLimits.set(key, timestamps);
   return true;
 }
 
@@ -936,12 +987,34 @@ async function handleMessage(event) {
             }
           }
           
+          // SEGUNDA LLAMADA A OPENAI para respuesta final
+          const secondResponse = await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+              model: 'gpt-4o',
+              messages: [{ role: 'system', content: systemPrompt }, ...history],
+              temperature: 0.7,
+              max_tokens: 500
+            },
+            { 
+              headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+              timeout: 15000
+            }
+          );
+          
+          const finalChoice = secondResponse?.data?.choices?.[0];
+          if (finalChoice && finalChoice.message?.content) {
+            const finalReply = finalChoice.message.content.trim();
+            history.push({ role: 'assistant', content: finalReply });
+            await sendMessage(senderId, finalReply);
+          }
+
           if (history.length > 15) history = history.slice(history.length - 15);
           await supabase.from('customers').update({
             fields: { ...customer.fields, ai_history: history }
           }).eq('instagram_id', senderId);
           
-          broadcastLog('SYSTEM', `Agente IA usó herramientas para ${senderName} (${Date.now() - aiStartTime}ms)`);
+          broadcastLog('SYSTEM', `Agente IA usó herramientas y respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
         } else {
           // Texto normal
           const aiReply = choice.message.content?.trim();
@@ -1064,8 +1137,9 @@ async function handleMessage(event) {
       });
       if (match) { matchedFlow = flow; break; }
     } else if (matchType === 'regex') {
-      const match = flow.keywords.find(kw => {
-        try { return new RegExp(kw, 'i').test(text); } catch (e) { return false; }
+      const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = flow.keywords.some(kw => {
+        try { return new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'i').test(text); } catch (e) { return false; }
       });
       if (match) { matchedFlow = flow; break; }
     }
@@ -2041,7 +2115,7 @@ app.patch('/api/contacts/:id', async (req, res) => {
 app.get('/api/contacts-export', async (req, res) => {
   if (!supabase) return res.status(500).json({ error: 'No DB' });
   try {
-    const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+    const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false }).limit(10000);
     if (!data || data.length === 0) return res.status(404).json({ error: 'Sin contactos' });
     const headers = ['instagram_id', 'name', 'tags', 'status', 'bot_paused', 'bot_state', 'fields', 'created_at', 'updated_at'];
     const csvRows = [headers.join(',')];
