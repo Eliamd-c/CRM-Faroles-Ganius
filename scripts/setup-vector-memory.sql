@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS learned_responses (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE OR REPLACE FUNCTION match_knowledge(
+DROP FUNCTION IF EXISTS match_knowledge(vector, double precision, integer);
+
+CREATE FUNCTION match_knowledge(
   query_embedding VECTOR(1536),
   match_threshold FLOAT,
   match_count INT
@@ -53,7 +55,9 @@ AS $$
   LIMIT match_count;
 $$;
 
-CREATE OR REPLACE FUNCTION match_learned_responses(
+DROP FUNCTION IF EXISTS match_learned_responses(vector, double precision, integer);
+
+CREATE FUNCTION match_learned_responses(
   query_embedding VECTOR(1536),
   match_threshold FLOAT,
   match_count INT
