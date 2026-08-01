@@ -265,7 +265,8 @@
         }
 
         // Connect to SSE stream
-        const evtSource = new EventSource("/stream");
+        const evtSourceToken = localStorage.getItem('API_SECRET') || '';
+        const evtSource = new EventSource("/stream?token=" + encodeURIComponent(evtSourceToken));
 
         evtSource.onmessage = (event) => {
             const data = JSON.parse(event.data);

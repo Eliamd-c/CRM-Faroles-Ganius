@@ -266,6 +266,11 @@ if (!BOT_USERNAME) {
 // GET /stream  — Server-Sent Events para el Dashboard UI
 // ─────────────────────────────────────────────
 app.get('/stream', (req, res) => {
+  // EventSource no permite headers personalizados, el token viaja por query string
+  if (req.query.token !== process.env.API_SECRET) {
+    return res.status(403).json({ error: 'Token inválido' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -2127,7 +2132,11 @@ app.get('/api/contacts/:id', async (req, res) => {
 app.patch('/api/contacts/:id', async (req, res) => {
   if (!supabase) return res.status(500).json({ error: 'No DB' });
   try {
-    const updates = req.body;
+    const allowedFields = ['name', 'tags', 'status', 'fields', 'bot_paused'];
+    const updates = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
     updates.updated_at = new Date().toISOString();
     const { data, error } = await supabase.from('customers').update(updates).eq('instagram_id', req.params.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
