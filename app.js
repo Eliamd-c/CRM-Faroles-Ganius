@@ -65,7 +65,7 @@ async function retrieveRelevantContext(query) {
     const embedRes = await axios.post(
       'https://api.openai.com/v1/embeddings',
       { input: query, model: 'text-embedding-3-small' },
-      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }, timeout: 15000 }
     );
     const queryEmbedding = embedRes.data.data[0].embedding;
     
@@ -658,7 +658,7 @@ app.post('/api/ai/learn', express.json(), async (req, res) => {
     const embedRes = await axios.post(
       'https://api.openai.com/v1/embeddings',
       { input: question, model: 'text-embedding-3-small' },
-      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }, timeout: 15000 }
     );
     const queryEmbedding = embedRes.data.data[0].embedding;
     
@@ -950,7 +950,8 @@ async function handleMessage(event) {
         if (choice.finish_reason === 'tool_calls') {
           // FASE 5: Procesar las llamadas a herramientas
           history.push(choice.message); // Añadir el tool_call al historial
-          
+          let escalatedToHuman = false;
+
           for (const toolCall of choice.message.tool_calls) {
             const args = JSON.parse(toolCall.function.arguments);
             
@@ -981,10 +982,11 @@ async function handleMessage(event) {
                 // Podríamos hacer una segunda llamada a OpenAI aquí para que se disculpe
               }
             } else if (toolCall.function.name === 'escalate_to_human') {
+              escalatedToHuman = true;
               await supabase.from('customers').update({ bot_state: 'paused' }).eq('instagram_id', senderId);
               await sendMessage(senderId, "Perfecto, voy a pasarte con alguien de nuestro equipo para confirmar detalles... 🕯️");
               broadcastLog('ESCALATION', `${senderName}: ${args.reason}`);
-              
+
               history.push({
                 role: 'tool',
                 tool_call_id: toolCall.id,
@@ -992,27 +994,30 @@ async function handleMessage(event) {
               });
             }
           }
-          
-          // SEGUNDA LLAMADA A OPENAI para respuesta final
-          const secondResponse = await axios.post(
-            'https://api.openai.com/v1/chat/completions',
-            {
-              model: 'gpt-4o',
-              messages: [{ role: 'system', content: systemPrompt }, ...history],
-              temperature: 0.7,
-              max_tokens: 500
-            },
-            { 
-              headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-              timeout: 15000
+
+          // SEGUNDA LLAMADA A OPENAI para respuesta final (se omite si ya se escaló a un humano,
+          // el mensaje fijo de escalate_to_human ya es suficiente y el bot quedó en pausa)
+          if (!escalatedToHuman) {
+            const secondResponse = await axios.post(
+              'https://api.openai.com/v1/chat/completions',
+              {
+                model: 'gpt-4o',
+                messages: [{ role: 'system', content: systemPrompt }, ...history],
+                temperature: 0.7,
+                max_tokens: 500
+              },
+              {
+                headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+                timeout: 15000
+              }
+            );
+
+            const finalChoice = secondResponse?.data?.choices?.[0];
+            if (finalChoice && finalChoice.message?.content) {
+              const finalReply = finalChoice.message.content.trim();
+              history.push({ role: 'assistant', content: finalReply });
+              await sendMessage(senderId, finalReply);
             }
-          );
-          
-          const finalChoice = secondResponse?.data?.choices?.[0];
-          if (finalChoice && finalChoice.message?.content) {
-            const finalReply = finalChoice.message.content.trim();
-            history.push({ role: 'assistant', content: finalReply });
-            await sendMessage(senderId, finalReply);
           }
 
           if (history.length > 15) history = history.slice(history.length - 15);
