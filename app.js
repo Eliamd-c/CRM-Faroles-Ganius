@@ -621,6 +621,48 @@ app.post('/api/ai/learn', express.json(), async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// FASE 8: Endpoint de Analytics del Agente IA
+// ─────────────────────────────────────────────
+app.get('/api/ai/analytics', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { data, error } = await supabase
+      .from('ai_analytics')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1000);
+      
+    if (error) throw error;
+    
+    // Procesamiento básico
+    const totalRequests = data.length;
+    let totalPrompt = 0, totalCompletion = 0, totalCached = 0, totalLatency = 0, toolCalls = 0;
+    
+    data.forEach(r => {
+      totalPrompt += r.prompt_tokens;
+      totalCompletion += r.completion_tokens;
+      totalCached += r.cached_tokens;
+      totalLatency += r.latency_ms;
+      if (r.has_tool_call) toolCalls++;
+    });
+    
+    res.json({
+      total_requests: totalRequests,
+      avg_latency_ms: totalRequests ? Math.round(totalLatency / totalRequests) : 0,
+      total_prompt_tokens: totalPrompt,
+      total_completion_tokens: totalCompletion,
+      total_cached_tokens: totalCached,
+      saved_by_cache_percent: totalPrompt ? Math.round((totalCached / totalPrompt) * 100) : 0,
+      tool_calls: toolCalls,
+      recent_events: data.slice(0, 50)
+    });
+  } catch (err) {
+    console.error('Error obteniendo analytics:', err.message);
+    res.status(500).json({ error: 'Error al obtener métricas' });
+  }
+});
+
+// ─────────────────────────────────────────────
 // Obtener Perfil de Usuario
 // ─────────────────────────────────────────────
 async function getUserProfile(senderId) {
@@ -914,6 +956,21 @@ async function handleMessage(event) {
           
           await sendMessage(senderId, aiReply);
           broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
+        }
+
+        // FASE 8: Registrar métricas de Analytics
+        if (supabase) {
+          const latency_ms = Date.now() - aiStartTime;
+          supabase.from('ai_analytics').insert({
+            instagram_id: senderId,
+            prompt_tokens: usage?.prompt_tokens || 0,
+            completion_tokens: usage?.completion_tokens || 0,
+            cached_tokens: cachedTokens,
+            latency_ms: latency_ms,
+            has_tool_call: choice.finish_reason === 'tool_calls'
+          }).then(({ error }) => {
+            if (error) console.error('Error guardando analytics:', error.message);
+          });
         }
 
       } catch (err) {
