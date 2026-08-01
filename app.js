@@ -154,25 +154,20 @@ app.use(express.static(path.join(__dirname, 'public')));
 function requireAuth(req, res, next) {
   // Ignorar autenticación en el webhook de instagram
   if (req.path === '/webhook' || req.path === '/chat-init') return next();
-  
-  // El token estático se lee del entorno
+
+  // El token estático se lee del entorno (validado al arrancar)
   const validToken = process.env.API_SECRET;
-  
-  if (!validToken) {
-    console.error('FATAL: API_SECRET no configurada. El servidor se detendrá por seguridad.');
-    process.exit(1);
-  }
-  
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Falta Token de Autorización' });
   }
-  
+
   const token = authHeader.split(' ')[1];
   if (token !== validToken) {
     return res.status(403).json({ error: 'Token Inválido' });
   }
-  
+
   next();
 }
 
@@ -796,6 +791,9 @@ Si el mensaje del usuario tiene la misma intención o significado que la "Intenc
   return null;
 }
 
+// Utilidad: Quitar acentos de un texto
+const removeAccents = (str) => str.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 // ─────────────────────────────────────────────
 // Handler: Mensaje Directo (DM) y Postbacks
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/messages
@@ -1113,7 +1111,6 @@ async function handleMessage(event) {
   }
 
   // 5. Normalizar el texto (quitar mayúsculas y acentos) para Trigger regular
-  const removeAccents = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const normalizedText = removeAccents(text);
   const lowerText = normalizedText.toLowerCase();
   
@@ -1471,14 +1468,14 @@ async function handleComment(value) {
   broadcastLog('COMMENT', `@${fromName} comentó: "${text}"`);
 
   const commentTriggers = flowsConfig.commentTriggers || [];
-  const lowerText = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const lowerText = removeAccents(text).toLowerCase();
   let matched = null;
 
   for (const trigger of commentTriggers) {
     if (!trigger.keywords || trigger.keywords.length === 0) continue;
     const matchType = trigger.matchType || 'contains';
     const found = trigger.keywords.find(kw => {
-      const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const cleanKw = removeAccents(kw).toLowerCase();
       if (matchType === 'exact') return lowerText === cleanKw;
       if (matchType === 'starts_with') return lowerText.startsWith(cleanKw);
       return lowerText.includes(cleanKw);
@@ -2184,6 +2181,15 @@ app.use((err, req, res, next) => {
   console.error('[EXPRESS ERROR]', err.message);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
+
+// ─────────────────────────────────────────────
+// Validación de configuración crítica
+// ─────────────────────────────────────────────
+if (!process.env.API_SECRET) {
+  console.error('❌ FATAL: API_SECRET no está configurada.');
+  console.error('   Configura esta variable de entorno y reinicia el servidor.');
+  process.exit(1);
+}
 
 // ─────────────────────────────────────────────
 // Arranque del servidor
