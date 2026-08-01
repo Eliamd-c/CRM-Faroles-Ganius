@@ -32,6 +32,11 @@ CREATE POLICY "Service Role Full Access" ON sequence_subscriptions FOR ALL USING
 -- 4. Agregar columna ai_history si no existe (Fase 3)
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS ai_history JSONB DEFAULT '[]'::jsonb;
 
--- Nota: Si usas Supabase client en el frontend con el anon_key, 
+-- 5. Mover current_ai_prompt / ignore_master_context fuera del JSONB "fields"
+-- para que no colisionen con acciones de flujo tipo "set_field" (Fase 4)
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS current_ai_prompt TEXT DEFAULT '';
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS ignore_master_context BOOLEAN DEFAULT false;
+
+-- Nota: Si usas Supabase client en el frontend con el anon_key,
 -- el frontend ya no podrá leer directamente la DB (que es lo correcto y seguro).
 -- Todo debe pasar por el backend (app.js).

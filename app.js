@@ -891,8 +891,8 @@ async function handleMessage(event) {
       // FASE 2: Construir el system prompt con Contexto Maestro + override del nodo.
       // Estructura: [Contexto Maestro fijo] + [Instrucciones adicionales del nodo]
       // El contexto maestro va PRIMERO para aprovechar el Prompt Caching de OpenAI.
-      const nodePrompt = customer.fields?.current_ai_prompt || '';
-      const ignoreMaster = customer.fields?.ignore_master_context || false;
+      const nodePrompt = customer.current_ai_prompt || '';
+      const ignoreMaster = customer.ignore_master_context || false;
       
       let systemPrompt;
       if (ignoreMaster || !AI_MASTER_CONTEXT) {
@@ -1296,11 +1296,8 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
       if (supabase) {
         await supabase.from('customers').update({
           bot_state: 'ai_agent',
-          fields: { 
-            ...customer?.fields, 
-            current_ai_prompt: step.system_prompt || '',
-            ignore_master_context: step.ignore_master_context || false  // FASE 3
-          }
+          current_ai_prompt: step.system_prompt || '',
+          ignore_master_context: step.ignore_master_context || false  // FASE 3
         }).eq('instagram_id', senderId);
         broadcastLog('SYSTEM', `Agente IA activado para ${senderName}${step.ignore_master_context ? ' (modo standalone)' : ' (con Contexto Maestro)'}`);
       } else {
@@ -2093,8 +2090,12 @@ app.get('/api/contacts', async (req, res) => {
     const { search, tag, status, limit = 50, offset = 0 } = req.query;
     let query = supabase.from('customers').select('*');
     if (search) {
-      const safeSearch = search.replace(/[,%"]/g, '');
-      query = query.or(`name.ilike.%${safeSearch}%,instagram_id.ilike.%${safeSearch}%`);
+      // Allowlist estricto: solo letras, números, espacios y separadores comunes de nombres/usernames.
+      // Bloquea , ( ) % " que tienen significado especial en la sintaxis de filtros de PostgREST.
+      const safeSearch = search.replace(/[^a-zA-Z0-9À-ÿ\s._-]/g, '');
+      if (safeSearch) {
+        query = query.or(`name.ilike.%${safeSearch}%,instagram_id.ilike.%${safeSearch}%`);
+      }
     }
     if (tag) query = query.contains('tags', [tag]);
     if (status) query = query.eq('status', status);
