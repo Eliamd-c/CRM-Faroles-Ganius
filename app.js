@@ -37,6 +37,7 @@ async function saveFlowsConfig() {
 }
 
 const app = express();
+app.set('trust proxy', true);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -342,6 +343,7 @@ app.post('/api/upload', (req, res, next) => {
 // ─────────────────────────────────────────────
 const aiRateLimits = new Map();
 const MAX_AI_CALLS_PER_HOUR = 10;
+setInterval(() => aiRateLimits.clear(), 3600000); // Limpiar caché cada hora
 function checkAiRateLimit(key) {
   if (!key) return true;
   const now = Date.now();
@@ -619,45 +621,67 @@ async function handleMessage(event) {
 
   // 3.8 Máquina de Estados: Agente IA
   if (customer && customer.bot_state === 'ai_agent') {
-    if (!process.env.OPENAI_API_KEY) {
-      await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
+    const escapeWords = ['salir', 'menu', 'menú', 'humano', 'asesor', 'agente'];
+    const lowerTxt = text.trim().toLowerCase();
+    
+    if (escapeWords.includes(lowerTxt)) {
+      await supabase.from('customers').update({ bot_state: 'active' }).eq('instagram_id', senderId);
+      await sendMessage(senderId, "Saliendo del asistente IA...");
+      customer.bot_state = 'active'; 
+      // Continuar con el código para que dispare flujos normales si coincide
+    } else {
+      if (!process.env.OPENAI_API_KEY) {
+        await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
+        return;
+      }
+      if (!checkAiRateLimit(senderId)) {
+        await sendMessage(senderId, "⚠️ Has alcanzado el límite de consultas a la IA por ahora. Intenta más tarde.");
+        return;
+      }
+      
+      const systemPrompt = customer.fields?.current_ai_prompt || 'Eres un asistente útil.';
+      let history = customer.fields?.ai_history || [];
+      
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history,
+        { role: 'user', content: text }
+      ];
+      
+      try {
+        const response = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            model: 'gpt-4o',
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 300
+          },
+          { 
+            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            timeout: 15000
+          }
+        );
+        
+        const aiReply = response?.data?.choices?.[0]?.message?.content?.trim();
+        if (!aiReply) throw new Error('Respuesta vacía o incompleta de OpenAI');
+        
+        history.push({ role: 'user', content: text });
+        history.push({ role: 'assistant', content: aiReply });
+        if (history.length > 6) history = history.slice(history.length - 6);
+        
+        await supabase.from('customers').update({
+          fields: { ...customer.fields, ai_history: history }
+        }).eq('instagram_id', senderId);
+        
+        await sendMessage(senderId, aiReply);
+        broadcastLog('SYSTEM', `Agente IA respondió a ${senderName}`);
+      } catch (err) {
+        console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
+        await sendMessage(senderId, "Lo siento, tuve un problema procesando tu mensaje.");
+      }
       return;
     }
-    if (!checkAiRateLimit(senderId)) {
-      await sendMessage(senderId, "⚠️ Has alcanzado el límite de consultas a la IA por ahora. Intenta más tarde.");
-      return;
-    }
-    
-    const systemPrompt = customer.fields?.current_ai_prompt || 'Eres un asistente útil.';
-    
-    try {
-      const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: text }
-          ],
-          temperature: 0.7,
-          max_tokens: 300
-        },
-        { 
-          headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          timeout: 15000
-        }
-      );
-      
-      const aiReply = response?.data?.choices?.[0]?.message?.content?.trim();
-      if (!aiReply) throw new Error('Respuesta vacía o incompleta de OpenAI');
-      
-      await sendMessage(senderId, aiReply);
-      broadcastLog('SYSTEM', `Agente IA respondió a ${senderName}`);
-    } catch (err) {
-      console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
-      await sendMessage(senderId, "Lo siento, tuve un problema procesando tu mensaje.");
-    }
-    return;
   }
 
   // 4. Máquina de Estados: Awaiting Input
