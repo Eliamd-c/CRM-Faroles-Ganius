@@ -43,12 +43,47 @@ async function saveFlowsConfig() {
 // de OpenAI (50% ahorro en tokens de entrada, -80% latencia).
 // ─────────────────────────────────────────────────────────────────
 let AI_MASTER_CONTEXT = '';
+let AI_BASE_PERSONA = ''; // FASE 6
 try {
   const contextPath = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro.md');
   AI_MASTER_CONTEXT = fs.readFileSync(contextPath, 'utf8');
   console.log(`🧠 Contexto maestro cargado (${AI_MASTER_CONTEXT.length} caracteres / ~${Math.round(AI_MASTER_CONTEXT.length / 4)} tokens)`);
+  
+  const splitIdx = AI_MASTER_CONTEXT.indexOf('# SECCIÓN 5:');
+  AI_BASE_PERSONA = splitIdx !== -1 ? AI_MASTER_CONTEXT.substring(0, splitIdx) : AI_MASTER_CONTEXT;
 } catch (err) {
   console.warn('⚠️ Contexto maestro no encontrado. El agente usará prompt genérico. Asegúrate de que el archivo Agente_IA_Faroles_Genius_Contexto_Maestro.md existe en la raíz del proyecto.');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// FASE 6: Recuperación de Contexto (RAG con pgvector)
+// ─────────────────────────────────────────────────────────────────
+async function retrieveRelevantContext(query) {
+  if (!supabase || !process.env.OPENAI_API_KEY) return AI_MASTER_CONTEXT;
+  try {
+    const embedRes = await axios.post(
+      'https://api.openai.com/v1/embeddings',
+      { input: query, model: 'text-embedding-3-small' },
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }
+    );
+    const queryEmbedding = embedRes.data.data[0].embedding;
+    
+    const { data: chunks, error } = await supabase.rpc('match_knowledge', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.30,
+      match_count: 5
+    });
+    
+    if (error || !chunks || chunks.length === 0) return AI_MASTER_CONTEXT;
+    
+    let ragContext = "\n\n=== CONOCIMIENTO RECUPERADO (RAG) ===\nÚsalo para responder al cliente:\n";
+    chunks.forEach(c => ragContext += `\n[${c.section_title}]\n${c.content}\n`);
+    
+    return AI_BASE_PERSONA + ragContext;
+  } catch (err) {
+    console.error('Error en RAG:', err.message);
+    return AI_MASTER_CONTEXT;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -724,13 +759,15 @@ async function handleMessage(event) {
       if (ignoreMaster || !AI_MASTER_CONTEXT) {
         // El nodo tiene activado "Ignorar contexto maestro" o no existe el archivo
         systemPrompt = nodePrompt || 'Eres un asistente útil y amigable.';
-      } else if (nodePrompt) {
-        // Contexto maestro + instrucciones adicionales del nodo
-        systemPrompt = AI_MASTER_CONTEXT + 
-          '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
       } else {
-        // Solo el contexto maestro (el nodo no tiene override)
-        systemPrompt = AI_MASTER_CONTEXT;
+        // FASE 6: RAG dinámico
+        const dynamicContext = await retrieveRelevantContext(text);
+        
+        if (nodePrompt) {
+          systemPrompt = dynamicContext + '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
+        } else {
+          systemPrompt = dynamicContext;
+        }
       }
       
       let history = customer.fields?.ai_history || [];
