@@ -5,6 +5,24 @@ editor.curvature = 0.5;
 editor.start();
 
 // ─────────────────────────────────────────────
+// Inicialización de IA
+// ─────────────────────────────────────────────
+window.AI_ENABLED = true;
+(async function initAI() {
+  try {
+    const res = await fetch('/api/ai/status');
+    const data = await res.json();
+    window.AI_ENABLED = data.configured;
+    if (!window.AI_ENABLED) {
+      const btnGenerate = document.getElementById('btn-ai-generate');
+      if (btnGenerate) btnGenerate.style.display = 'none';
+      const nodeBtn = document.querySelector('[data-node="ai_agent"]');
+      if (nodeBtn) nodeBtn.style.display = 'none';
+    }
+  } catch(e) {}
+})();
+
+// ─────────────────────────────────────────────
 // Estado global
 // ─────────────────────────────────────────────
 let currentLoadedFlowId = null; // ID del flujo cargado via ?flowId=
@@ -542,7 +560,7 @@ function renderMessageInspector(nodeId) {
       html += `
         <div style="background: #f1f2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
           <textarea id="text-block-${nodeId}-${idx}" class="cfg-input" style="width: 100%; border: none; background: transparent; outline: none; resize: none; min-height: 80px; font-size: 13px; font-family: inherit; color: #1c1e21;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Introduce tu texto...">${block.content}</textarea>
-          <div style="display: flex; justify-content: flex-end;">
+          <div style="display: ${window.AI_ENABLED ? 'flex' : 'none'}; justify-content: flex-end;">
             <button onclick="improveTextWithAI('${nodeId}', ${idx})" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(236, 72, 153, 0.2); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
               <span id="ai-icon-${nodeId}-${idx}">✨</span> <span id="ai-text-${nodeId}-${idx}">Mejorar con IA</span>
             </button>
@@ -2436,8 +2454,8 @@ window.renderAiAgentInspector = function(nodeId) {
         <span>Prompt del Sistema (Instrucciones)</span>
         <span style="color:#8b5cf6; font-size:11px;">Requerido</span>
       </label>
-      <textarea id="ai-system-prompt" class="cfg-input" style="height: 150px; resize:vertical;" placeholder="Ej: Eres un vendedor experto. Resuelve dudas y trata de obtener el email del usuario.">${state.system_prompt}</textarea>
-      <p style="font-size:11px; color:var(--text-muted); margin:0;">Define el rol, el tono y el objetivo de la IA.</p>
+      <textarea id="ai-system-prompt" class="cfg-input" maxlength="1000" style="height: 150px; resize:vertical;" placeholder="Ej: Eres un vendedor experto. Resuelve dudas y trata de obtener el email del usuario.">${state.system_prompt}</textarea>
+      <p style="font-size:11px; color:var(--text-muted); margin:0;">Define el rol, el tono y el objetivo de la IA (máx 1000 caracteres).</p>
     </div>
     
     <button class="btn-primary" onclick="saveAiAgentConfig('${nodeId}')" style="width:100%;">Guardar Prompt</button>

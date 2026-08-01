@@ -340,11 +340,33 @@ app.post('/api/upload', (req, res, next) => {
 // ─────────────────────────────────────────────
 // IA Asistente de Textos (Fase 4 - Opción 3)
 // ─────────────────────────────────────────────
+const aiRateLimits = new Map();
+const MAX_AI_CALLS_PER_HOUR = 10;
+function checkAiRateLimit(key) {
+  if (!key) return true;
+  const now = Date.now();
+  let data = aiRateLimits.get(key);
+  if (!data || (now - data.timestamp) > 3600000) {
+    data = { count: 0, timestamp: now };
+  }
+  if (data.count >= MAX_AI_CALLS_PER_HOUR) return false;
+  data.count++;
+  aiRateLimits.set(key, data);
+  return true;
+}
+
+app.get('/api/ai/status', (req, res) => {
+  res.json({ configured: !!process.env.OPENAI_API_KEY });
+});
 app.post('/api/ai/improve-text', express.json(), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Texto requerido' });
+  if (text.length > 2000) return res.status(400).json({ error: 'Texto demasiado largo (máx 2000 caracteres)' });
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Falta configurar OPENAI_API_KEY en el backend' });
+  }
+  if (!checkAiRateLimit(req.ip)) {
+    return res.status(429).json({ error: 'Límite de peticiones de IA excedido (máx 10 por hora)' });
   }
 
   try {
@@ -366,14 +388,16 @@ app.post('/api/ai/improve-text', express.json(), async (req, res) => {
         headers: {
           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 15000
       }
     );
 
-    const improvedText = response.data.choices[0].message.content.trim();
+    const improvedText = response?.data?.choices?.[0]?.message?.content?.trim();
+    if (!improvedText) throw new Error('Respuesta vacía o incompleta de OpenAI');
     res.json({ text: improvedText });
   } catch (error) {
-    console.error('Error llamando a OpenAI:', error.response?.data || error.message);
+    console.error('OpenAI API Error (/improve-text):', error.response?.status, error.message);
     res.status(500).json({ error: 'Error al procesar el texto con IA' });
   }
 });
@@ -384,8 +408,12 @@ app.post('/api/ai/improve-text', express.json(), async (req, res) => {
 app.post('/api/ai/generate-flow', express.json(), async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt requerido' });
+  if (prompt.length > 2000) return res.status(400).json({ error: 'Prompt demasiado largo (máx 2000 caracteres)' });
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Falta configurar OPENAI_API_KEY en el backend' });
+  }
+  if (!checkAiRateLimit(req.ip)) {
+    return res.status(429).json({ error: 'Límite de peticiones de IA excedido (máx 10 por hora)' });
   }
 
   try {
@@ -419,13 +447,23 @@ Devuelve ÚNICAMENTE el JSON válido.
         temperature: 0.2,
         max_tokens: 1500
       },
-      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        timeout: 15000 
+      }
     );
 
-    const generatedJSON = response.data.choices[0].message.content.trim();
-    res.json(JSON.parse(generatedJSON));
+    const generatedJSON = response?.data?.choices?.[0]?.message?.content?.trim();
+    if (!generatedJSON) throw new Error('Respuesta vacía o incompleta de OpenAI');
+    
+    const parsedJSON = JSON.parse(generatedJSON);
+    if (!parsedJSON || !parsedJSON.nodes || !Array.isArray(parsedJSON.nodes)) {
+      throw new Error('Estructura JSON inválida devuelta por la IA');
+    }
+    
+    res.json(parsedJSON);
   } catch (error) {
-    console.error('Error generando flujo con IA:', error.response?.data?.error?.message || error.message);
+    console.error('OpenAI API Error (/generate-flow):', error.response?.status, error.message);
     res.status(500).json({ error: 'Error al generar flujo con IA' });
   }
 });
@@ -451,8 +489,12 @@ async function getUserProfile(senderId) {
 // ─────────────────────────────────────────────
 // Motor IA: Disparadores Inteligentes (Smart Triggers)
 // ─────────────────────────────────────────────
-async function detectIntentWithAI(text, flows) {
+async function detectIntentWithAI(text, flows, senderId) {
   if (!process.env.OPENAI_API_KEY) return null;
+  if (!checkAiRateLimit(senderId)) {
+    console.log(`[Smart Trigger] Fallback abortado: Límite de IA excedido para ${senderId}`);
+    return null;
+  }
   
   // Extraer los flujos que tienen keywords
   const candidateFlows = flows.filter(f => f.enabled !== false && f.keywords && f.keywords.length > 0);
@@ -483,15 +525,25 @@ Si el mensaje del usuario tiene la misma intención o significado que la "Intenc
         temperature: 0.0,
         max_tokens: 50
       },
-      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        timeout: 15000
+      }
     );
     
-    const reply = response.data.choices[0].message.content.trim();
-    if (reply !== 'NULL' && reply !== 'null' && reply !== '') {
-      return reply;
+    const reply = response?.data?.choices?.[0]?.message?.content?.trim();
+    if (!reply) {
+      console.log(`[Smart Trigger] Sin respuesta válida de OpenAI`);
+      return null;
     }
+    
+    if (reply === 'NULL' || reply === 'null') {
+      console.log(`[Smart Trigger] IA determinó que no hay coincidencia (NULL)`);
+      return null;
+    }
+    return reply;
   } catch (err) {
-    console.error('❌ Error en Smart Trigger AI:', err.response?.data?.error?.message || err.message);
+    console.error('OpenAI API Error (detectIntentWithAI):', err.response?.status, err.message);
   }
   return null;
 }
@@ -571,6 +623,10 @@ async function handleMessage(event) {
       await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
       return;
     }
+    if (!checkAiRateLimit(senderId)) {
+      await sendMessage(senderId, "⚠️ Has alcanzado el límite de consultas a la IA por ahora. Intenta más tarde.");
+      return;
+    }
     
     const systemPrompt = customer.fields?.current_ai_prompt || 'Eres un asistente útil.';
     
@@ -586,14 +642,19 @@ async function handleMessage(event) {
           temperature: 0.7,
           max_tokens: 300
         },
-        { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+        { 
+          headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          timeout: 15000
+        }
       );
       
-      const aiReply = response.data.choices[0].message.content.trim();
+      const aiReply = response?.data?.choices?.[0]?.message?.content?.trim();
+      if (!aiReply) throw new Error('Respuesta vacía o incompleta de OpenAI');
+      
       await sendMessage(senderId, aiReply);
       broadcastLog('SYSTEM', `Agente IA respondió a ${senderName}`);
     } catch (err) {
-      console.error('❌ Error IA Agent:', err.response?.data?.error?.message || err.message);
+      console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
       await sendMessage(senderId, "Lo siento, tuve un problema procesando tu mensaje.");
     }
     return;
@@ -697,7 +758,7 @@ async function handleMessage(event) {
   } else {
     // 6. Smart Triggers (IA Fallback)
     console.log(`[Smart Trigger] Buscando intención con IA para: "${text}"`);
-    const smartFlowId = await detectIntentWithAI(text, flowsConfig.flows);
+    const smartFlowId = await detectIntentWithAI(text, flowsConfig.flows, senderId);
     
     if (smartFlowId) {
       console.log(`[Smart Trigger] Intención detectada. Ejecutando flujo: ${smartFlowId}`);
