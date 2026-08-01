@@ -2186,6 +2186,10 @@ function renderTriggerMessageInspector(nodeId, data) {
   const keywords = node.data.keywords || '';
   const matchType = node.data.matchType || 'contains';
 
+  const labelText = matchType === 'intent' 
+    ? 'Descripción de la intención (Ej: El usuario quiere comprar, saludó, etc)'
+    : 'Palabras clave (separadas por coma)';
+
   document.getElementById('config-body').innerHTML = `
     <div style="margin-bottom:16px;">
       <button onclick="openTriggerPicker('${nodeId}')" style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:6px 12px; font-size:12px; color:#6b7280; cursor:pointer; display:flex; align-items:center; gap:6px;">
@@ -2193,17 +2197,19 @@ function renderTriggerMessageInspector(nodeId, data) {
       </button>
     </div>
     <div class="config-group">
-      <label class="config-label">Palabras clave (separadas por coma)</label>
+      <label class="config-label" id="trigger-keywords-label">${labelText}</label>
       <input type="text" class="config-input" id="trigger-keywords" value="${keywords}" placeholder="ej: precio, valor, costo">
     </div>
     <div class="config-group">
       <label class="config-label">Tipo de coincidencia</label>
-      <select class="config-input" id="trigger-match-type">
+      <select class="config-input" id="trigger-match-type" onchange="document.getElementById('trigger-keywords-label').innerText = this.value === 'intent' ? 'Descripción de la intención (Ej: El usuario quiere comprar)' : 'Palabras clave (separadas por coma)';">
         <option value="contains" ${matchType === 'contains' ? 'selected' : ''}>Contiene la palabra</option>
         <option value="exact" ${matchType === 'exact' ? 'selected' : ''}>Coincidencia exacta</option>
         <option value="starts_with" ${matchType === 'starts_with' ? 'selected' : ''}>Empieza con</option>
         <option value="regex" ${matchType === 'regex' ? 'selected' : ''}>Expresión regular (avanzado)</option>
+        <option value="intent" ${matchType === 'intent' ? 'selected' : ''}>🧠 Intención por IA (Smart Trigger)</option>
       </select>
+      <p style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.4;">Si usas <b>Intención por IA</b>, nuestro motor semántico evaluará si el mensaje significa lo mismo que tu descripción, incluso si usa sinónimos o palabras diferentes.</p>
     </div>
     <button class="btn-primary" style="width:100%; margin-top:8px;" onclick="saveTrigger('${nodeId}')">Aplicar</button>`;
 }

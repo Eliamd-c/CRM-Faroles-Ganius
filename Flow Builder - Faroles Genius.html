@@ -274,10 +274,20 @@ header {
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
     z-index: 5;
     box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+    overflow-y: auto;
 }
+
+.sidebar-category {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8b92a1;
+    letter-spacing: 0.5px;
+    margin: 18px 0 8px 0;
+    text-transform: uppercase;
+}
+.sidebar-category:first-child { margin-top: 0; }
 
 .drag-item {
     background: var(--panel-bg);
@@ -292,6 +302,7 @@ header {
     font-weight: 500;
     color: var(--text-main);
     transition: all 0.2s ease;
+    margin-bottom: 8px;
 }
 .drag-item span { font-size: 16px; }
 .drag-item:hover { 
@@ -565,19 +576,35 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
 
     <div class="wrapper">
         <div class="sidebar">
+            <div class="sidebar-category">DISPARADORES</div>
             <div class="drag-item" draggable="true" data-node="trigger">
-                <span>⚡</span> Palabra Clave (Trigger)
+                <span>⚡</span> Palabra Clave
             </div>
+
+            <div class="sidebar-category">CONTENIDO</div>
             <div class="drag-item" draggable="true" data-node="message">
                 <span>💬</span> Enviar Mensaje
-            </div>
-            <div class="drag-item" draggable="true" data-node="ai_agent" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color: white; border: none;">
-                <span>🧠</span> Agente IA
             </div>
             <div class="drag-item" draggable="true" data-node="input">
                 <span>📥</span> Pedir Dato
             </div>
+            <div class="drag-item" draggable="true" data-node="carousel">
+                <span>🖼️</span> Carrusel
+            </div>
+            <div class="drag-item" draggable="true" data-node="gallery">
+                <span>📸</span> Galería
+            </div>
+            <div class="drag-item" draggable="true" data-node="audio">
+                <span>🎵</span> Audio
+            </div>
+            <div class="drag-item" draggable="true" data-node="video">
+                <span>🎥</span> Video
+            </div>
+            <div class="drag-item" draggable="true" data-node="file">
+                <span>📄</span> Archivo / PDF
+            </div>
 
+            <div class="sidebar-category">LÓGICA</div>
             <div class="drag-item" draggable="true" data-node="action">
                 <span>⚡</span> Realizar Acciones
             </div>
@@ -586,6 +613,17 @@ CONTENIDO DEL NODO (Estilo Manychat Canvas)
             </div>
             <div class="drag-item" draggable="true" data-node="randomizer">
                 <span>🎲</span> Aleatorio (A/B)
+            </div>
+            <div class="drag-item" draggable="true" data-node="delay">
+                <span>⏱️</span> Espera (Delay)
+            </div>
+
+            <div class="sidebar-category">AVANZADO</div>
+            <div class="drag-item" draggable="true" data-node="goto">
+                <span>↗️</span> Goto / Saltar
+            </div>
+            <div class="drag-item" draggable="true" data-node="ai_agent" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color: white; border: none;">
+                <span>🧠</span> Agente IA
             </div>
         </div>
         

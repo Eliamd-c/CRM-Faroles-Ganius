@@ -458,14 +458,18 @@ async function detectIntentWithAI(text, flows) {
   const candidateFlows = flows.filter(f => f.enabled !== false && f.keywords && f.keywords.length > 0);
   if (candidateFlows.length === 0) return null;
 
-  const intents = candidateFlows.map(f => `- ID: ${f.id} | Palabras clave: ${f.keywords.join(', ')}`).join('\n');
+  const intents = candidateFlows.map(f => {
+    const isIntent = f.matchType === 'intent';
+    const label = isIntent ? 'Intención descrita' : 'Palabras clave';
+    return `- ID: ${f.id} | ${label}: ${f.keywords.join(', ')}`;
+  }).join('\n');
   
   const systemPrompt = `Eres el motor de reconocimiento de intenciones de un chatbot.
 Tus opciones de respuesta son ÚNICAMENTE el "ID" del flujo que mejor coincida con la intención del usuario, o la palabra "NULL" si ninguna coincide.
-Aquí están los flujos disponibles y sus palabras clave (que definen su intención):
+Aquí están los flujos disponibles y sus intenciones/palabras clave:
 ${intents}
 
-Si el mensaje del usuario tiene la misma intención o significado que alguna de las palabras clave de un flujo (sinónimos, faltas de ortografía, formas de decirlo), responde con su ID exacto. Si no coincide con ninguna intención clara, responde NULL. NO digas nada más, solo el ID o NULL.`;
+Si el mensaje del usuario tiene la misma intención o significado que la "Intención descrita" o las "Palabras clave" de un flujo (sinónimos, faltas de ortografía, formas de decirlo), responde con su ID exacto. Si no coincide con ninguna intención clara, responde NULL. NO digas nada más, solo el ID o NULL.`;
 
   try {
     const response = await axios.post(
