@@ -1204,6 +1204,17 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
       if (conf.flow_id) steps.push({ type: 'goto', flow_id: conf.flow_id });
       currentId = null;
     }
+    else if (node.name === 'ai_agent') {
+      // Fase 1 Fix: el nodo Agente IA ahora se exporta correctamente.
+      // El agente toma el control de la conversación → no hay nodo siguiente (break).
+      const aiState = nodeAiAgentState[currentId] || JSON.parse(node.data._ai || '{}');
+      steps.push({
+        type: 'ai_agent',
+        system_prompt: aiState.system_prompt || '',
+        ignore_master_context: aiState.ignore_master_context || false
+      });
+      currentId = null; // El agente IA es un nodo terminal — no hay continuación lineal
+    }
     else {
       break; // Trigger o nodo final
     }
@@ -2441,24 +2452,44 @@ window.renderAiAgentNode = function(nodeId) {
 window.renderAiAgentInspector = function(nodeId) {
   document.getElementById('config-title').innerText = 'Agente IA';
   
-  const state = nodeAiAgentState[nodeId] || { system_prompt: '' };
+  const state = nodeAiAgentState[nodeId] || { system_prompt: '', ignore_master_context: false };
+  const ignoreMaster = state.ignore_master_context || false;
   
   let html = `
     <div style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); padding: 15px; border-radius: 8px; color: white; margin-bottom: 15px;">
-      <h3 style="margin:0 0 5px 0; font-size:14px; display:flex; align-items:center; gap:5px;">🧠 Toma el Control</h3>
-      <p style="margin:0; font-size:12px; opacity:0.9;">Cuando el flujo llegue a este nodo, la IA responderá automáticamente a los mensajes del usuario siguiendo las instrucciones del Prompt.</p>
+      <h3 style="margin:0 0 5px 0; font-size:14px; display:flex; align-items:center; gap:5px;">🧠 Agente IA</h3>
+      <p style="margin:0; font-size:12px; opacity:0.9;">Cuando el flujo llegue a este nodo, la IA tomará el control y responderá automáticamente.</p>
     </div>
     
-    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+    <!-- FASE 2: Info sobre el contexto maestro -->
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+      <p style="margin:0; font-size:12px; color: #166534; display:flex; align-items:flex-start; gap:6px;">
+        <span style="font-size:14px; flex-shrink:0;">✅</span>
+        <span><strong>Contexto Maestro activo:</strong> El agente ya conoce los productos, precios, tono de Faroles Genius y cómo manejar objeciones. No necesitas repetir esa información aquí.</span>
+      </p>
+    </div>
+
+    <!-- FASE 3: Override por nodo -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
       <label class="cfg-label" style="display:flex; justify-content:space-between;">
-        <span>Prompt del Sistema (Instrucciones)</span>
-        <span style="color:#8b5cf6; font-size:11px;">Requerido</span>
+        <span>➕ Instrucciones adicionales (opcional)</span>
+        <span style="color:#8b5cf6; font-size:11px;">Opcional</span>
       </label>
-      <textarea id="ai-system-prompt" class="cfg-input" maxlength="1000" style="height: 150px; resize:vertical;" placeholder="Ej: Eres un vendedor experto. Resuelve dudas y trata de obtener el email del usuario.">${state.system_prompt}</textarea>
-      <p style="font-size:11px; color:var(--text-muted); margin:0;">Define el rol, el tono y el objetivo de la IA (máx 1000 caracteres).</p>
+      <textarea id="ai-system-prompt" class="cfg-input" maxlength="1500" style="height: 120px; resize:vertical;" 
+        placeholder="Ej: Solo atiende clientes detal. No menciones el Kit de Aliado.&#10;&#10;O: Este flujo es post-compra, el cliente ya compró. Ayuda con dudas de armado y cuidado.">${state.system_prompt}</textarea>
+      <p style="font-size:11px; color:var(--text-muted); margin:0;">Se concatena al Contexto Maestro. Úsa esto para enfocar este nodo en un tipo de cliente o etapa específica.</p>
     </div>
     
-    <button class="btn-primary" onclick="saveAiAgentConfig('${nodeId}')" style="width:100%;">Guardar Prompt</button>
+    <!-- FASE 3: Checkbox para ignorar contexto maestro -->
+    <div style="display:flex; align-items:flex-start; gap:10px; padding: 12px; background: #fef9c3; border: 1px solid #fde047; border-radius: 8px; margin-bottom: 14px; cursor:pointer;" onclick="document.getElementById('ai-ignore-master').click()">
+      <input type="checkbox" id="ai-ignore-master" ${ignoreMaster ? 'checked' : ''} onclick="event.stopPropagation()" style="margin-top:2px; accent-color: #a855f7; width:16px; height:16px; flex-shrink:0; cursor:pointer;">
+      <div>
+        <p style="margin:0 0 2px; font-size:12px; font-weight:600; color:#854d0e;">Ignorar Contexto Maestro</p>
+        <p style="margin:0; font-size:11px; color:#92400e;">Activa esto solo si este agente es para un negocio diferente o un propósito completamente distinto a Faroles Genius.</p>
+      </div>
+    </div>
+    
+    <button class="btn-primary" onclick="saveAiAgentConfig('${nodeId}')" style="width:100%;">Guardar Configuración</button>
   `;
   
   document.getElementById('config-body').innerHTML = html;
@@ -2466,20 +2497,29 @@ window.renderAiAgentInspector = function(nodeId) {
 
 window.saveAiAgentConfig = function(nodeId) {
   const promptStr = document.getElementById('ai-system-prompt').value.trim();
+  const ignoreMaster = document.getElementById('ai-ignore-master')?.checked || false;
   
-  if (!promptStr) {
-    if (typeof Toast !== 'undefined') Toast.warning('Debes escribir instrucciones para la IA.');
+  // FASE 3: el prompt ya no es requerido si el contexto maestro está activo
+  if (ignoreMaster && !promptStr) {
+    if (typeof Toast !== 'undefined') Toast.warning('Si ignoras el Contexto Maestro, debes escribir instrucciones propias.');
     return;
   }
   
-  nodeAiAgentState[nodeId] = { system_prompt: promptStr };
+  nodeAiAgentState[nodeId] = { 
+    system_prompt: promptStr,
+    ignore_master_context: ignoreMaster
+  };
   
   // Guardar en data del drawflow para la exportación final
   editor.drawflow.drawflow.Home.data[nodeId].data._ai = JSON.stringify(nodeAiAgentState[nodeId]);
   
   renderAiAgentNode(nodeId);
   closeInspector();
-  if (typeof Toast !== 'undefined') Toast.success('Configuración de Agente IA guardada');
+  
+  const msg = ignoreMaster 
+    ? 'Agente configurado (modo standalone — sin Contexto Maestro)'
+    : (promptStr ? 'Agente configurado con instrucciones adicionales ✅' : 'Agente configurado con Contexto Maestro completo ✅');
+  if (typeof Toast !== 'undefined') Toast.success(msg);
 };
 
 // ─────────────────────────────────────────────

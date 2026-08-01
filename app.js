@@ -36,6 +36,22 @@ async function saveFlowsConfig() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────
+// FASE 2: Cargar Contexto Maestro del Agente IA al arrancar
+// El archivo .md se lee una sola vez y se guarda en memoria.
+// Al ponerlo al inicio del prompt se activa el Prompt Caching
+// de OpenAI (50% ahorro en tokens de entrada, -80% latencia).
+// ─────────────────────────────────────────────────────────────────
+let AI_MASTER_CONTEXT = '';
+try {
+  const contextPath = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro.md');
+  AI_MASTER_CONTEXT = fs.readFileSync(contextPath, 'utf8');
+  console.log(`🧠 Contexto maestro cargado (${AI_MASTER_CONTEXT.length} caracteres / ~${Math.round(AI_MASTER_CONTEXT.length / 4)} tokens)`);
+} catch (err) {
+  console.warn('⚠️ Contexto maestro no encontrado. El agente usará prompt genérico. Asegúrate de que el archivo Agente_IA_Faroles_Genius_Contexto_Maestro.md existe en la raíz del proyecto.');
+}
+
+
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
@@ -639,7 +655,25 @@ async function handleMessage(event) {
         return;
       }
       
-      const systemPrompt = customer.fields?.current_ai_prompt || 'Eres un asistente útil.';
+      // FASE 2: Construir el system prompt con Contexto Maestro + override del nodo.
+      // Estructura: [Contexto Maestro fijo] + [Instrucciones adicionales del nodo]
+      // El contexto maestro va PRIMERO para aprovechar el Prompt Caching de OpenAI.
+      const nodePrompt = customer.fields?.current_ai_prompt || '';
+      const ignoreMaster = customer.fields?.ignore_master_context || false;
+      
+      let systemPrompt;
+      if (ignoreMaster || !AI_MASTER_CONTEXT) {
+        // El nodo tiene activado "Ignorar contexto maestro" o no existe el archivo
+        systemPrompt = nodePrompt || 'Eres un asistente útil y amigable.';
+      } else if (nodePrompt) {
+        // Contexto maestro + instrucciones adicionales del nodo
+        systemPrompt = AI_MASTER_CONTEXT + 
+          '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
+      } else {
+        // Solo el contexto maestro (el nodo no tiene override)
+        systemPrompt = AI_MASTER_CONTEXT;
+      }
+      
       let history = customer.fields?.ai_history || [];
       
       const messages = [
@@ -649,13 +683,14 @@ async function handleMessage(event) {
       ];
       
       try {
+        const aiStartTime = Date.now();
         const response = await axios.post(
           'https://api.openai.com/v1/chat/completions',
           {
             model: 'gpt-4o',
             messages: messages,
             temperature: 0.7,
-            max_tokens: 300
+            max_tokens: 500  // FASE 1: aumentado de 300 a 500 para respuestas de venta más completas
           },
           { 
             headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -666,19 +701,26 @@ async function handleMessage(event) {
         const aiReply = response?.data?.choices?.[0]?.message?.content?.trim();
         if (!aiReply) throw new Error('Respuesta vacía o incompleta de OpenAI');
         
+        // Log de uso de tokens (útil para monitorear caching en Fase 8)
+        const usage = response.data.usage;
+        const cachedTokens = usage?.prompt_tokens_details?.cached_tokens || 0;
+        if (cachedTokens > 0) {
+          console.log(`💾 Prompt Cache activo: ${cachedTokens}/${usage.prompt_tokens} tokens cacheados (ahorro ~50%)`);
+        }
+        
         history.push({ role: 'user', content: text });
         history.push({ role: 'assistant', content: aiReply });
-        if (history.length > 6) history = history.slice(history.length - 6);
+        if (history.length > 10) history = history.slice(history.length - 10); // FASE 1: aumentado de 6 a 10
         
         await supabase.from('customers').update({
           fields: { ...customer.fields, ai_history: history }
         }).eq('instagram_id', senderId);
         
         await sendMessage(senderId, aiReply);
-        broadcastLog('SYSTEM', `Agente IA respondió a ${senderName}`);
+        broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
       } catch (err) {
         console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
-        await sendMessage(senderId, "Lo siento, tuve un problema procesando tu mensaje.");
+        await sendMessage(senderId, 'Lo siento, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.');
       }
       return;
     }
@@ -916,9 +958,13 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
       if (supabase) {
         await supabase.from('customers').update({
           bot_state: 'ai_agent',
-          fields: { ...customer?.fields, current_ai_prompt: step.system_prompt }
+          fields: { 
+            ...customer?.fields, 
+            current_ai_prompt: step.system_prompt || '',
+            ignore_master_context: step.ignore_master_context || false  // FASE 3
+          }
         }).eq('instagram_id', senderId);
-        broadcastLog('SYSTEM', `Agente IA activado para ${senderName}`);
+        broadcastLog('SYSTEM', `Agente IA activado para ${senderName}${step.ignore_master_context ? ' (modo standalone)' : ' (con Contexto Maestro)'}`);
       } else {
         console.warn('⚠️ Supabase no conectado. No se puede activar el Agente IA.');
       }
