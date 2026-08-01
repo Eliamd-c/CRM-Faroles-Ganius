@@ -51,6 +51,45 @@ try {
   console.warn('⚠️ Contexto maestro no encontrado. El agente usará prompt genérico. Asegúrate de que el archivo Agente_IA_Faroles_Genius_Contexto_Maestro.md existe en la raíz del proyecto.');
 }
 
+// ─────────────────────────────────────────────────────────────────
+// FASE 5: Herramientas del Agente IA (Function Calling)
+// ─────────────────────────────────────────────────────────────────
+const AI_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'send_product_media',
+      description: 'Envía una foto o video del producto al cliente. Úsalo cuando el cliente quiera ver los faroles, el efecto vitral, o cómo se arman.',
+      parameters: {
+        type: 'object',
+        properties: {
+          media_type: { type: 'string', enum: ['image', 'video'], description: 'Tipo de media' },
+          search_tags: { 
+            type: 'array', items: { type: 'string' },
+            description: 'Tags para buscar el media. Ej: ["encendido", "vitral", "noche"] o ["armado", "tutorial", "instrucciones"] o ["reseña", "testimonio"]'
+          },
+          caption: { type: 'string', description: 'Mensaje opcional que acompaña la imagen/video' }
+        },
+        required: ['media_type', 'search_tags']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'escalate_to_human',
+      description: 'Pasa la conversación a un asesor humano. Úsalo cuando: el cliente quiere cerrar la compra, está frustrado, tiene un reclamo, o pregunta algo que no sabes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string', description: 'Resumen de por qué se escala' },
+          customer_summary: { type: 'string', description: 'Resumen del cliente: qué quiere, qué datos ya dio, en qué quedó la conversación' }
+        },
+        required: ['reason', 'customer_summary']
+      }
+    }
+  }
+];
 
 const app = express();
 app.set('trust proxy', true);
@@ -709,6 +748,8 @@ async function handleMessage(event) {
           {
             model: 'gpt-4o',
             messages: messages,
+            tools: AI_TOOLS,
+            tool_choice: 'auto',
             temperature: 0.7,
             max_tokens: 500  // FASE 1: aumentado de 300 a 500 para respuestas de venta más completas
           },
@@ -718,8 +759,8 @@ async function handleMessage(event) {
           }
         );
         
-        const aiReply = response?.data?.choices?.[0]?.message?.content?.trim();
-        if (!aiReply) throw new Error('Respuesta vacía o incompleta de OpenAI');
+        const choice = response?.data?.choices?.[0];
+        if (!choice) throw new Error('Respuesta vacía o incompleta de OpenAI');
         
         // Log de uso de tokens (útil para monitorear caching en Fase 8)
         const usage = response.data.usage;
@@ -729,15 +770,75 @@ async function handleMessage(event) {
         }
         
         history.push({ role: 'user', content: text });
-        history.push({ role: 'assistant', content: aiReply });
-        if (history.length > 10) history = history.slice(history.length - 10); // FASE 1: aumentado de 6 a 10
         
-        await supabase.from('customers').update({
-          fields: { ...customer.fields, ai_history: history }
-        }).eq('instagram_id', senderId);
-        
-        await sendMessage(senderId, aiReply);
-        broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
+        if (choice.finish_reason === 'tool_calls') {
+          // FASE 5: Procesar las llamadas a herramientas
+          history.push(choice.message); // Añadir el tool_call al historial
+          
+          for (const toolCall of choice.message.tool_calls) {
+            const args = JSON.parse(toolCall.function.arguments);
+            
+            if (toolCall.function.name === 'send_product_media') {
+              const { data: medias } = await supabase
+                .from('media_catalog')
+                .select('*')
+                .overlaps('tags', args.search_tags || [])
+                .eq('type', args.media_type)
+                .eq('active', true)
+                .limit(1);
+              
+              if (medias && medias.length > 0) {
+                await sendMediaMessage(senderId, args.media_type, medias[0].url);
+                if (args.caption) await sendMessage(senderId, args.caption);
+                
+                history.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: `Enviado media exitosamente al cliente. URL: ${medias[0].url}`
+                });
+              } else {
+                history.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: 'No se encontraron medias con esos tags en el catálogo.'
+                });
+                // Podríamos hacer una segunda llamada a OpenAI aquí para que se disculpe
+              }
+            } else if (toolCall.function.name === 'escalate_to_human') {
+              await supabase.from('customers').update({ bot_state: 'paused' }).eq('instagram_id', senderId);
+              await sendMessage(senderId, "Perfecto, voy a pasarte con alguien de nuestro equipo para confirmar detalles... 🕯️");
+              broadcastLog('ESCALATION', `${senderName}: ${args.reason}`);
+              
+              history.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: 'Escalado exitosamente a humano. El bot está pausado.'
+              });
+            }
+          }
+          
+          if (history.length > 15) history = history.slice(history.length - 15);
+          await supabase.from('customers').update({
+            fields: { ...customer.fields, ai_history: history }
+          }).eq('instagram_id', senderId);
+          
+          broadcastLog('SYSTEM', `Agente IA usó herramientas para ${senderName} (${Date.now() - aiStartTime}ms)`);
+        } else {
+          // Texto normal
+          const aiReply = choice.message.content?.trim();
+          if (!aiReply) throw new Error('Contenido de respuesta vacío de OpenAI');
+          
+          history.push({ role: 'assistant', content: aiReply });
+          if (history.length > 10) history = history.slice(history.length - 10);
+          
+          await supabase.from('customers').update({
+            fields: { ...customer.fields, ai_history: history }
+          }).eq('instagram_id', senderId);
+          
+          await sendMessage(senderId, aiReply);
+          broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
+        }
+
       } catch (err) {
         console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
         await sendMessage(senderId, 'Lo siento, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.');
