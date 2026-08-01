@@ -487,6 +487,26 @@ Devuelve ÚNICAMENTE el JSON válido.
 });
 
 // ─────────────────────────────────────────────
+// FASE 4: Endpoint del Catálogo de Media
+// ─────────────────────────────────────────────
+app.get('/api/media-catalog', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'Supabase no conectado' });
+  try {
+    const { data, error } = await supabase
+      .from('media_catalog')
+      .select('*')
+      .eq('active', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Error fetching media catalog:', err.message);
+    res.status(500).json({ error: 'Error al obtener el catálogo de media' });
+  }
+});
+
+// ─────────────────────────────────────────────
 // Obtener Perfil de Usuario
 // ─────────────────────────────────────────────
 async function getUserProfile(senderId) {
@@ -1257,6 +1277,54 @@ async function sendTemplate(recipientId, text, buttons) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Plantilla:', errorMsg);
     broadcastLog('ERROR', `Error al enviar plantilla: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// FASE 4: Enviar Media Autónomo (Agente IA)
+// ─────────────────────────────────────────────
+async function sendMediaMessage(recipientId, type, url) {
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: {
+          attachment: { type, payload: { url, is_reusable: true } }
+        }
+      },
+      { params: { access_token: ACCESS_TOKEN }, timeout: 15000 }
+    );
+    console.log(`✅ Media (${type}) enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Media enviado a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Media autónomo:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar media: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// FASE 4: Enviar Media Autónomo (Agente IA)
+// ─────────────────────────────────────────────
+async function sendMediaMessage(recipientId, type, url) {
+  try {
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: {
+          attachment: { type, payload: { url, is_reusable: true } }
+        }
+      },
+      { params: { access_token: ACCESS_TOKEN }, timeout: 15000 }
+    );
+    console.log(`✅ Media (${type}) enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Media enviado a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Media autónomo:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar media: ${errorMsg}`);
   }
 }
 
