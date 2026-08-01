@@ -155,8 +155,13 @@ function requireAuth(req, res, next) {
   // Ignorar autenticación en el webhook de instagram
   if (req.path === '/webhook' || req.path === '/chat-init') return next();
   
-  // El token estático se lee del entorno o se usa uno por defecto en desarrollo
-  const validToken = process.env.API_SECRET || 'farolesgenius_dev_secret';
+  // El token estático se lee del entorno
+  const validToken = process.env.API_SECRET;
+  
+  if (!validToken) {
+    console.error('FATAL: API_SECRET no configurada. El servidor se detendrá por seguridad.');
+    process.exit(1);
+  }
   
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -522,9 +527,7 @@ app.post('/api/ai/improve-text', express.json(), async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Falta configurar OPENAI_API_KEY en el backend' });
   }
-  if (!checkAiRateLimit(req.ip)) {
-    return res.status(429).json({ error: 'Límite de peticiones de IA excedido (máx 10 por hora)' });
-  }
+  // Rate limit removido: protegido por requireAuth y de uso exclusivo del admin.
 
   try {
     const response = await axios.post(
@@ -569,9 +572,7 @@ app.post('/api/ai/generate-flow', express.json(), async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'Falta configurar OPENAI_API_KEY en el backend' });
   }
-  if (!checkAiRateLimit(req.ip)) {
-    return res.status(429).json({ error: 'Límite de peticiones de IA excedido (máx 10 por hora)' });
-  }
+  // Rate limit removido: protegido por requireAuth y de uso exclusivo del admin.
 
   try {
     const systemInstruction = `
@@ -905,7 +906,7 @@ async function handleMessage(event) {
         }
       }
       
-      let history = customer.fields?.ai_history || [];
+      let history = customer.ai_history || [];
       
       const messages = [
         { role: 'system', content: systemPrompt },
@@ -1013,7 +1014,7 @@ async function handleMessage(event) {
 
           if (history.length > 15) history = history.slice(history.length - 15);
           await supabase.from('customers').update({
-            fields: { ...customer.fields, ai_history: history }
+            ai_history: history
           }).eq('instagram_id', senderId);
           
           broadcastLog('SYSTEM', `Agente IA usó herramientas y respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
@@ -1026,7 +1027,7 @@ async function handleMessage(event) {
           if (history.length > 10) history = history.slice(history.length - 10);
           
           await supabase.from('customers').update({
-            fields: { ...customer.fields, ai_history: history }
+            ai_history: history
           }).eq('instagram_id', senderId);
           
           await sendMessage(senderId, aiReply);
@@ -1112,7 +1113,10 @@ async function handleMessage(event) {
   }
 
   // 5. Normalizar el texto (quitar mayúsculas y acentos) para Trigger regular
-  const lowerText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const removeAccents = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normalizedText = removeAccents(text);
+  const lowerText = normalizedText.toLowerCase();
+  
   let matchedFlow = null;
 
   for (const flow of flowsConfig.flows) {
@@ -1141,7 +1145,8 @@ async function handleMessage(event) {
     } else if (matchType === 'regex') {
       const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const match = flow.keywords.some(kw => {
-        try { return new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'i').test(text); } catch (e) { return false; }
+        const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        try { return new RegExp('\\b' + escapeRegExp(cleanKw) + '\\b', 'i').test(lowerText); } catch (e) { return false; }
       });
       if (match) { matchedFlow = flow; break; }
     }
@@ -1363,14 +1368,14 @@ async function executeAction(senderId, senderName, step) {
         const field = params.field?.trim();
         const value = params.value?.trim();
         if (field) {
-          updates.fields = { ...customer.fields, [field]: value };
+          updates.fields = { ...(updates.fields || customer.fields), [field]: value };
         }
         break;
       }
       case 'clear_field': {
         const field = params.field?.trim();
         if (field) {
-          updates.fields = { ...customer.fields };
+          updates.fields = { ...(updates.fields || customer.fields) };
           delete updates.fields[field];
         }
         break;
@@ -1937,13 +1942,28 @@ app.post('/api/sequences', async (req, res) => {
 // ─────────────────────────────────────────────
 // Broadcasts — Envío masivo
 // ─────────────────────────────────────────────
+const BROADCASTS_FILE = path.join(__dirname, 'broadcasts.json');
 let activeBroadcasts = {};
+
+function loadBroadcasts() {
+  try {
+    if (fs.existsSync(BROADCASTS_FILE)) {
+      activeBroadcasts = JSON.parse(fs.readFileSync(BROADCASTS_FILE, 'utf8'));
+    }
+  } catch (e) { console.warn('⚠️ Error al cargar broadcasts:', e.message); }
+}
+function saveBroadcasts() {
+  try { fs.writeFileSync(BROADCASTS_FILE, JSON.stringify(activeBroadcasts, null, 2)); }
+  catch (e) { console.error('❌ Error al guardar broadcasts:', e.message); }
+}
+loadBroadcasts();
 
 app.post('/api/broadcasts', async (req, res) => {
   const { name, message_steps, recipient_filter, scheduled_at } = req.body;
   const id = 'bc_' + Date.now();
   const broadcast = { id, name, message_steps, recipient_filter, scheduled_at, status: scheduled_at ? 'scheduled' : 'sending', total: 0, sent: 0, failed: 0, created_at: new Date().toISOString() };
   activeBroadcasts[id] = broadcast;
+  saveBroadcasts();
   if (!scheduled_at) {
     executeBroadcast(broadcast);
   }
@@ -1974,9 +1994,11 @@ async function executeBroadcast(broadcast) {
     }
     broadcast.status = 'completed';
     broadcast.completed_at = new Date().toISOString();
+    saveBroadcasts();
     broadcastLog('SYSTEM', `Broadcast "${broadcast.name}" completado: ${broadcast.sent}/${broadcast.total} enviados`);
   } catch (e) {
     broadcast.status = 'failed';
+    saveBroadcasts();
     console.error('[BROADCAST] Error:', e.message);
   }
 }
@@ -1986,6 +2008,7 @@ setInterval(() => {
   for (const bc of Object.values(activeBroadcasts)) {
     if (bc.status === 'scheduled' && bc.scheduled_at && new Date(bc.scheduled_at) <= now) {
       executeBroadcast(bc);
+      saveBroadcasts();
     }
   }
 }, 60_000);
@@ -2067,7 +2090,10 @@ app.get('/api/contacts', async (req, res) => {
   try {
     const { search, tag, status, limit = 50, offset = 0 } = req.query;
     let query = supabase.from('customers').select('*');
-    if (search) query = query.or(`name.ilike.%${search}%,instagram_id.ilike.%${search}%`);
+    if (search) {
+      const safeSearch = search.replace(/[,%"]/g, '');
+      query = query.or(`name.ilike.%${safeSearch}%,instagram_id.ilike.%${safeSearch}%`);
+    }
     if (tag) query = query.contains('tags', [tag]);
     if (status) query = query.eq('status', status);
     query = query.order('updated_at', { ascending: false }).range(Number(offset), Number(offset) + Number(limit) - 1);
