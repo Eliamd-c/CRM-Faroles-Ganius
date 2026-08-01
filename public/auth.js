@@ -1,5 +1,9 @@
 // Interceptor global para inyectar token de autenticación en llamadas a la API
-const API_SECRET = 'farolesgenius_dev_secret'; // Debe coincidir con backend (app.js)
+const API_SECRET = localStorage.getItem('API_SECRET');
+
+if (!API_SECRET && window.location.pathname !== '/login.html') {
+  window.location.href = '/login.html';
+}
 
 const originalFetch = window.fetch;
 window.fetch = async function() {
@@ -16,5 +20,13 @@ window.fetch = async function() {
     }
   }
   
-  return originalFetch(resource, config);
+  const response = await originalFetch(resource, config);
+  
+  // Si la API rechaza el token, borrarlo y mandar a login
+  if (response.status === 401 || response.status === 403) {
+    localStorage.removeItem('API_SECRET');
+    window.location.href = '/login.html';
+  }
+  
+  return response;
 };

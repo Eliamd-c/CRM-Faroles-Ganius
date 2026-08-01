@@ -325,7 +325,8 @@ app.post('/webhook', async (req, res) => {
       return res.status(403).send('Invalid signature');
     }
   } else if (!appSecret) {
-    console.warn('⚠️ META_APP_SECRET no configurado, omitiendo validación de firma.');
+    console.error('❌ META_APP_SECRET no configurado, bloqueando petición.');
+    return res.status(500).send('Server misconfiguration');
   } else if (!signature) {
     console.warn('❌ Petición sin firma X-Hub-Signature-256');
     return res.status(403).send('Missing signature');
@@ -335,7 +336,8 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 
   const body = req.body;
-  console.log('\n📨 Evento recibido:', JSON.stringify(body, null, 2));
+  const eventId = body?.entry?.[0]?.id || 'unknown';
+  console.log(`\n📨 Evento recibido de Instagram (ID: ${eventId})`);
 
   if (body.object !== 'instagram') return;
 
