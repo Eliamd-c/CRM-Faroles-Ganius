@@ -338,6 +338,99 @@ app.post('/api/upload', (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────
+// IA Asistente de Textos (Fase 4 - Opción 3)
+// ─────────────────────────────────────────────
+app.post('/api/ai/improve-text', express.json(), async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'Texto requerido' });
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'Falta configurar OPENAI_API_KEY en el backend' });
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'Eres un experto en copywriting para chatbots y marketing. Tu tarea es mejorar el texto proporcionado por el usuario para hacerlo más persuasivo, claro y amigable para WhatsApp/Instagram. Mantén la esencia original, corrige ortografía si es necesario, y puedes añadir emojis pertinentes. No uses comillas extras ni texto de relleno, solo devuelve el texto mejorado.'
+          },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const improvedText = response.data.choices[0].message.content.trim();
+    res.json({ text: improvedText });
+  } catch (error) {
+    console.error('Error llamando a OpenAI:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Error al procesar el texto con IA' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Generación Automática de Flujos con IA
+// ─────────────────────────────────────────────
+app.post('/api/ai/generate-flow', express.json(), async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'Prompt requerido' });
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'Falta configurar OPENAI_API_KEY en el backend' });
+  }
+
+  try {
+    const systemInstruction = `
+Eres un experto diseñador de Chatbots. El usuario pedirá que crees un flujo de conversación. Debes generar un objeto JSON estricto con dos arreglos: "nodes" y "connections".
+Tipos de nodo ('type'): 'trigger', 'message', 'action', 'input', 'condition', 'delay', 'ai_agent'.
+
+Formato esperado para cada nodo en "nodes":
+- trigger: { "id": "1", "type": "trigger", "data": { "keywords": "palabra" }, "x": 100, "y": 200 }
+- message: { "id": "2", "type": "message", "data": { "text": "¡Hola!" }, "x": 400, "y": 200 }
+- input: { "id": "3", "type": "input", "data": { "prompt": "Dime tu email", "inputType": "email" }, "x": 700, "y": 200 }
+- action: { "id": "4", "type": "action", "data": { "actionType": "add_tag", "tag": "nuevo" }, "x": 400, "y": 400 }
+- delay: { "id": "5", "type": "delay", "data": { "seconds": 5 }, "x": 100, "y": 400 }
+- ai_agent: { "id": "6", "type": "ai_agent", "data": { "system_prompt": "Eres experto en ventas" }, "x": 700, "y": 400 }
+
+Formato de "connections":
+[{ "from": "1", "to": "2" }]
+
+Devuelve ÚNICAMENTE el JSON válido.
+`;
+
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o',
+        response_format: { type: "json_object" },
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 1500
+      },
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+    );
+
+    const generatedJSON = response.data.choices[0].message.content.trim();
+    res.json(JSON.parse(generatedJSON));
+  } catch (error) {
+    console.error('Error generando flujo con IA:', error.response?.data?.error?.message || error.message);
+    res.status(500).json({ error: 'Error al generar flujo con IA' });
+  }
+});
+
+// ─────────────────────────────────────────────
 // Obtener Perfil de Usuario
 // ─────────────────────────────────────────────
 async function getUserProfile(senderId) {
@@ -353,6 +446,50 @@ async function getUserProfile(senderId) {
     console.error(`❌ Error obteniendo perfil de ${senderId}:`, err.response?.data?.error?.message || err.message);
     return null;
   }
+}
+
+// ─────────────────────────────────────────────
+// Motor IA: Disparadores Inteligentes (Smart Triggers)
+// ─────────────────────────────────────────────
+async function detectIntentWithAI(text, flows) {
+  if (!process.env.OPENAI_API_KEY) return null;
+  
+  // Extraer los flujos que tienen keywords
+  const candidateFlows = flows.filter(f => f.enabled !== false && f.keywords && f.keywords.length > 0);
+  if (candidateFlows.length === 0) return null;
+
+  const intents = candidateFlows.map(f => `- ID: ${f.id} | Palabras clave: ${f.keywords.join(', ')}`).join('\n');
+  
+  const systemPrompt = `Eres el motor de reconocimiento de intenciones de un chatbot.
+Tus opciones de respuesta son ÚNICAMENTE el "ID" del flujo que mejor coincida con la intención del usuario, o la palabra "NULL" si ninguna coincide.
+Aquí están los flujos disponibles y sus palabras clave (que definen su intención):
+${intents}
+
+Si el mensaje del usuario tiene la misma intención o significado que alguna de las palabras clave de un flujo (sinónimos, faltas de ortografía, formas de decirlo), responde con su ID exacto. Si no coincide con ninguna intención clara, responde NULL. NO digas nada más, solo el ID o NULL.`;
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.0,
+        max_tokens: 50
+      },
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+    );
+    
+    const reply = response.data.choices[0].message.content.trim();
+    if (reply !== 'NULL' && reply !== 'null' && reply !== '') {
+      return reply;
+    }
+  } catch (err) {
+    console.error('❌ Error en Smart Trigger AI:', err.response?.data?.error?.message || err.message);
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────
@@ -422,6 +559,40 @@ async function handleMessage(event) {
     } catch (e) {
       console.error('[DB] Error creando nuevo contacto:', e.message);
     }
+  }
+
+  // 3.8 Máquina de Estados: Agente IA
+  if (customer && customer.bot_state === 'ai_agent') {
+    if (!process.env.OPENAI_API_KEY) {
+      await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
+      return;
+    }
+    
+    const systemPrompt = customer.fields?.current_ai_prompt || 'Eres un asistente útil.';
+    
+    try {
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: text }
+          ],
+          temperature: 0.7,
+          max_tokens: 300
+        },
+        { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+      );
+      
+      const aiReply = response.data.choices[0].message.content.trim();
+      await sendMessage(senderId, aiReply);
+      broadcastLog('SYSTEM', `Agente IA respondió a ${senderName}`);
+    } catch (err) {
+      console.error('❌ Error IA Agent:', err.response?.data?.error?.message || err.message);
+      await sendMessage(senderId, "Lo siento, tuve un problema procesando tu mensaje.");
+    }
+    return;
   }
 
   // 4. Máquina de Estados: Awaiting Input
@@ -519,8 +690,28 @@ async function handleMessage(event) {
     matchedFlow.lastExecutedAt = new Date().toISOString();
     saveFlowsConfig().catch(() => {});
     await processFlowSteps(matchedFlow.steps, senderId, senderName);
-  } else if (flowsConfig.defaultFlow?.steps) {
-    await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName);
+  } else {
+    // 6. Smart Triggers (IA Fallback)
+    console.log(`[Smart Trigger] Buscando intención con IA para: "${text}"`);
+    const smartFlowId = await detectIntentWithAI(text, flowsConfig.flows);
+    
+    if (smartFlowId) {
+      console.log(`[Smart Trigger] Intención detectada. Ejecutando flujo: ${smartFlowId}`);
+      const smartFlow = flowsConfig.flows.find(f => f.id === smartFlowId);
+      if (smartFlow && smartFlow.steps) {
+        smartFlow.executionCount = (smartFlow.executionCount || 0) + 1;
+        smartFlow.lastExecutedAt = new Date().toISOString();
+        saveFlowsConfig().catch(() => {});
+        await processFlowSteps(smartFlow.steps, senderId, senderName);
+        return;
+      }
+    }
+
+    // 7. Flujo por Defecto (Si la IA no detecta intención)
+    if (flowsConfig.defaultFlow?.steps) {
+      console.log(`[Router] No hubo coincidencia. Ejecutando Default Flow.`);
+      await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName);
+    }
   }
 }
 
@@ -630,6 +821,17 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
         const targetFlow = flowsConfig.flows.find(f => f.id === `flow_${targetId}` || f.id === targetId);
         if (targetFlow) await processFlowSteps(targetFlow.steps, senderId, senderName, _visited);
         else broadcastLog('WARNING', `Goto: Flujo no encontrado: ${targetId}`);
+      }
+      break;
+    } else if (step.type === 'ai_agent') {
+      if (supabase) {
+        await supabase.from('customers').update({
+          bot_state: 'ai_agent',
+          fields: { ...customer?.fields, current_ai_prompt: step.system_prompt }
+        }).eq('instagram_id', senderId);
+        broadcastLog('SYSTEM', `Agente IA activado para ${senderName}`);
+      } else {
+        console.warn('⚠️ Supabase no conectado. No se puede activar el Agente IA.');
       }
       break;
     }

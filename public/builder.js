@@ -20,6 +20,7 @@ const nodeVideoState = {};    // { nodeId: { video_url: '' } }
 const nodeFileState = {};     // { nodeId: { file_url: '' } }
 const nodeDelayState = {};    // { nodeId: { seconds: 5 } }
 const nodeGotoState = {};     // { nodeId: { flow_id: '' } }
+const nodeAiAgentState = {};  // { nodeId: { system_prompt: '' } }
 
 // ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
@@ -322,6 +323,15 @@ const htmlGoto = `
   </div>
 `;
 
+const htmlAiAgent = `
+  <div class="mc-node mc-ai">
+    <div class="mc-header"><span>🧠</span> Agente IA</div>
+    <div class="box ai-agent-node-preview" style="padding: 12px; background: #f8fafc; text-align: center; border-radius: 6px;">
+      <em style="color:#64748b; font-size:11px;">Sin Prompt Configurado</em>
+    </div>
+  </div>
+`;
+
 // Registrar nodos estáticos
 editor.registerNode('trigger', htmlTrigger);
 editor.registerNode('card', htmlCard);
@@ -334,6 +344,7 @@ editor.registerNode('video', htmlVideo);
 editor.registerNode('file', htmlFile);
 editor.registerNode('delay', htmlDelay);
 editor.registerNode('goto', htmlGoto);
+editor.registerNode('ai_agent', htmlAiAgent);
 
 // ─────────────────────────────────────────────
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
@@ -419,6 +430,10 @@ id.addEventListener('drop', e => {
     const nodeId = editor.addNode('goto', 1, 0, posX, posY, 'goto', { _goto: '{}' }, htmlGoto);
     nodeGotoState[nodeId] = { flow_id: '' };
     setTimeout(() => renderGotoNode(nodeId), 50);
+  } else if (type === 'ai_agent') {
+    const nodeId = editor.addNode('ai_agent', 1, 1, posX, posY, 'ai_agent', { _ai: '{}' }, htmlAiAgent);
+    nodeAiAgentState[nodeId] = { system_prompt: 'Eres un asistente útil y amigable. Ayuda al usuario a resolver sus dudas basándote en la información de la tienda.' };
+    setTimeout(() => renderAiAgentNode(nodeId), 50);
   }
 });
 
@@ -441,6 +456,7 @@ const NODE_META = {
   delay:      { icon: '⏱', cls: 'type-delay' },
   goto:       { icon: '↗️', cls: 'type-goto' },
   file:       { icon: '📄', cls: 'type-file' },
+  ai_agent:   { icon: '🧠', cls: 'type-ai' },
 };
 
 function openInspector(nodeId) {
@@ -490,6 +506,8 @@ function openInspector(nodeId) {
     renderDelayInspector(nodeId);
   } else if (node.name === 'goto') {
     renderGotoInspector(nodeId);
+  } else if (node.name === 'ai_agent') {
+    renderAiAgentInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
@@ -523,13 +541,25 @@ function renderMessageInspector(nodeId) {
     if (block.type === 'text') {
       html += `
         <div style="background: #f1f2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-          <textarea class="cfg-input" style="width: 100%; border: none; background: transparent; outline: none; resize: none; min-height: 80px; font-size: 13px; font-family: inherit; color: #1c1e21;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Introduce tu texto...">${block.content}</textarea>
+          <textarea id="text-block-${nodeId}-${idx}" class="cfg-input" style="width: 100%; border: none; background: transparent; outline: none; resize: none; min-height: 80px; font-size: 13px; font-family: inherit; color: #1c1e21;" oninput="updateBlockContent('${nodeId}', ${idx}, this.value)" placeholder="Introduce tu texto...">${block.content}</textarea>
+          <div style="display: flex; justify-content: flex-end;">
+            <button onclick="improveTextWithAI('${nodeId}', ${idx})" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(236, 72, 153, 0.2); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+              <span id="ai-icon-${nodeId}-${idx}">✨</span> <span id="ai-text-${nodeId}-${idx}">Mejorar con IA</span>
+            </button>
+          </div>
       `;
     } else if (block.type === 'image') {
       html += `
         <div style="background: #f1f2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-          <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen</label>
-          <input class="cfg-input" type="text" style="width:100%; border: none; background: #ffffff; padding: 8px; border-radius: 6px; font-size: 13px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
+          <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen o Subir archivo</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input id="img-url-${nodeId}-${idx}" class="cfg-input" type="text" style="flex:1; border: none; background: #ffffff; padding: 8px; border-radius: 6px; font-size: 13px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
+            <label style="cursor: pointer; background: #ffffff; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0;" title="Subir imagen desde tu PC">
+              <input type="file" accept="image/*" style="display: none;" onchange="uploadBlockImage(this, '${nodeId}', ${idx})" />
+              <span style="font-size: 16px; display:inline-block; margin-top:-2px;">📁</span>
+            </label>
+          </div>
+          <div id="upload-progress-${nodeId}-${idx}" style="font-size: 11px; color: var(--color-primary); display: none; margin-top: 4px;">Subiendo imagen...</div>
       `;
     }
 
@@ -780,7 +810,70 @@ window.addBlockNode = function(sourceNodeId, type) {
 };
 
 window.updateBlockContent = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].content = val; renderBlocksInNode(nodeId); };
+
+window.improveTextWithAI = async (nodeId, idx) => {
+  const textarea = document.getElementById(`text-block-${nodeId}-${idx}`);
+  const icon = document.getElementById(`ai-icon-${nodeId}-${idx}`);
+  const btnText = document.getElementById(`ai-text-${nodeId}-${idx}`);
+  
+  if (!textarea || !textarea.value.trim()) {
+    if (typeof Toast !== 'undefined') Toast.warning('Escribe algo primero para que la IA lo mejore');
+    return;
+  }
+
+  const originalText = textarea.value;
+  icon.innerText = '⏳';
+  btnText.innerText = 'Pensando...';
+  
+  try {
+    const res = await fetch('/api/ai/improve-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: originalText })
+    });
+    
+    const data = await res.json();
+    if (res.ok && data.text) {
+      textarea.value = data.text;
+      window.updateBlockContent(nodeId, idx, data.text);
+      if (typeof Toast !== 'undefined') Toast.success('Texto mejorado con IA ✨');
+    } else {
+      if (typeof Toast !== 'undefined') Toast.error(data.error || 'Error de IA');
+    }
+  } catch (err) {
+    console.error('Error IA:', err);
+    if (typeof Toast !== 'undefined') Toast.error('Error de conexión con la IA');
+  } finally {
+    icon.innerText = '✨';
+    btnText.innerText = 'Mejorar con IA';
+  }
+};
 window.updateBlockUrl = (nodeId, idx, val) => { nodeBlocksState[nodeId][idx].url = val; renderBlocksInNode(nodeId); };
+window.uploadBlockImage = async (input, nodeId, idx) => {
+  const file = input.files[0];
+  if (!file) return;
+  const progressEl = document.getElementById(`upload-progress-${nodeId}-${idx}`);
+  if (progressEl) progressEl.style.display = 'block';
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (res.ok && data.url) {
+      window.updateBlockUrl(nodeId, idx, data.url);
+      const urlInput = document.getElementById(`img-url-${nodeId}-${idx}`);
+      if (urlInput) urlInput.value = data.url;
+      if (typeof Toast !== 'undefined') Toast.success('Imagen subida correctamente');
+    } else {
+      if (typeof Toast !== 'undefined') Toast.error(data.error || 'Error al subir');
+    }
+  } catch (err) {
+    if (typeof Toast !== 'undefined') Toast.error('Error de conexión');
+  } finally {
+    if (progressEl) progressEl.style.display = 'none';
+    input.value = '';
+  }
+};
 window.deleteBlock = (nodeId, idx) => { nodeBlocksState[nodeId].splice(idx, 1); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
 window.addBlock = (nodeId, type) => { nodeBlocksState[nodeId].push({id: generateId(), type, content: type==='text'?'Nuevo texto':'', url:'', buttons:[]}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
 window.addButton = (nodeId, idx) => { nodeBlocksState[nodeId][idx].buttons.push({title:'New Button', type:'postback', url:''}); renderBlocksInNode(nodeId); renderMessageInspector(nodeId); };
@@ -2303,3 +2396,157 @@ function renderTriggerNode(nodeId) {
     container.innerHTML = `<div style="border:2px dashed #0084ff; border-radius:8px; padding:12px; text-align:center; color:#0084ff; font-weight:600; font-size:14px; cursor:pointer;" onclick="openTriggerPicker('${nodeId}')">+ Elegir disparador</div>`;
   }
 }
+
+// ─────────────────────────────────────────────
+// IA Agent Handlers
+// ─────────────────────────────────────────────
+window.renderAiAgentNode = function(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.ai-agent-node-preview');
+  if (!container) return;
+  
+  const state = nodeAiAgentState[nodeId] || { system_prompt: '' };
+  if (state.system_prompt) {
+    container.innerHTML = `<div style="font-size:11px; color:#475569; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;">${state.system_prompt}</div>`;
+  } else {
+    container.innerHTML = `<em style="color:#ef4444; font-size:11px;">⚠️ Sin Configurar</em>`;
+  }
+};
+
+window.renderAiAgentInspector = function(nodeId) {
+  document.getElementById('config-title').innerText = 'Agente IA';
+  
+  const state = nodeAiAgentState[nodeId] || { system_prompt: '' };
+  
+  let html = `
+    <div style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); padding: 15px; border-radius: 8px; color: white; margin-bottom: 15px;">
+      <h3 style="margin:0 0 5px 0; font-size:14px; display:flex; align-items:center; gap:5px;">🧠 Toma el Control</h3>
+      <p style="margin:0; font-size:12px; opacity:0.9;">Cuando el flujo llegue a este nodo, la IA responderá automáticamente a los mensajes del usuario siguiendo las instrucciones del Prompt.</p>
+    </div>
+    
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+      <label class="cfg-label" style="display:flex; justify-content:space-between;">
+        <span>Prompt del Sistema (Instrucciones)</span>
+        <span style="color:#8b5cf6; font-size:11px;">Requerido</span>
+      </label>
+      <textarea id="ai-system-prompt" class="cfg-input" style="height: 150px; resize:vertical;" placeholder="Ej: Eres un vendedor experto. Resuelve dudas y trata de obtener el email del usuario.">${state.system_prompt}</textarea>
+      <p style="font-size:11px; color:var(--text-muted); margin:0;">Define el rol, el tono y el objetivo de la IA.</p>
+    </div>
+    
+    <button class="btn-primary" onclick="saveAiAgentConfig('${nodeId}')" style="width:100%;">Guardar Prompt</button>
+  `;
+  
+  document.getElementById('config-body').innerHTML = html;
+};
+
+window.saveAiAgentConfig = function(nodeId) {
+  const promptStr = document.getElementById('ai-system-prompt').value.trim();
+  
+  if (!promptStr) {
+    if (typeof Toast !== 'undefined') Toast.warning('Debes escribir instrucciones para la IA.');
+    return;
+  }
+  
+  nodeAiAgentState[nodeId] = { system_prompt: promptStr };
+  
+  // Guardar en data del drawflow para la exportación final
+  editor.drawflow.drawflow.Home.data[nodeId].data._ai = JSON.stringify(nodeAiAgentState[nodeId]);
+  
+  renderAiAgentNode(nodeId);
+  closeInspector();
+  if (typeof Toast !== 'undefined') Toast.success('Configuración de Agente IA guardada');
+};
+
+// ─────────────────────────────────────────────
+// Generador Mágico de Flujos (AI)
+// ─────────────────────────────────────────────
+window.generateFlowFromAI = async function() {
+  const promptInput = document.getElementById('ai-prompt');
+  const btnConfirm = document.getElementById('btn-confirm-generate');
+  const prompt = promptInput.value.trim();
+  
+  if (!prompt) {
+    if (typeof Toast !== 'undefined') Toast.warning('Escribe una descripción para el flujo.');
+    return;
+  }
+  
+  btnConfirm.innerHTML = '✨ Generando...';
+  btnConfirm.disabled = true;
+  
+  try {
+    const res = await fetch('/api/ai/generate-flow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Error desconocido');
+    }
+    
+    const flowData = await res.json();
+    if (!flowData.nodes || !Array.isArray(flowData.nodes)) throw new Error('La IA devolvió un formato inválido');
+    
+    editor.clear(); // Limpiamos el canvas actual
+    const idMap = {};
+    
+    // 1. Crear Nodos
+    for (const aiNode of flowData.nodes) {
+      const type = aiNode.type;
+      const x = aiNode.x || (Math.random() * 400 + 100);
+      const y = aiNode.y || (Math.random() * 400 + 100);
+      const data = aiNode.data || {};
+      
+      let newId = null;
+      if (type === 'trigger') {
+        newId = editor.addNode('trigger', 0, 1, x, y, 'trigger', { keywords: data.keywords || '', triggerType: 'message' }, htmlTrigger);
+      } else if (type === 'message') {
+        const tempHtml = `<div class="mc-node mc-content"><div class="mc-header"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>`;
+        newId = editor.addNode('message', 1, 10, x, y, 'message', { _blocks: '[]' }, tempHtml);
+        nodeBlocksState[newId] = [ { id: generateId(), type: 'text', content: data.text || 'Hola', buttons: [] } ];
+        setTimeout(() => renderBlocksInNode(newId), 50);
+      } else if (type === 'input') {
+        newId = editor.addNode('input', 1, 2, x, y, 'input', { _input: '{}' }, htmlInput);
+        nodeInputState[newId] = { type: data.inputType || 'email', field: data.field || 'email', prompt: data.prompt || 'Ingresa tu dato:', retry: 'Intenta de nuevo:' };
+        setTimeout(() => renderInputNode(newId), 50);
+      } else if (type === 'action') {
+        newId = editor.addNode('action', 1, 1, x, y, 'action', { _action: '{}' }, htmlAction);
+        nodeActionsState[newId] = { type: data.actionType || 'add_tag', params: { tag: data.tag || 'ia_tag' } };
+        setTimeout(() => renderActionNode(newId), 50);
+      } else if (type === 'delay') {
+        newId = editor.addNode('delay', 1, 1, x, y, 'delay', { _delay: '{}' }, htmlDelay);
+        nodeDelayState[newId] = { seconds: data.seconds || 5 };
+        setTimeout(() => renderDelayNode(newId), 50);
+      } else if (type === 'ai_agent') {
+        newId = editor.addNode('ai_agent', 1, 1, x, y, 'ai_agent', { _ai: '{}' }, htmlAiAgent);
+        nodeAiAgentState[newId] = { system_prompt: data.system_prompt || 'Eres un asistente.' };
+        setTimeout(() => renderAiAgentNode(newId), 50);
+      }
+      
+      if (newId) idMap[aiNode.id] = newId;
+    }
+    
+    // 2. Conectar Nodos
+    if (flowData.connections) {
+      for (const conn of flowData.connections) {
+        const fromId = idMap[conn.from];
+        const toId = idMap[conn.to];
+        if (fromId && toId) {
+          editor.addConnection(fromId, toId, 'output_1', 'input_1');
+        }
+      }
+    }
+    
+    if (typeof Toast !== 'undefined') Toast.success('Flujo mágico generado con éxito ✨');
+    closeAiModal();
+    
+  } catch (err) {
+    if (typeof Toast !== 'undefined') Toast.error(err.message);
+    else alert('Error: ' + err.message);
+  } finally {
+    btnConfirm.innerHTML = 'Generar Flujo';
+    btnConfirm.disabled = false;
+  }
+};

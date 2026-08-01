@@ -77,6 +77,8 @@
 .mc-action .mc-header { background: #2A9D8F; }
 /* Logic: Orange */
 .mc-logic .mc-header { background: #F77F00; }
+/* AI Agent: Purple */
+.mc-ai .mc-header { background: #8B5CF6; }
 
 /* ── Body ── */
 .drawflow-node .box {
