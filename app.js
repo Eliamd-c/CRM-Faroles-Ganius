@@ -68,6 +68,18 @@ async function retrieveRelevantContext(query) {
     );
     const queryEmbedding = embedRes.data.data[0].embedding;
     
+    // FASE 7: Buscar primero en respuestas aprendidas
+    let learnedContext = "";
+    const { data: learned, error: errLearned } = await supabase.rpc('match_learned_responses', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.85,
+      match_count: 1
+    });
+
+    if (!errLearned && learned && learned.length > 0) {
+      learnedContext = `\n\n=== 🚨 INSTRUCCIÓN ESTRICTA: RESPUESTA APRENDIDA DE UN HUMANO ===\nEsta es la respuesta exacta que debes dar a esta pregunta (úsala textualmente o adáptala muy ligeramente):\nPregunta: ${learned[0].question}\nRespuesta: ${learned[0].answer}\n`;
+    }
+
     const { data: chunks, error } = await supabase.rpc('match_knowledge', {
       query_embedding: queryEmbedding,
       match_threshold: 0.30,
@@ -79,7 +91,7 @@ async function retrieveRelevantContext(query) {
     let ragContext = "\n\n=== CONOCIMIENTO RECUPERADO (RAG) ===\nÚsalo para responder al cliente:\n";
     chunks.forEach(c => ragContext += `\n[${c.section_title}]\n${c.content}\n`);
     
-    return AI_BASE_PERSONA + ragContext;
+    return AI_BASE_PERSONA + learnedContext + ragContext;
   } catch (err) {
     console.error('Error en RAG:', err.message);
     return AI_MASTER_CONTEXT;
@@ -577,6 +589,34 @@ app.get('/api/media-catalog', async (req, res) => {
   } catch (err) {
     console.error('Error fetching media catalog:', err.message);
     res.status(500).json({ error: 'Error al obtener el catálogo de media' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// FASE 7: Endpoint de Aprendizaje Humano
+// ─────────────────────────────────────────────
+app.post('/api/ai/learn', express.json(), async (req, res) => {
+  if (!supabase || !process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'Configuración incompleta' });
+  try {
+    const { question, answer } = req.body;
+    if (!question || !answer) return res.status(400).json({ error: 'Faltan datos (question, answer)' });
+    
+    const embedRes = await axios.post(
+      'https://api.openai.com/v1/embeddings',
+      { input: question, model: 'text-embedding-3-small' },
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } }
+    );
+    const queryEmbedding = embedRes.data.data[0].embedding;
+    
+    const { error } = await supabase.from('learned_responses').insert({
+      question, answer, embedding: queryEmbedding
+    });
+    
+    if (error) throw error;
+    res.json({ success: true, message: 'Aprendizaje guardado correctamente' });
+  } catch (err) {
+    console.error('Error en /api/ai/learn:', err.message);
+    res.status(500).json({ error: 'Error al guardar aprendizaje' });
   }
 });
 
