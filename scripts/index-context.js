@@ -4,21 +4,33 @@ const path = require('path');
 const axios = require('axios');
 const supabase = require('../db');
 
-async function generateEmbedding(text) {
-  const response = await axios.post(
-    'https://api.openai.com/v1/embeddings',
-    {
-      input: text,
-      model: 'text-embedding-3-small'
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function generateEmbedding(text, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.post(
+        'https://api.openai.com/v1/embeddings',
+        {
+          input: text,
+          model: 'text-embedding-3-small'
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 20000
+        }
+      );
+      return response.data.data[0].embedding;
+    } catch (err) {
+      const isLast = attempt === retries;
+      console.warn(`  ⚠️ Intento ${attempt}/${retries} falló: ${err.message}${err.cause ? ' | causa: ' + err.cause.message : ''}`);
+      if (isLast) throw err;
+      await sleep(1000 * attempt);
     }
-  );
-  return response.data.data[0].embedding;
+  }
 }
 
 async function indexContext() {
@@ -68,10 +80,12 @@ async function indexContext() {
         console.log(`✅ ${sectionTitle} indexado con éxito.`);
       }
     } catch (err) {
-      console.error(`❌ Error procesando ${sectionTitle}:`, err.message);
+      console.error(`❌ Error procesando ${sectionTitle}:`, err.message, err.cause ? '| causa: ' + err.cause.message : '');
     }
+
+    await sleep(300); // pequeña pausa entre secciones para no saturar la conexión
   }
-  
+
   console.log('✅ Proceso de indexación finalizado.');
 }
 
