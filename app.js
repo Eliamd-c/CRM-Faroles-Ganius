@@ -1484,6 +1484,29 @@ async function executeAction(senderId, senderName, step) {
         }
         break;
       }
+      case 'compute': {
+        // Calcula field = operand1 (operador) operand2. Cada operando puede ser
+        // el nombre de otro campo del cliente o un número literal.
+        const field = params.field?.trim();
+        const operator = params.operator || '*';
+        const currentFields = updates.fields || customer.fields || {};
+        const resolveOperand = (val) => {
+          if (val === undefined || val === null || val === '') return NaN;
+          const fieldVal = currentFields[val];
+          return Number(fieldVal !== undefined ? fieldVal : val);
+        };
+        const a = resolveOperand(params.operand1);
+        const b = resolveOperand(params.operand2);
+        if (field && !isNaN(a) && !isNaN(b)) {
+          let result;
+          if (operator === '+') result = a + b;
+          else if (operator === '-') result = a - b;
+          else if (operator === '/') result = b !== 0 ? a / b : 0;
+          else result = a * b;
+          updates.fields = { ...currentFields, [field]: result };
+        }
+        break;
+      }
       case 'delete_contact': {
         await supabase.from('customers').delete().eq('instagram_id', senderId);
         broadcastLog('SYSTEM', `Contacto eliminado permanentemente: ${senderName}`);
