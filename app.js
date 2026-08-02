@@ -12,6 +12,9 @@ const supabase = require('./db');
 
 // Cargar configuración de flujos (Arquitectura JSON - Fase 1)
 let flowsConfig = { flows: [], defaultFlow: null };
+
+// Cargar configuración de flujos de bienvenida (Welcome Message Ads)
+let welcomeFlowsConfig = { welcome_flows: [] };
 try {
   let filePath = path.join(__dirname, 'flows.json');
   // Si flows.json no existe, intenta flows.json.example (para despliegues)
@@ -42,6 +45,21 @@ try {
 } catch (err) {
   console.error('❌ Error al cargar flows.json:', err.message);
   console.warn('⚠️ Usando configuración de flujos vacía por defecto.');
+}
+
+// Cargar welcome_flows.json (Welcome Message Ads)
+try {
+  const welcomeFlowsPath = path.join(__dirname, 'welcome_flows.json');
+  if (fs.existsSync(welcomeFlowsPath)) {
+    const rawData = fs.readFileSync(welcomeFlowsPath);
+    welcomeFlowsConfig = JSON.parse(rawData);
+    console.log(`✅ ${welcomeFlowsConfig.welcome_flows?.length || 0} Welcome Message Flows cargados.`);
+  } else {
+    console.log('ℹ️ welcome_flows.json no encontrado. Usando configuración vacía.');
+  }
+} catch (err) {
+  console.error('❌ Error al cargar welcome_flows.json:', err.message);
+  console.warn('⚠️ Usando configuración de welcome flows vacía por defecto.');
 }
 
 // Fuente de verdad de los flujos: Supabase (sobrevive a los despliegues).
@@ -463,6 +481,11 @@ try {
       else if (event.typing) {
         await handleTypingIndicator(event);
       }
+      // Welcome Message Ads (Click en anuncio de bienvenida)
+      else if ((event.referral?.ref && (event.referral.ref.includes('welcome') || event.referral.source === 'ads')) ||
+               (event.postback?.title && event.postback.title.includes('welcome'))) {
+        await handleWelcomeMessageAd(event);
+      }
       // Postback (botones pulsados)
       else if (event.postback) {
         await handlePostback(event);
@@ -667,6 +690,179 @@ app.post('/api/flows/:id/duplicate', async (req, res) => {
   } catch (err) {
     console.error('Error duplicating flow:', err);
     res.status(500).json({ error: 'Failed to duplicate flow' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Welcome Message Ads (Instagram Click-to-DM)
+// ─────────────────────────────────────────────
+
+// Listar flujos de bienvenida
+app.get('/api/welcome-flows', (req, res) => {
+  try {
+    res.json(welcomeFlowsConfig.welcome_flows || []);
+  } catch (err) {
+    console.error('Error getting welcome flows:', err);
+    res.status(500).json({ error: 'Failed to get welcome flows' });
+  }
+});
+
+// Crear un flujo de bienvenida
+app.post('/api/welcome-flows', express.json(), async (req, res) => {
+  try {
+    const { name, message_text, quick_replies, enabled } = req.body;
+    if (!name || !message_text) {
+      return res.status(400).json({ error: 'name y message_text son requeridos' });
+    }
+
+    const flow = {
+      id: 'wf_' + Date.now(),
+      name,
+      message_text,
+      quick_replies: quick_replies || [],
+      enabled: enabled !== false,
+      meta_flow_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (!welcomeFlowsConfig.welcome_flows) welcomeFlowsConfig.welcome_flows = [];
+    welcomeFlowsConfig.welcome_flows.push(flow);
+
+    // Guardar en archivo local
+    try {
+      await fs.promises.writeFile(
+        path.join(__dirname, 'welcome_flows.json'),
+        JSON.stringify(welcomeFlowsConfig, null, 2)
+      );
+    } catch (e) {
+      console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
+    }
+
+    res.json(flow);
+  } catch (err) {
+    console.error('Error creating welcome flow:', err);
+    res.status(500).json({ error: 'Failed to create welcome flow' });
+  }
+});
+
+// Actualizar un flujo de bienvenida
+app.patch('/api/welcome-flows/:id', express.json(), async (req, res) => {
+  try {
+    const { name, message_text, quick_replies, enabled } = req.body;
+    const flow = welcomeFlowsConfig.welcome_flows?.find(f => f.id === req.params.id);
+
+    if (!flow) return res.status(404).json({ error: 'Welcome flow not found' });
+
+    if (name) flow.name = name;
+    if (message_text) flow.message_text = message_text;
+    if (quick_replies) flow.quick_replies = quick_replies;
+    if (enabled !== undefined) flow.enabled = enabled;
+    flow.updated_at = new Date().toISOString();
+
+    try {
+      await fs.promises.writeFile(
+        path.join(__dirname, 'welcome_flows.json'),
+        JSON.stringify(welcomeFlowsConfig, null, 2)
+      );
+    } catch (e) {
+      console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
+    }
+
+    res.json(flow);
+  } catch (err) {
+    console.error('Error updating welcome flow:', err);
+    res.status(500).json({ error: 'Failed to update welcome flow' });
+  }
+});
+
+// Eliminar un flujo de bienvenida
+app.delete('/api/welcome-flows/:id', async (req, res) => {
+  try {
+    const idx = welcomeFlowsConfig.welcome_flows?.findIndex(f => f.id === req.params.id);
+    if (idx === -1 || idx === undefined) {
+      return res.status(404).json({ error: 'Welcome flow not found' });
+    }
+
+    welcomeFlowsConfig.welcome_flows.splice(idx, 1);
+
+    try {
+      await fs.promises.writeFile(
+        path.join(__dirname, 'welcome_flows.json'),
+        JSON.stringify(welcomeFlowsConfig, null, 2)
+      );
+    } catch (e) {
+      console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting welcome flow:', err);
+    res.status(500).json({ error: 'Failed to delete welcome flow' });
+  }
+});
+
+// Crear flujo en Meta API y vincularlo a un anuncio
+app.post('/api/welcome-flows/:id/publish', express.json(), async (req, res) => {
+  try {
+    const { igUserAccessToken } = req.body;
+    const flow = welcomeFlowsConfig.welcome_flows?.find(f => f.id === req.params.id);
+
+    if (!flow) return res.status(404).json({ error: 'Welcome flow not found' });
+    if (!igUserAccessToken) return res.status(400).json({ error: 'igUserAccessToken requerido' });
+
+    // Construir payload para Meta API
+    const metaPayload = {
+      eligible_platforms: ['instagram'],
+      name: flow.name,
+      welcome_message_flow: [
+        {
+          message: {
+            text: flow.message_text,
+            quick_replies: flow.quick_replies.map(qr => ({
+              content_type: 'text',
+              title: qr.title,
+              payload: qr.payload
+            }))
+          }
+        }
+      ]
+    };
+
+    // Llamar a Meta Graph API
+    const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || 'me';
+    const response = await axios.post(
+      `https://graph.instagram.com/v26.0/${igUserId}/welcome_message_flows`,
+      metaPayload,
+      {
+        headers: { Authorization: `Bearer ${igUserAccessToken}` }
+      }
+    );
+
+    if (response.data?.flow_id) {
+      flow.meta_flow_id = response.data.flow_id;
+      flow.updated_at = new Date().toISOString();
+
+      try {
+        await fs.promises.writeFile(
+          path.join(__dirname, 'welcome_flows.json'),
+          JSON.stringify(welcomeFlowsConfig, null, 2)
+        );
+      } catch (e) {
+        console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
+      }
+
+      console.log(`✅ Welcome Message Flow publicado en Meta: ${response.data.flow_id}`);
+      res.json({ success: true, meta_flow_id: response.data.flow_id });
+    } else {
+      res.status(400).json({ error: 'No flow_id recibido de Meta' });
+    }
+  } catch (err) {
+    console.error('Error publishing welcome flow:', err.response?.data || err.message);
+    res.status(500).json({
+      error: 'Failed to publish welcome flow',
+      details: err.response?.data?.error?.message || err.message
+    });
   }
 });
 
@@ -2136,6 +2332,65 @@ async function handleMessageTags(value) {
 async function handleMessagingHandover(value) {
   console.log(`🔄 Messaging Handover - ${value?.status || 'event'}`);
   broadcastLog('MESSAGING_HANDOVER', `Evento de handover detectado`);
+}
+
+// ─────────────────────────────────────────────
+// Welcome Message Ads - Click en anuncio de bienvenida
+// ─────────────────────────────────────────────
+async function handleWelcomeMessageAd(event) {
+  const senderId = event.sender?.id;
+  const clickedButtonPayload = event.message?.quick_reply?.payload || event.postback?.payload;
+
+  if (!senderId) return;
+
+  console.log(`🎯 Welcome Message Ad - Usuario: ${senderId}, Botón: ${clickedButtonPayload}`);
+  broadcastLog('WELCOME_AD', `Usuario hizo clic en anuncio de bienvenida (payload: ${clickedButtonPayload})`);
+
+  // Registrar conversión en Supabase si existe
+  if (supabase) {
+    try {
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('instagram_id', senderId)
+        .single();
+
+      if (!existingCustomer) {
+        // Nuevo cliente desde Welcome Message Ad
+        await supabase.from('customers').insert({
+          instagram_id: senderId,
+          source: 'welcome_message_ad',
+          welcome_flow_payload: clickedButtonPayload,
+          created_at: new Date().toISOString()
+        });
+        console.log(`✅ Nuevo cliente registrado desde Welcome Message Ad: ${senderId}`);
+      } else {
+        // Actualizar fuente si viene de un Welcome Message Ad
+        await supabase
+          .from('customers')
+          .update({
+            source: 'welcome_message_ad',
+            welcome_flow_payload: clickedButtonPayload
+          })
+          .eq('id', existingCustomer.id);
+      }
+    } catch (err) {
+      console.error('❌ Error registrando cliente de Welcome Message Ad:', err.message);
+    }
+  }
+
+  // Ejecutar el flujo asociado al payload del botón
+  // Por ejemplo, si payload es "BTN_CATALOG", ejecutar el flujo de catálogo
+  if (clickedButtonPayload) {
+    const matchingFlow = flowsConfig.flows.find(f =>
+      f.keywords && f.keywords.includes(clickedButtonPayload)
+    );
+
+    if (matchingFlow) {
+      console.log(`▶️ Ejecutando flujo para Welcome Message Ad: ${matchingFlow.name}`);
+      // Aquí se ejecutaría el flujo (por ahora solo se registra)
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
