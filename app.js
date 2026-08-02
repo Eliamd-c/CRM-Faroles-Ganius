@@ -545,7 +545,7 @@ try {
       }
     }
     }
-    });
+  });
   console.log('📝 [REGISTRO] POST /webhook registrado exitosamente');
 } catch (err) {
   console.error('❌ [ERROR] Fallo al registrar POST /webhook:', err.message);
