@@ -321,12 +321,16 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook', async (req, res) => {
   // Verificación de Firma (Seguridad)
   const signature = req.headers['x-hub-signature-256'];
-  const appSecret = process.env.META_APP_SECRET;
-  
+  const appSecret = (process.env.META_APP_SECRET || '').trim();
+
   if (appSecret && signature) {
     const expectedSignature = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
     if (signature !== expectedSignature) {
       console.warn('❌ Firma de webhook inválida');
+      console.warn(`   Recibida:  ${signature}`);
+      console.warn(`   Esperada:  ${expectedSignature}`);
+      console.warn(`   Longitud del secreto usado: ${appSecret.length} caracteres`);
+      console.warn(`   Bytes del body: ${req.rawBody ? req.rawBody.length : 'undefined'}`);
       return res.status(403).send('Invalid signature');
     }
   } else if (!appSecret) {
