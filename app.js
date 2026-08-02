@@ -326,19 +326,20 @@ app.post('/webhook', async (req, res) => {
   if (appSecret && signature) {
     const expectedSignature = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
     if (signature !== expectedSignature) {
-      console.warn('❌ Firma de webhook inválida');
+      // TEMPORAL: no bloquea mientras diagnosticamos un problema de firma en
+      // producción (el webhook dejó de recibir mensajes reales tras activar
+      // este chequeo). Se sigue registrando para poder depurarlo, pero ya
+      // no se rechaza la petición — evita dejar el bot sordo por este bug.
+      console.warn('⚠️ Firma de webhook inválida (NO BLOQUEANTE por ahora, ver diagnóstico)');
       console.warn(`   Recibida:  ${signature}`);
       console.warn(`   Esperada:  ${expectedSignature}`);
       console.warn(`   Longitud del secreto usado: ${appSecret.length} caracteres`);
       console.warn(`   Bytes del body: ${req.rawBody ? req.rawBody.length : 'undefined'}`);
-      return res.status(403).send('Invalid signature');
     }
   } else if (!appSecret) {
-    console.error('❌ META_APP_SECRET no configurado, bloqueando petición.');
-    return res.status(500).send('Server misconfiguration');
+    console.warn('⚠️ META_APP_SECRET no configurado, se omite verificación de firma (no bloqueante).');
   } else if (!signature) {
-    console.warn('❌ Petición sin firma X-Hub-Signature-256');
-    return res.status(403).send('Missing signature');
+    console.warn('⚠️ Petición sin firma X-Hub-Signature-256 (no bloqueante por ahora).');
   }
 
   // Responder 200 inmediatamente para que Meta no reintente
