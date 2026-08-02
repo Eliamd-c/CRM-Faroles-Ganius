@@ -407,12 +407,16 @@ app.get('/webhook', (req, res) => {
 // ─────────────────────────────────────────────
 // POST /webhook  — Recepción de eventos en tiempo real
 // ─────────────────────────────────────────────
-app.post('/webhook', async (req, res) => {
-  // Verificación de Firma (Seguridad)
-  const signature = req.headers['x-hub-signature-256'];
-  const appSecret = (process.env.META_APP_SECRET || '').trim();
+console.log('📝 [REGISTRO] Antes de registrar POST /webhook, app existe:', !!app);
+console.log('📝 [REGISTRO] typeof app.post:', typeof app.post);
+try {
+  app.post('/webhook', async (req, res) => {
+    console.log('📨 [WEBHOOK] POST recibido en /webhook');
+    // Verificación de Firma (Seguridad)
+    const signature = req.headers['x-hub-signature-256'];
+    const appSecret = (process.env.META_APP_SECRET || '').trim();
 
-  if (appSecret && signature) {
+    if (appSecret && signature) {
     const expectedSignature = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
     if (signature !== expectedSignature) {
       // TEMPORAL: no bloquea mientras diagnosticamos un problema de firma en
@@ -425,36 +429,81 @@ app.post('/webhook', async (req, res) => {
       console.warn(`   Longitud del secreto usado: ${appSecret.length} caracteres`);
       console.warn(`   Bytes del body: ${req.rawBody ? req.rawBody.length : 'undefined'}`);
     }
-  } else if (!appSecret) {
+    } else if (!appSecret) {
     console.warn('⚠️ META_APP_SECRET no configurado, se omite verificación de firma (no bloqueante).');
-  } else if (!signature) {
+    } else if (!signature) {
     console.warn('⚠️ Petición sin firma X-Hub-Signature-256 (no bloqueante por ahora).');
-  }
-
-  // Responder 200 inmediatamente para que Meta no reintente
-  res.sendStatus(200);
-
-  const body = req.body;
-  const eventId = body?.entry?.[0]?.id || 'unknown';
-  console.log(`\n📨 Evento recibido de Instagram (ID: ${eventId})`);
-
-  if (body.object !== 'instagram') return;
-
-  for (const entry of body.entry || []) {
-    for (const event of entry.messaging || []) {
-      await handleMessage(event);
     }
 
+    // Responder 200 inmediatamente para que Meta no reintente
+    res.sendStatus(200);
+
+    const body = req.body;
+    const eventId = body?.entry?.[0]?.id || 'unknown';
+    console.log(`\n📨 Evento recibido de Instagram (ID: ${eventId})`);
+
+    if (body.object !== 'instagram') return;
+
+    for (const entry of body.entry || []) {
+    // ─── MESSAGING EVENTS ───
+    for (const event of entry.messaging || []) {
+      // Message Echoes (confirmación de envío del bot)
+      if (event.message?.is_echo) {
+        await handleMessageEcho(event);
+      }
+      // Delivery Confirmations
+      else if (event.delivery) {
+        await handleDeliveryConfirmation(event);
+      }
+      // Read Receipts
+      else if (event.read) {
+        await handleReadReceipt(event);
+      }
+      // Typing Indicator
+      else if (event.typing) {
+        await handleTypingIndicator(event);
+      }
+      // Postback (botones pulsados)
+      else if (event.postback) {
+        await handlePostback(event);
+      }
+      // Message Reactions (reacciones a comentarios)
+      else if (event.message?.reaction) {
+        await handleMessageReaction(event);
+      }
+      // Mensajes regulares o quick replies
+      else if (event.message?.text || event.message?.quick_reply) {
+        await handleMessage(event);
+      }
+    }
+
+    // ─── CHANGE EVENTS ───
     for (const change of entry.changes || []) {
+      // Comentarios en publicaciones
       if (change.field === 'comments') {
         await handleComment(change.value);
       }
-      if (change.field === 'mentions') {
+      // Menciones en historias
+      else if (change.field === 'mentions') {
         await handleMention(change.value);
       }
+      // Story Reactions (reacciones a historias)
+      else if (change.field === 'story_reactions') {
+        await handleStoryReaction(change.value);
+      }
+      // Ice Breakers
+      else if (change.field === 'messaging_handover') {
+        // Puede usarse para icebreakers en handover
+        console.log('📋 Handover event:', change.value);
+      }
     }
-  }
-});
+    }
+    });
+  console.log('📝 [REGISTRO] POST /webhook registrado exitosamente');
+} catch (err) {
+  console.error('❌ [ERROR] Fallo al registrar POST /webhook:', err.message);
+  console.error(err);
+}
 
 // ─────────────────────────────────────────────
 // API REST para el Flow Builder
@@ -1760,6 +1809,101 @@ async function handleMention(value) {
 }
 
 // ─────────────────────────────────────────────
+// Message Echoes - Confirmación de envío del bot
+// DOC: https://developers.facebook.com/docs/messenger-platform/reference/message-send
+// ─────────────────────────────────────────────
+async function handleMessageEcho(event) {
+  const senderId = event.sender?.id;
+  const messageId = event.message?.mid;
+  const timestamp = event.timestamp;
+  console.log(`✅ Message Echo - ID: ${messageId} enviado a ${senderId}`);
+  broadcastLog('ECHO', `Mensaje confirmado (ID: ${messageId})`);
+}
+
+// ─────────────────────────────────────────────
+// Delivery Confirmations - Confirmación de entrega
+// DOC: https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/message-deliveries
+// ─────────────────────────────────────────────
+async function handleDeliveryConfirmation(event) {
+  const senderId = event.sender?.id;
+  const watermark = event.delivery?.watermark;
+  console.log(`🚚 Delivery Confirmation - Entregado hasta: ${watermark}`);
+  broadcastLog('DELIVERY', `Mensaje entregado a ${senderId}`);
+}
+
+// ─────────────────────────────────────────────
+// Read Receipts - Confirmación de lectura
+// DOC: https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/message-reads
+// ─────────────────────────────────────────────
+async function handleReadReceipt(event) {
+  const senderId = event.sender?.id;
+  const watermark = event.read?.watermark;
+  console.log(`👀 Read Receipt - Leído por ${senderId}`);
+  broadcastLog('READ', `Mensaje leído por el usuario`);
+}
+
+// ─────────────────────────────────────────────
+// Typing Indicator - Usuario está escribiendo
+// DOC: https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/typing
+// ─────────────────────────────────────────────
+async function handleTypingIndicator(event) {
+  const senderId = event.sender?.id;
+  console.log(`⌨️ Typing Indicator - ${senderId} está escribiendo...`);
+  broadcastLog('TYPING', `Usuario está escribiendo...`);
+}
+
+// ─────────────────────────────────────────────
+// Postback Events - Botones pulsados
+// DOC: https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/postback
+// ─────────────────────────────────────────────
+async function handlePostback(event) {
+  const senderId = event.sender?.id;
+  const payload = event.postback?.payload;
+  const text = event.postback?.title;
+  console.log(`🔘 Postback - ${text} (${payload}) desde ${senderId}`);
+  broadcastLog('POSTBACK', `Usuario pulsó botón: ${text}`);
+
+  // Procesar como si fuera un mensaje de texto
+  await handleMessage({ sender: event.sender, message: { text: payload } });
+}
+
+// ─────────────────────────────────────────────
+// Message Reactions - Reacciones a comentarios
+// DOC: https://developers.facebook.com/docs/instagram-platform/webhooks/reference
+// ─────────────────────────────────────────────
+async function handleMessageReaction(event) {
+  const senderId = event.sender?.id;
+  const reaction = event.message?.reaction;
+  console.log(`😊 Message Reaction - ${reaction} desde ${senderId}`);
+  broadcastLog('REACTION', `Usuario reaccionó: ${reaction}`);
+}
+
+// ─────────────────────────────────────────────
+// Story Reactions - Reacciones a historias
+// DOC: https://developers.facebook.com/docs/instagram-platform/webhooks/reference/story-reactions
+// ─────────────────────────────────────────────
+async function handleStoryReaction(value) {
+  const fromId = value.from?.id;
+  const fromUsername = value.from?.username;
+  const reaction = value.reaction;
+  const storyId = value.story?.id;
+
+  console.log(`💬 Story Reaction - @${fromUsername} reaccionó con ${reaction}`);
+  broadcastLog('STORY_REACTION', `@${fromUsername} reaccionó a tu historia: ${reaction}`, { id: fromId, name: fromUsername });
+
+  if (supabase) {
+    try {
+      await supabase.from('customers').update({
+        tags: (await supabase.from('customers').select('tags').eq('instagram_id', fromId).single()).data?.tags || [],
+        fields: { last_story_reaction: reaction, story_reaction_at: new Date().toISOString() }
+      }).eq('instagram_id', fromId);
+    } catch (e) {
+      console.error('Error guardando story reaction:', e.message);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
 // Enviar DM
 // DOC: https://developers.facebook.com/docs/messenger-platform/send-messages
 // ─────────────────────────────────────────────
@@ -1833,6 +1977,100 @@ async function sendTemplate(recipientId, text, buttons) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Plantilla:', errorMsg);
     broadcastLog('ERROR', `Error al enviar plantilla: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Ice Breakers - Preguntas sugeridas al abrir chat
+// DOC: https://developers.facebook.com/docs/messenger-platform/discovery/ice-breakers
+// ─────────────────────────────────────────────
+async function sendIceBreaker(recipientId, question, suggestions = []) {
+  try {
+    const messagePayload = { text: question };
+
+    if (suggestions && suggestions.length > 0) {
+      messagePayload.quick_replies = suggestions.map((s, idx) => ({
+        content_type: 'text',
+        title: s.title || `Opción ${idx + 1}`,
+        payload: s.payload || s.title || `ICE_${idx}`,
+        image_url: s.image_url
+      }));
+    }
+
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: messagePayload,
+      },
+      { params: { access_token: ACCESS_TOKEN } }
+    );
+    console.log(`❄️ Ice Breaker enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Ice Breaker enviado a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Ice Breaker:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar Ice Breaker: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Quick Replies - Respuestas rápidas personalizadas
+// ─────────────────────────────────────────────
+async function sendQuickReplies(recipientId, text, options = []) {
+  try {
+    const messagePayload = {
+      text,
+      quick_replies: options.map(opt => ({
+        content_type: opt.content_type || 'text',
+        title: opt.title,
+        payload: opt.payload || opt.title,
+        image_url: opt.image_url,
+        location_coordinates: opt.location_coordinates
+      }))
+    };
+
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: messagePayload,
+      },
+      { params: { access_token: ACCESS_TOKEN } }
+    );
+    console.log(`⚡ Quick Replies enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Quick Replies enviado a ${recipientId}`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando Quick Replies:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar Quick Replies: ${errorMsg}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enviar con Messaging Tag (para mensajes 24h+)
+// DOC: https://developers.facebook.com/docs/messenger-platform/reference/send-api
+// ─────────────────────────────────────────────
+async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPDATE') {
+  try {
+    const messagePayload = { text };
+
+    await axios.post(
+      `${GRAPH_API}/me/messages`,
+      {
+        recipient: { id: recipientId },
+        message: messagePayload,
+        messaging_type: 'MESSAGE_TAG',
+        tag: messagingTag // ACCOUNT_UPDATE, CONFIRMED_EVENT_UPDATE, POST_PURCHASE_UPDATE, HUMAN_AGENT
+      },
+      { params: { access_token: ACCESS_TOKEN } }
+    );
+    console.log(`🏷️ Mensaje con tag "${messagingTag}" enviado a ${recipientId}`);
+    broadcastLog('SYSTEM', `Mensaje con tag "${messagingTag}" enviado`);
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message;
+    console.error('❌ Error enviando mensaje con tag:', errorMsg);
+    broadcastLog('ERROR', `Error al enviar con tag: ${errorMsg}`);
   }
 }
 
