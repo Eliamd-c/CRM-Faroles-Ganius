@@ -50,7 +50,7 @@ try {
   AI_MASTER_CONTEXT = fs.readFileSync(contextPath, 'utf8');
   console.log(`🧠 Contexto maestro cargado (${AI_MASTER_CONTEXT.length} caracteres / ~${Math.round(AI_MASTER_CONTEXT.length / 4)} tokens)`);
   
-  const splitIdx = AI_MASTER_CONTEXT.indexOf('# SECCIÓN 5:');
+  const splitIdx = AI_MASTER_CONTEXT.indexOf('## 5. HISTORIAS DE ÉXITO');
   AI_BASE_PERSONA = splitIdx !== -1 ? AI_MASTER_CONTEXT.substring(0, splitIdx) : AI_MASTER_CONTEXT;
 } catch (err) {
   console.warn('⚠️ Contexto maestro no encontrado. El agente usará prompt genérico. Asegúrate de que el archivo Agente_IA_Faroles_Genius_Contexto_Maestro.md existe en la raíz del proyecto.');
@@ -799,6 +799,83 @@ Si el mensaje del usuario tiene la misma intención o significado que la "Intenc
 // Utilidad: Quitar acentos de un texto
 const removeAccents = (str) => str.normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+// ─────────────────────────────────────────────────────────────────
+// Framework de Persuasión del Agente IA: Hall (momentos) + Cialdini
+// (armas de influencia) + Grice (validación de claridad)
+// ─────────────────────────────────────────────────────────────────
+
+// Detecta en cuál de los 4 momentos del cliente (Hall) está la conversación,
+// según las etiquetas guardadas en su registro.
+function detectarMomento(customer) {
+  const tags = customer?.tags || [];
+  if (tags.includes('cliente_confirmado') || tags.includes('pagado')) return 'Momento 4: Post-Compra';
+  if (tags.includes('considerando')) return 'Momento 3: Decisión';
+  if (tags.includes('aliado_fase1') || tags.includes('cliente_detal')) return 'Momento 2: Consideración';
+  return 'Momento 1: Primer Contacto';
+}
+
+const KEYWORDS_INTENCION = {
+  escape_word: ['quiero hablar con un humano', 'asesor', 'persona real', 'necesito soporte', 'hablar con alguien', 'agente', 'representante', 'support', 'ayuda urgente'],
+  listo_compra: ['dale', 'si me interesa', 'adelante', 'vamos', 'quiero empezar', 'procede'],
+  objecion_caro: ['caro', 'costoso', 'mucho dinero', 'cara', 'expensive', 'mucho'],
+  objecion_no_vender: ['vender', 'no se vender', 'no puedo vender', 'venta', 'miedo', 'asusta'],
+  objecion_durabilidad: ['duran', 'dura', 'anos', 'resiste', 'rotura', 'quiebr'],
+  objecion_arrepentimiento: ['arrepentir', 'cambiar de opinion', 'devolucion', 'cambio', 'garantia'],
+  objecion_exterior: ['exterior', 'fuera', 'otro pais', 'enviaran', 'internacional'],
+  pregunta_precio: ['precio', 'cuesta', 'costo', 'valor', 'plata', 'cuanto', 'pago'],
+  pregunta_funciona: ['funciona', 'funcione', 'realmente', 'en serio', 'cierto', 'verdad'],
+  pregunta_poliza: ['garantia', 'politica', 'cambio', 'devolu'],
+};
+
+// Detecta qué tipo de pregunta/objeción/intención tiene el mensaje del cliente,
+// buscando palabras clave (ignorando acentos/mayúsculas).
+function detectarIntencion(text) {
+  const t = removeAccents(text).toLowerCase();
+  const matches = (list) => list.some(k => t.includes(removeAccents(k).toLowerCase()));
+  if (matches(KEYWORDS_INTENCION.escape_word)) return 'escape_word';
+  if (matches(KEYWORDS_INTENCION.listo_compra)) return 'listo_compra';
+  if (matches(KEYWORDS_INTENCION.objecion_caro)) return 'objecion_caro';
+  if (matches(KEYWORDS_INTENCION.objecion_no_vender)) return 'objecion_no_vender';
+  if (matches(KEYWORDS_INTENCION.objecion_durabilidad)) return 'objecion_durabilidad';
+  if (matches(KEYWORDS_INTENCION.objecion_arrepentimiento)) return 'objecion_arrepentimiento';
+  if (matches(KEYWORDS_INTENCION.objecion_exterior)) return 'objecion_exterior';
+  if (matches(KEYWORDS_INTENCION.pregunta_precio)) return 'pregunta_precio';
+  if (matches(KEYWORDS_INTENCION.pregunta_funciona)) return 'pregunta_funciona';
+  if (matches(KEYWORDS_INTENCION.pregunta_poliza)) return 'pregunta_poliza';
+  return 'desconocido';
+}
+
+// Selecciona qué arma de persuasión (Cialdini) conviene activar, según
+// el momento del cliente (Hall) y la intención detectada en su mensaje.
+function seleccionarArma(momento, intencion) {
+  if (intencion === 'escape_word') return 'Confianza/Veracidad';
+  if (momento === 'Momento 1: Primer Contacto') return 'Simpatía';
+  if (momento === 'Momento 4: Post-Compra') return 'Reciprocidad';
+  if (momento === 'Momento 3: Decisión') {
+    return intencion === 'listo_compra' ? 'Compromiso' : 'Escasez';
+  }
+  if (momento === 'Momento 2: Consideración') {
+    if (intencion === 'objecion_caro') return 'Autoridad';
+    if (intencion === 'objecion_no_vender') return 'Prueba Social';
+    if (intencion === 'objecion_durabilidad') return 'Autoridad';
+    if (intencion === 'pregunta_precio' || intencion === 'pregunta_funciona') return 'Autoridad';
+    if (intencion === 'objecion_arrepentimiento' || intencion === 'pregunta_poliza') return 'Confianza/Veracidad';
+  }
+  return 'Reciprocidad';
+}
+
+// Valida (sin bloquear) que la respuesta generada respete las máximas de Grice:
+// ni muy larga ni muy corta, y con estructura clara si es extensa.
+// Devuelve una lista de advertencias; vacía si todo está bien.
+function validarGrice(respuesta) {
+  const problemas = [];
+  const palabras = respuesta.trim().split(/\s+/).length;
+  if (palabras < 20 || palabras > 500) problemas.push(`Cantidad: ${palabras} palabras (ideal 50-300)`);
+  const tieneEstructura = /[•✅→-]|(?:^|\n)\s*\d+\./.test(respuesta);
+  if (!tieneEstructura && palabras > 100) problemas.push('Manera: respuesta larga sin estructura clara (bullets, numeración)');
+  return problemas;
+}
+
 // ─────────────────────────────────────────────
 // Handler: Mensaje Directo (DM) y Postbacks
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/messages
@@ -901,14 +978,28 @@ async function handleMessage(event) {
       } else {
         // FASE 6: RAG dinámico
         const dynamicContext = await retrieveRelevantContext(text);
-        
+
         if (nodePrompt) {
           systemPrompt = dynamicContext + '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
         } else {
           systemPrompt = dynamicContext;
         }
       }
-      
+
+      // Framework de Persuasión (Hall + Cialdini): se calcula en cada turno
+      // y se inyecta como guía estratégica explícita, sin reemplazar el
+      // razonamiento libre del modelo — solo lo orienta.
+      const momento = detectarMomento(customer);
+      const intencion = detectarIntencion(text);
+      const arma = seleccionarArma(momento, intencion);
+      const debeEscalarSugerido = intencion === 'escape_word' || intencion === 'listo_compra' || momento === 'Momento 4: Post-Compra';
+
+      systemPrompt += `\n\n---\n## 🎯 GUÍA ESTRATÉGICA PARA ESTA RESPUESTA (Framework Hall + Cialdini)
+- Momento del cliente: ${momento}
+- Intención detectada en su mensaje: ${intencion}
+- Arma de persuasión a activar: ${arma}
+- Recuerda las 3 máximas de Grice: cantidad (ni mucho ni poco, ideal 50-300 palabras), calidad (solo verdad, números verificables), relación (responde SU pregunta específica) y manera (claro, estructurado, con bullets/números si es larga).${debeEscalarSugerido ? '\n- ⚠️ Señal fuerte de escalado: usa la herramienta escalate_to_human si el cliente confirma que quiere comprar, pide hablar con un asesor/humano, o ya es cliente confirmado.' : ''}`;
+
       let history = customer.ai_history || [];
       
       const messages = [
@@ -1015,6 +1106,10 @@ async function handleMessage(event) {
             const finalChoice = secondResponse?.data?.choices?.[0];
             if (finalChoice && finalChoice.message?.content) {
               const finalReply = finalChoice.message.content.trim();
+              const griceProblemas = validarGrice(finalReply);
+              if (griceProblemas.length > 0) {
+                console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
+              }
               history.push({ role: 'assistant', content: finalReply });
               await sendMessage(senderId, finalReply);
             }
@@ -1024,22 +1119,27 @@ async function handleMessage(event) {
           await supabase.from('customers').update({
             ai_history: history
           }).eq('instagram_id', senderId);
-          
-          broadcastLog('SYSTEM', `Agente IA usó herramientas y respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
+
+          broadcastLog('SYSTEM', `Agente IA usó herramientas y respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
         } else {
           // Texto normal
           const aiReply = choice.message.content?.trim();
           if (!aiReply) throw new Error('Contenido de respuesta vacío de OpenAI');
-          
+
+          const griceProblemas = validarGrice(aiReply);
+          if (griceProblemas.length > 0) {
+            console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
+          }
+
           history.push({ role: 'assistant', content: aiReply });
           if (history.length > 10) history = history.slice(history.length - 10);
-          
+
           await supabase.from('customers').update({
             ai_history: history
           }).eq('instagram_id', senderId);
-          
+
           await sendMessage(senderId, aiReply);
-          broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} (${Date.now() - aiStartTime}ms)`);
+          broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
         }
 
         // FASE 8: Registrar métricas de Analytics
