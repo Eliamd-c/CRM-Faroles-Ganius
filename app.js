@@ -471,6 +471,46 @@ try {
       else if (event.message?.reaction) {
         await handleMessageReaction(event);
       }
+      // Attachments (imágenes, videos, audios, archivos)
+      else if (event.message?.attachments) {
+        await handleAttachments(event);
+      }
+      // Location (ubicación compartida)
+      else if (event.message?.location) {
+        await handleLocation(event);
+      }
+      // Share (contenido compartido)
+      else if (event.message?.shares) {
+        await handleShare(event);
+      }
+      // Live Location (ubicación en tiempo real)
+      else if (event.message?.live_location) {
+        await handleLiveLocation(event);
+      }
+      // Referral (usuario viene de referral)
+      else if (event.referral) {
+        await handleUserReferral(event);
+      }
+      // Account Linking (vinculación de cuentas)
+      else if (event.account_linking) {
+        await handleAccountLinking(event);
+      }
+      // Messaging Handover (cambio bot/humano)
+      else if (event.pass_thread_control) {
+        await handleHandoverProtocol(event);
+      }
+      // Opt-in (confirmación de opt-in)
+      else if (event.opt_in) {
+        await handleOptIn(event);
+      }
+      // Payment (pagos integrados)
+      else if (event.payment) {
+        await handlePayment(event);
+      }
+      // Sponsored Messages
+      else if (event.sponsored_message) {
+        await handleSponsoredMessage(event);
+      }
       // Mensajes regulares o quick replies
       else if (event.message?.text || event.message?.quick_reply) {
         await handleMessage(event);
@@ -491,10 +531,17 @@ try {
       else if (change.field === 'story_reactions') {
         await handleStoryReaction(change.value);
       }
-      // Ice Breakers
+      // Policy Enforcement (violación de política)
+      else if (change.field === 'messaging_policy_enforcement') {
+        await handlePolicyEnforcement(change.value);
+      }
+      // Message Tags (para mensajes fuera de 24h)
+      else if (change.field === 'message_template_quality_update') {
+        await handleMessageTags(change.value);
+      }
+      // Handover Protocol
       else if (change.field === 'messaging_handover') {
-        // Puede usarse para icebreakers en handover
-        console.log('📋 Handover event:', change.value);
+        await handleMessagingHandover(change.value);
       }
     }
     }
@@ -1901,6 +1948,194 @@ async function handleStoryReaction(value) {
       console.error('Error guardando story reaction:', e.message);
     }
   }
+}
+
+// ─────────────────────────────────────────────
+// Attachments - Archivos, imágenes, videos
+// ─────────────────────────────────────────────
+async function handleAttachments(event) {
+  const senderId = event.sender?.id;
+  const attachments = event.message?.attachments || [];
+
+  for (const attachment of attachments) {
+    const type = attachment.type; // image, video, audio, file
+    const url = attachment.payload?.url;
+    console.log(`📎 Attachment - ${type} desde ${senderId}: ${url}`);
+    broadcastLog('ATTACHMENT', `Usuario compartió ${type}`, { id: senderId });
+  }
+}
+
+// ─────────────────────────────────────────────
+// Location - Ubicación compartida
+// ─────────────────────────────────────────────
+async function handleLocation(event) {
+  const senderId = event.sender?.id;
+  const coords = event.message?.location?.coordinates;
+  console.log(`📍 Location - Lat: ${coords?.lat}, Lng: ${coords?.long} desde ${senderId}`);
+  broadcastLog('LOCATION', `Usuario compartió ubicación`);
+
+  if (supabase && coords) {
+    try {
+      await supabase.from('customers').update({
+        fields: { last_location_lat: coords.lat, last_location_lng: coords.long }
+      }).eq('instagram_id', senderId);
+    } catch (e) {
+      console.error('Error guardando ubicación:', e.message);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// Share - Contenido compartido
+// ─────────────────────────────────────────────
+async function handleShare(event) {
+  const senderId = event.sender?.id;
+  const shares = event.message?.shares || [];
+  console.log(`🔗 Share - ${shares.length} contenidos compartidos desde ${senderId}`);
+  broadcastLog('SHARE', `Usuario compartió contenido`);
+}
+
+// ─────────────────────────────────────────────
+// Live Location - Ubicación en tiempo real
+// ─────────────────────────────────────────────
+async function handleLiveLocation(event) {
+  const senderId = event.sender?.id;
+  const liveLocation = event.message?.live_location;
+  console.log(`🔴 Live Location - Desde ${senderId}`);
+  broadcastLog('LIVE_LOCATION', `Usuario compartió ubicación en vivo`);
+}
+
+// ─────────────────────────────────────────────
+// User Referral - Usuario viene de referral
+// ─────────────────────────────────────────────
+async function handleUserReferral(event) {
+  const senderId = event.sender?.id;
+  const referral = event.referral;
+  console.log(`🎁 Referral - ${referral?.ref} desde ${senderId}`);
+  broadcastLog('REFERRAL', `Usuario llegó via referral: ${referral?.ref}`);
+
+  if (supabase) {
+    try {
+      await supabase.from('customers').update({
+        fields: { referral_source: referral?.ref, referral_at: new Date().toISOString() }
+      }).eq('instagram_id', senderId);
+    } catch (e) {
+      console.error('Error guardando referral:', e.message);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// Account Linking - Vinculación de cuentas
+// ─────────────────────────────────────────────
+async function handleAccountLinking(event) {
+  const senderId = event.sender?.id;
+  const status = event.account_linking?.status; // linked, unlinked
+  console.log(`🔗 Account Linking - ${status} para ${senderId}`);
+  broadcastLog('ACCOUNT_LINKING', `Cuenta ${status} por ${senderId}`);
+}
+
+// ─────────────────────────────────────────────
+// Handover Protocol - Pasar entre bot/humano
+// ─────────────────────────────────────────────
+async function handleHandoverProtocol(event) {
+  const senderId = event.sender?.id;
+  const metadata = event.pass_thread_control?.metadata;
+  console.log(`👤 Handover - Thread pasado a humano (${metadata})`);
+  broadcastLog('HANDOVER', `Conversación pasada a humano`, { id: senderId });
+
+  if (supabase) {
+    try {
+      await supabase.from('customers').update({
+        bot_state: 'paused',
+        bot_paused: true
+      }).eq('instagram_id', senderId);
+    } catch (e) {
+      console.error('Error en handover:', e.message);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// Opt-in - Confirmación de opt-in
+// ─────────────────────────────────────────────
+async function handleOptIn(event) {
+  const senderId = event.sender?.id;
+  const ref = event.opt_in?.ref;
+  console.log(`✅ Opt-in - ${ref} desde ${senderId}`);
+  broadcastLog('OPT_IN', `Usuario hizo opt-in: ${ref}`);
+
+  if (supabase) {
+    try {
+      await supabase.from('customers').update({
+        fields: { opted_in: true, opt_in_type: ref }
+      }).eq('instagram_id', senderId);
+    } catch (e) {
+      console.error('Error guardando opt-in:', e.message);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// Payment - Pagos integrados
+// ─────────────────────────────────────────────
+async function handlePayment(event) {
+  const senderId = event.sender?.id;
+  const payment = event.payment;
+  const amount = payment?.amount;
+  const currency = payment?.currency;
+  console.log(`💳 Payment - ${amount} ${currency} desde ${senderId}`);
+  broadcastLog('PAYMENT', `Pago recibido: ${amount} ${currency}`, { id: senderId });
+
+  if (supabase) {
+    try {
+      await supabase.from('customers').update({
+        fields: {
+          last_payment: amount,
+          last_payment_currency: currency,
+          last_payment_at: new Date().toISOString()
+        }
+      }).eq('instagram_id', senderId);
+    } catch (e) {
+      console.error('Error guardando pago:', e.message);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// Sponsored Message - Mensajes patrocinados
+// ─────────────────────────────────────────────
+async function handleSponsoredMessage(event) {
+  const senderId = event.sender?.id;
+  const sponsoredMessage = event.sponsored_message;
+  console.log(`🎯 Sponsored Message desde ${senderId}`);
+  broadcastLog('SPONSORED', `Usuario vio mensaje patrocinado`);
+}
+
+// ─────────────────────────────────────────────
+// Policy Enforcement - Violación de política
+// ─────────────────────────────────────────────
+async function handlePolicyEnforcement(value) {
+  const action = value.action; // warn, block, unblock
+  console.log(`⚠️ Policy Enforcement - Acción: ${action}`);
+  broadcastLog('POLICY', `Acción de cumplimiento: ${action}`);
+}
+
+// ─────────────────────────────────────────────
+// Message Tags - Para mensajes fuera de 24h
+// ─────────────────────────────────────────────
+async function handleMessageTags(value) {
+  const quality = value.quality; // HIGH, MEDIUM, LOW
+  console.log(`🏷️ Message Tags - Calidad: ${quality}`);
+  broadcastLog('MESSAGE_TAGS', `Calidad de mensajes: ${quality}`);
+}
+
+// ─────────────────────────────────────────────
+// Messaging Handover - Protocolo de handover
+// ─────────────────────────────────────────────
+async function handleMessagingHandover(value) {
+  console.log(`🔄 Messaging Handover - ${value?.status || 'event'}`);
+  broadcastLog('MESSAGING_HANDOVER', `Evento de handover detectado`);
 }
 
 // ─────────────────────────────────────────────
