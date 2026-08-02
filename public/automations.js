@@ -7,9 +7,34 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function isInternalSubFlow(flow) {
-  if (!flow.keywords || flow.keywords.length === 0) return false;
-  return flow.keywords.every(kw => /^[A-Z][A-Z0-9_]+$/.test(kw) && kw.includes('_'));
+// IDs de flujos que son alcanzados SOLO internamente desde otro flujo
+// (goto / condición / aleatorio / input). Se calcula una vez sobre toda la lista.
+function getReferencedFlowIds(flows) {
+  const refs = new Set();
+  const add = (v) => { if (v !== null && v !== undefined && v !== '') refs.add(String(v)); };
+  for (const f of flows) {
+    for (const s of (f.steps || [])) {
+      if (s.type === 'goto') add(s.flow_id);
+      else if (s.type === 'condition') { add(s.truePayload); add(s.falsePayload); }
+      else if (s.type === 'randomizer') for (const p of (s.paths || [])) add(p);
+      else if (s.type === 'input') { add(s.successPayload); add(s.failPayload); }
+    }
+  }
+  return refs;
+}
+
+function isInternalSubFlow(flow, referencedIds) {
+  // Caso 1: sub-flujo alcanzado por payload de botón (keyword en MAYÚSCULAS tipo AGENTE_X).
+  if (flow.keywords && flow.keywords.length > 0) {
+    return flow.keywords.every(kw => /^[A-Z][A-Z0-9_]+$/.test(kw) && kw.includes('_'));
+  }
+  // Caso 2: sub-flujo sin keyword, alcanzado solo por goto/condición/aleatorio/input
+  // desde otro flujo (p. ej. las historias, los pasos de cálculo de precio).
+  if (referencedIds) {
+    const bare = flow.id.replace(/^flow_/, '');
+    return referencedIds.has(flow.id) || referencedIds.has(bare);
+  }
+  return false;
 }
 
 function getFlowStatus(flow) {
@@ -63,7 +88,8 @@ function stepTypeIcons(types) {
 }
 
 function renderFlows(flows) {
-  const visible = flows.filter(f => !isInternalSubFlow(f));
+  const referencedIds = getReferencedFlowIds(flows);
+  const visible = flows.filter(f => !isInternalSubFlow(f, referencedIds));
   const tbody = document.getElementById('flows-body');
   const empty = document.getElementById('empty-state');
   const count = document.getElementById('flow-count');
