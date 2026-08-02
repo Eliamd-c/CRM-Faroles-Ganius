@@ -13,21 +13,35 @@ const supabase = require('./db');
 // Cargar configuración de flujos (Arquitectura JSON - Fase 1)
 let flowsConfig = { flows: [], defaultFlow: null };
 try {
-  const rawData = fs.readFileSync(path.join(__dirname, 'flows.json'));
-  flowsConfig = JSON.parse(rawData);
-  console.log('✅ Flujos cargados correctamente.');
-  let migrated = false;
-  for (const flow of (flowsConfig.flows || [])) {
-    if (flow.enabled === undefined) { flow.enabled = true; migrated = true; }
-    if (!flow.createdAt) { flow.createdAt = new Date().toISOString(); migrated = true; }
-    if (!flow.updatedAt) { flow.updatedAt = new Date().toISOString(); migrated = true; }
+  let filePath = path.join(__dirname, 'flows.json');
+  // Si flows.json no existe, intenta flows.json.example (para despliegues)
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, 'flows.json.example');
+    if (fs.existsSync(filePath)) {
+      console.log('ℹ️ flows.json no encontrado. Usando flows.json.example como semilla...');
+    }
   }
-  if (migrated) {
-    fs.writeFileSync(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
-    console.log('✅ flows.json migrado: campos enabled/createdAt/updatedAt añadidos');
+
+  if (fs.existsSync(filePath)) {
+    const rawData = fs.readFileSync(filePath);
+    flowsConfig = JSON.parse(rawData);
+    console.log('✅ Flujos cargados correctamente.');
+    let migrated = false;
+    for (const flow of (flowsConfig.flows || [])) {
+      if (flow.enabled === undefined) { flow.enabled = true; migrated = true; }
+      if (!flow.createdAt) { flow.createdAt = new Date().toISOString(); migrated = true; }
+      if (!flow.updatedAt) { flow.updatedAt = new Date().toISOString(); migrated = true; }
+    }
+    if (migrated) {
+      fs.writeFileSync(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+      console.log('✅ flows.json migrado: campos enabled/createdAt/updatedAt añadidos');
+    }
+  } else {
+    console.warn('⚠️ flows.json ni flows.json.example encontrados. Usando configuración vacía por defecto.');
   }
 } catch (err) {
-  console.error('❌ Error al cargar flows.json', err);
+  console.error('❌ Error al cargar flows.json:', err.message);
+  console.warn('⚠️ Usando configuración de flujos vacía por defecto.');
 }
 
 // Fuente de verdad de los flujos: Supabase (sobrevive a los despliegues).

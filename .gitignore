@@ -4,3 +4,6 @@ node_modules/
 flows.json
 sequences.json
 broadcasts.json
+!flows.json.example
+!sequences.json.example
+!broadcasts.json.example
