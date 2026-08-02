@@ -1511,6 +1511,10 @@ async function loadFlowIntoBuilder(flowId) {
       } else if (step.type === 'goto') {
         nodeId = editor.addNode('goto', 1, 0, posX, posY, 'goto', { _goto: JSON.stringify({ flow_id: step.flow_id || '' }) }, htmlGoto);
         nodeGotoState[nodeId] = { flow_id: step.flow_id || '' };
+      } else if (step.type === 'ai_agent') {
+        const aiConf = { system_prompt: step.system_prompt || '', ignore_master_context: step.ignore_master_context || false };
+        nodeId = editor.addNode('ai_agent', 1, 1, posX, posY, 'ai_agent', { _ai: JSON.stringify(aiConf) }, htmlAiAgent);
+        nodeAiAgentState[nodeId] = aiConf;
       }
 
       if (nodeId) {
@@ -1538,6 +1542,7 @@ async function loadFlowIntoBuilder(flowId) {
         else if (node.name === 'action') renderActionNode(nid);
         else if (node.name === 'input') renderInputNode(nid);
         else if (node.name === 'goto') renderGotoNode(nid);
+        else if (node.name === 'ai_agent') renderAiAgentNode(nid);
       });
 
       // Auto-layout with Dagre
