@@ -30,11 +30,60 @@ try {
   console.error('❌ Error al cargar flows.json', err);
 }
 
+// Fuente de verdad de los flujos: Supabase (sobrevive a los despliegues).
+// flows.json queda solo como semilla inicial y respaldo local. Antes, al estar
+// flows.json en git, cada despliegue lo sobreescribía y borraba los cambios
+// hechos desde el Builder.
 async function saveFlowsConfig() {
-  await fs.promises.writeFile(
-    path.join(__dirname, 'flows.json'),
-    JSON.stringify(flowsConfig, null, 2)
-  );
+  let savedToDb = false;
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('app_flows')
+        .upsert({ id: 1, config: flowsConfig, updated_at: new Date().toISOString() });
+      if (!error) savedToDb = true;
+      else console.error('❌ Error guardando flujos en Supabase:', error.message);
+    } catch (e) {
+      console.error('❌ Excepción guardando flujos en Supabase:', e.message);
+    }
+  }
+  // Respaldo local (útil en desarrollo o si Supabase está caído).
+  try {
+    await fs.promises.writeFile(
+      path.join(__dirname, 'flows.json'),
+      JSON.stringify(flowsConfig, null, 2)
+    );
+  } catch (e) {
+    if (!savedToDb) throw e; // si no se guardó ni en DB ni en archivo, propagar el error
+  }
+}
+
+// Carga los flujos desde Supabase al arrancar. Si la tabla aún no tiene datos,
+// la siembra con el contenido actual de flows.json. Ante cualquier fallo,
+// conserva lo ya cargado de flows.json (degradación elegante).
+async function loadFlowsFromSupabase() {
+  if (!supabase) {
+    console.warn('⚠️ Supabase no conectado: los flujos se leen/escriben solo en flows.json (NO persisten entre despliegues).');
+    return;
+  }
+  try {
+    const { data, error } = await supabase.from('app_flows').select('config').eq('id', 1).single();
+    if (error) {
+      if (error.code === 'PGRST116' || /no rows|0 rows/i.test(error.message || '')) {
+        console.log('ℹ️ No hay flujos guardados en Supabase todavía. Sembrando con flows.json...');
+        await saveFlowsConfig();
+      } else {
+        console.error('⚠️ No se pudieron cargar flujos de Supabase, se usa flows.json:', error.message);
+      }
+      return;
+    }
+    if (data && data.config && Array.isArray(data.config.flows)) {
+      flowsConfig = data.config;
+      console.log(`✅ Flujos cargados desde Supabase (${flowsConfig.flows.length} flujos) — persistentes entre despliegues.`);
+    }
+  } catch (e) {
+    console.error('⚠️ Excepción cargando flujos de Supabase, se usa flows.json:', e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -283,6 +332,11 @@ async function initBot() {
 }
 initBot();
 
+// Cargar los flujos persistentes desde Supabase (reemplaza la semilla de
+// flows.json si existen datos guardados). Así los cambios del Builder
+// sobreviven a los despliegues.
+loadFlowsFromSupabase();
+
 // ─────────────────────────────────────────────
 // GET /stream  — Server-Sent Events para el Dashboard UI
 // ─────────────────────────────────────────────
@@ -437,9 +491,9 @@ app.post('/api/flows', async (req, res) => {
     }
     incoming.flows = merged;
 
-    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(incoming, null, 2));
     flowsConfig = incoming;
-    console.log('✅ flows.json actualizado desde el Builder (merge)');
+    await saveFlowsConfig();
+    console.log('✅ Flujos actualizados desde el Builder (merge) y persistidos en Supabase');
     res.json({ success: true });
   } catch (err) {
     console.error('❌ Error guardando flows.json', err);
@@ -2195,7 +2249,7 @@ app.get('/api/welcome-flow', (req, res) => {
 app.post('/api/welcome-flow', async (req, res) => {
   try {
     flowsConfig.welcomeFlow = req.body;
-    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    await saveFlowsConfig();
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2230,7 +2284,7 @@ app.get('/api/comment-triggers', (req, res) => {
 app.post('/api/comment-triggers', async (req, res) => {
   try {
     flowsConfig.commentTriggers = req.body;
-    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    await saveFlowsConfig();
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2247,7 +2301,7 @@ app.get('/api/mention-flow', (req, res) => {
 app.post('/api/mention-flow', async (req, res) => {
   try {
     flowsConfig.mentionFlow = req.body;
-    await fs.promises.writeFile(path.join(__dirname, 'flows.json'), JSON.stringify(flowsConfig, null, 2));
+    await saveFlowsConfig();
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
