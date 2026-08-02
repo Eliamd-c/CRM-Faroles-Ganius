@@ -904,6 +904,218 @@ function validarGrice(respuesta) {
 }
 
 // ─────────────────────────────────────────────
+// Ejecuta el Agente IA sobre un mensaje concreto: genera la respuesta con
+// GPT-4o (contexto maestro + RAG + framework de persuasión + herramientas) y
+// la envía. Se usa tanto cuando el cliente ya está en estado 'ai_agent' como
+// al activarse un nodo Agente IA, para responder al mensaje que lo disparó.
+async function runAiAgent(senderId, senderName, text, customer) {
+  if (!process.env.OPENAI_API_KEY) {
+    await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
+    return;
+  }
+  if (!checkAiRateLimit(senderId)) {
+    await sendMessage(senderId, "⚠️ Has alcanzado el límite de consultas a la IA por ahora. Intenta más tarde.");
+    return;
+  }
+    // FASE 2: Construir el system prompt con Contexto Maestro + override del nodo.
+  // Estructura: [Contexto Maestro fijo] + [Instrucciones adicionales del nodo]
+  // El contexto maestro va PRIMERO para aprovechar el Prompt Caching de OpenAI.
+  const nodePrompt = customer.current_ai_prompt || '';
+  const ignoreMaster = customer.ignore_master_context || false;
+  
+  let systemPrompt;
+  if (ignoreMaster || !AI_MASTER_CONTEXT) {
+    // El nodo tiene activado "Ignorar contexto maestro" o no existe el archivo
+    systemPrompt = nodePrompt || 'Eres un asistente útil y amigable.';
+  } else {
+    // FASE 6: RAG dinámico
+    const dynamicContext = await retrieveRelevantContext(text);
+
+    if (nodePrompt) {
+      systemPrompt = dynamicContext + '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
+    } else {
+      systemPrompt = dynamicContext;
+    }
+  }
+
+  // Framework de Persuasión (Hall + Cialdini): se calcula en cada turno
+  // y se inyecta como guía estratégica explícita, sin reemplazar el
+  // razonamiento libre del modelo — solo lo orienta.
+  const momento = detectarMomento(customer);
+  const intencion = detectarIntencion(text);
+  const arma = seleccionarArma(momento, intencion);
+  const debeEscalarSugerido = intencion === 'escape_word' || intencion === 'listo_compra' || momento === 'Momento 4: Post-Compra';
+
+  systemPrompt += `\n\n---\n## 🎯 GUÍA ESTRATÉGICA PARA ESTA RESPUESTA (Framework Hall + Cialdini)
+- Momento del cliente: ${momento}
+- Intención detectada en su mensaje: ${intencion}
+- Arma de persuasión a activar: ${arma}
+- Recuerda las 3 máximas de Grice: cantidad (ni mucho ni poco, ideal 50-300 palabras), calidad (solo verdad, números verificables), relación (responde SU pregunta específica) y manera (claro, estructurado, con bullets/números si es larga).${debeEscalarSugerido ? '\n- ⚠️ Señal fuerte de escalado: usa la herramienta escalate_to_human si el cliente confirma que quiere comprar, pide hablar con un asesor/humano, o ya es cliente confirmado.' : ''}`;
+
+  let history = customer.ai_history || [];
+  
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...history,
+    { role: 'user', content: text }
+  ];
+  
+  try {
+    const aiStartTime = Date.now();
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o',
+        messages: messages,
+        tools: AI_TOOLS,
+        tool_choice: 'auto',
+        temperature: 0.7,
+        max_tokens: 500  // FASE 1: aumentado de 300 a 500 para respuestas de venta más completas
+      },
+      { 
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        timeout: 15000
+      }
+    );
+    
+    const choice = response?.data?.choices?.[0];
+    if (!choice) throw new Error('Respuesta vacía o incompleta de OpenAI');
+    
+    // Log de uso de tokens (útil para monitorear caching en Fase 8)
+    const usage = response.data.usage;
+    const cachedTokens = usage?.prompt_tokens_details?.cached_tokens || 0;
+    if (cachedTokens > 0) {
+      console.log(`💾 Prompt Cache activo: ${cachedTokens}/${usage.prompt_tokens} tokens cacheados (ahorro ~50%)`);
+    }
+    
+    history.push({ role: 'user', content: text });
+    
+    if (choice.finish_reason === 'tool_calls') {
+      // FASE 5: Procesar las llamadas a herramientas
+      history.push(choice.message); // Añadir el tool_call al historial
+      let escalatedToHuman = false;
+
+      for (const toolCall of choice.message.tool_calls) {
+        const args = JSON.parse(toolCall.function.arguments);
+        
+        if (toolCall.function.name === 'send_product_media') {
+          const { data: medias } = await supabase
+            .from('media_catalog')
+            .select('*')
+            .overlaps('tags', args.search_tags || [])
+            .eq('type', args.media_type)
+            .eq('active', true)
+            .limit(1);
+          
+          if (medias && medias.length > 0) {
+            await sendMediaMessage(senderId, args.media_type, medias[0].url);
+            if (args.caption) await sendMessage(senderId, args.caption);
+            
+            history.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: `Enviado media exitosamente al cliente. URL: ${medias[0].url}`
+            });
+          } else {
+            history.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: 'No se encontraron medias con esos tags en el catálogo.'
+            });
+            // Podríamos hacer una segunda llamada a OpenAI aquí para que se disculpe
+          }
+        } else if (toolCall.function.name === 'escalate_to_human') {
+          escalatedToHuman = true;
+          await supabase.from('customers').update({ bot_state: 'paused' }).eq('instagram_id', senderId);
+          await sendMessage(senderId, "Perfecto, voy a pasarte con alguien de nuestro equipo para confirmar detalles... 🕯️");
+          broadcastLog('ESCALATION', `${senderName}: ${args.reason}`);
+
+          history.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: 'Escalado exitosamente a humano. El bot está pausado.'
+          });
+        }
+      }
+
+      // SEGUNDA LLAMADA A OPENAI para respuesta final (se omite si ya se escaló a un humano,
+      // el mensaje fijo de escalate_to_human ya es suficiente y el bot quedó en pausa)
+      if (!escalatedToHuman) {
+        const secondResponse = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            model: 'gpt-4o',
+            messages: [{ role: 'system', content: systemPrompt }, ...history],
+            temperature: 0.7,
+            max_tokens: 500
+          },
+          {
+            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            timeout: 15000
+          }
+        );
+
+        const finalChoice = secondResponse?.data?.choices?.[0];
+        if (finalChoice && finalChoice.message?.content) {
+          const finalReply = finalChoice.message.content.trim();
+          const griceProblemas = validarGrice(finalReply);
+          if (griceProblemas.length > 0) {
+            console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
+          }
+          history.push({ role: 'assistant', content: finalReply });
+          await sendMessage(senderId, finalReply);
+        }
+      }
+
+      if (history.length > 15) history = history.slice(history.length - 15);
+      await supabase.from('customers').update({
+        ai_history: history
+      }).eq('instagram_id', senderId);
+
+      broadcastLog('SYSTEM', `Agente IA usó herramientas y respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
+    } else {
+      // Texto normal
+      const aiReply = choice.message.content?.trim();
+      if (!aiReply) throw new Error('Contenido de respuesta vacío de OpenAI');
+
+      const griceProblemas = validarGrice(aiReply);
+      if (griceProblemas.length > 0) {
+        console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
+      }
+
+      history.push({ role: 'assistant', content: aiReply });
+      if (history.length > 10) history = history.slice(history.length - 10);
+
+      await supabase.from('customers').update({
+        ai_history: history
+      }).eq('instagram_id', senderId);
+
+      await sendMessage(senderId, aiReply);
+      broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
+    }
+
+    // FASE 8: Registrar métricas de Analytics
+    if (supabase) {
+      const latency_ms = Date.now() - aiStartTime;
+      supabase.from('ai_analytics').insert({
+        instagram_id: senderId,
+        prompt_tokens: usage?.prompt_tokens || 0,
+        completion_tokens: usage?.completion_tokens || 0,
+        cached_tokens: cachedTokens,
+        latency_ms: latency_ms,
+        has_tool_call: choice.finish_reason === 'tool_calls'
+      }).then(({ error }) => {
+        if (error) console.error('Error guardando analytics:', error.message);
+      });
+    }
+
+  } catch (err) {
+    console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
+    await sendMessage(senderId, 'Lo siento, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.');
+  }
+}
+
+// ─────────────────────────────────────────────
 // Handler: Mensaje Directo (DM) y Postbacks
 // DOC: https://developers.facebook.com/docs/messenger-platform/instagram/messages
 // ─────────────────────────────────────────────
@@ -983,211 +1195,7 @@ async function handleMessage(event) {
       customer.bot_state = 'active'; 
       // Continuar con el código para que dispare flujos normales si coincide
     } else {
-      if (!process.env.OPENAI_API_KEY) {
-        await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
-        return;
-      }
-      if (!checkAiRateLimit(senderId)) {
-        await sendMessage(senderId, "⚠️ Has alcanzado el límite de consultas a la IA por ahora. Intenta más tarde.");
-        return;
-      }
-      
-      // FASE 2: Construir el system prompt con Contexto Maestro + override del nodo.
-      // Estructura: [Contexto Maestro fijo] + [Instrucciones adicionales del nodo]
-      // El contexto maestro va PRIMERO para aprovechar el Prompt Caching de OpenAI.
-      const nodePrompt = customer.current_ai_prompt || '';
-      const ignoreMaster = customer.ignore_master_context || false;
-      
-      let systemPrompt;
-      if (ignoreMaster || !AI_MASTER_CONTEXT) {
-        // El nodo tiene activado "Ignorar contexto maestro" o no existe el archivo
-        systemPrompt = nodePrompt || 'Eres un asistente útil y amigable.';
-      } else {
-        // FASE 6: RAG dinámico
-        const dynamicContext = await retrieveRelevantContext(text);
-
-        if (nodePrompt) {
-          systemPrompt = dynamicContext + '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
-        } else {
-          systemPrompt = dynamicContext;
-        }
-      }
-
-      // Framework de Persuasión (Hall + Cialdini): se calcula en cada turno
-      // y se inyecta como guía estratégica explícita, sin reemplazar el
-      // razonamiento libre del modelo — solo lo orienta.
-      const momento = detectarMomento(customer);
-      const intencion = detectarIntencion(text);
-      const arma = seleccionarArma(momento, intencion);
-      const debeEscalarSugerido = intencion === 'escape_word' || intencion === 'listo_compra' || momento === 'Momento 4: Post-Compra';
-
-      systemPrompt += `\n\n---\n## 🎯 GUÍA ESTRATÉGICA PARA ESTA RESPUESTA (Framework Hall + Cialdini)
-- Momento del cliente: ${momento}
-- Intención detectada en su mensaje: ${intencion}
-- Arma de persuasión a activar: ${arma}
-- Recuerda las 3 máximas de Grice: cantidad (ni mucho ni poco, ideal 50-300 palabras), calidad (solo verdad, números verificables), relación (responde SU pregunta específica) y manera (claro, estructurado, con bullets/números si es larga).${debeEscalarSugerido ? '\n- ⚠️ Señal fuerte de escalado: usa la herramienta escalate_to_human si el cliente confirma que quiere comprar, pide hablar con un asesor/humano, o ya es cliente confirmado.' : ''}`;
-
-      let history = customer.ai_history || [];
-      
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...history,
-        { role: 'user', content: text }
-      ];
-      
-      try {
-        const aiStartTime = Date.now();
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-4o',
-            messages: messages,
-            tools: AI_TOOLS,
-            tool_choice: 'auto',
-            temperature: 0.7,
-            max_tokens: 500  // FASE 1: aumentado de 300 a 500 para respuestas de venta más completas
-          },
-          { 
-            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            timeout: 15000
-          }
-        );
-        
-        const choice = response?.data?.choices?.[0];
-        if (!choice) throw new Error('Respuesta vacía o incompleta de OpenAI');
-        
-        // Log de uso de tokens (útil para monitorear caching en Fase 8)
-        const usage = response.data.usage;
-        const cachedTokens = usage?.prompt_tokens_details?.cached_tokens || 0;
-        if (cachedTokens > 0) {
-          console.log(`💾 Prompt Cache activo: ${cachedTokens}/${usage.prompt_tokens} tokens cacheados (ahorro ~50%)`);
-        }
-        
-        history.push({ role: 'user', content: text });
-        
-        if (choice.finish_reason === 'tool_calls') {
-          // FASE 5: Procesar las llamadas a herramientas
-          history.push(choice.message); // Añadir el tool_call al historial
-          let escalatedToHuman = false;
-
-          for (const toolCall of choice.message.tool_calls) {
-            const args = JSON.parse(toolCall.function.arguments);
-            
-            if (toolCall.function.name === 'send_product_media') {
-              const { data: medias } = await supabase
-                .from('media_catalog')
-                .select('*')
-                .overlaps('tags', args.search_tags || [])
-                .eq('type', args.media_type)
-                .eq('active', true)
-                .limit(1);
-              
-              if (medias && medias.length > 0) {
-                await sendMediaMessage(senderId, args.media_type, medias[0].url);
-                if (args.caption) await sendMessage(senderId, args.caption);
-                
-                history.push({
-                  role: 'tool',
-                  tool_call_id: toolCall.id,
-                  content: `Enviado media exitosamente al cliente. URL: ${medias[0].url}`
-                });
-              } else {
-                history.push({
-                  role: 'tool',
-                  tool_call_id: toolCall.id,
-                  content: 'No se encontraron medias con esos tags en el catálogo.'
-                });
-                // Podríamos hacer una segunda llamada a OpenAI aquí para que se disculpe
-              }
-            } else if (toolCall.function.name === 'escalate_to_human') {
-              escalatedToHuman = true;
-              await supabase.from('customers').update({ bot_state: 'paused' }).eq('instagram_id', senderId);
-              await sendMessage(senderId, "Perfecto, voy a pasarte con alguien de nuestro equipo para confirmar detalles... 🕯️");
-              broadcastLog('ESCALATION', `${senderName}: ${args.reason}`);
-
-              history.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: 'Escalado exitosamente a humano. El bot está pausado.'
-              });
-            }
-          }
-
-          // SEGUNDA LLAMADA A OPENAI para respuesta final (se omite si ya se escaló a un humano,
-          // el mensaje fijo de escalate_to_human ya es suficiente y el bot quedó en pausa)
-          if (!escalatedToHuman) {
-            const secondResponse = await axios.post(
-              'https://api.openai.com/v1/chat/completions',
-              {
-                model: 'gpt-4o',
-                messages: [{ role: 'system', content: systemPrompt }, ...history],
-                temperature: 0.7,
-                max_tokens: 500
-              },
-              {
-                headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-                timeout: 15000
-              }
-            );
-
-            const finalChoice = secondResponse?.data?.choices?.[0];
-            if (finalChoice && finalChoice.message?.content) {
-              const finalReply = finalChoice.message.content.trim();
-              const griceProblemas = validarGrice(finalReply);
-              if (griceProblemas.length > 0) {
-                console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
-              }
-              history.push({ role: 'assistant', content: finalReply });
-              await sendMessage(senderId, finalReply);
-            }
-          }
-
-          if (history.length > 15) history = history.slice(history.length - 15);
-          await supabase.from('customers').update({
-            ai_history: history
-          }).eq('instagram_id', senderId);
-
-          broadcastLog('SYSTEM', `Agente IA usó herramientas y respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
-        } else {
-          // Texto normal
-          const aiReply = choice.message.content?.trim();
-          if (!aiReply) throw new Error('Contenido de respuesta vacío de OpenAI');
-
-          const griceProblemas = validarGrice(aiReply);
-          if (griceProblemas.length > 0) {
-            console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
-          }
-
-          history.push({ role: 'assistant', content: aiReply });
-          if (history.length > 10) history = history.slice(history.length - 10);
-
-          await supabase.from('customers').update({
-            ai_history: history
-          }).eq('instagram_id', senderId);
-
-          await sendMessage(senderId, aiReply);
-          broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
-        }
-
-        // FASE 8: Registrar métricas de Analytics
-        if (supabase) {
-          const latency_ms = Date.now() - aiStartTime;
-          supabase.from('ai_analytics').insert({
-            instagram_id: senderId,
-            prompt_tokens: usage?.prompt_tokens || 0,
-            completion_tokens: usage?.completion_tokens || 0,
-            cached_tokens: cachedTokens,
-            latency_ms: latency_ms,
-            has_tool_call: choice.finish_reason === 'tool_calls'
-          }).then(({ error }) => {
-            if (error) console.error('Error guardando analytics:', error.message);
-          });
-        }
-
-      } catch (err) {
-        console.error('OpenAI API Error (AI Agent):', err.response?.status, err.message);
-        await sendMessage(senderId, 'Lo siento, tuve un problema procesando tu mensaje. Por favor intenta de nuevo en un momento.');
-      }
+      await runAiAgent(senderId, senderName, text, customer);
       return;
     }
   }
@@ -1290,7 +1298,7 @@ async function handleMessage(event) {
     matchedFlow.executionCount = (matchedFlow.executionCount || 0) + 1;
     matchedFlow.lastExecutedAt = new Date().toISOString();
     saveFlowsConfig().catch(() => {});
-    await processFlowSteps(matchedFlow.steps, senderId, senderName);
+    await processFlowSteps(matchedFlow.steps, senderId, senderName, new Set(), text);
   } else {
     // 6. Smart Triggers (IA Fallback)
     console.log(`[Smart Trigger] Buscando intención con IA para: "${text}"`);
@@ -1303,7 +1311,7 @@ async function handleMessage(event) {
         smartFlow.executionCount = (smartFlow.executionCount || 0) + 1;
         smartFlow.lastExecutedAt = new Date().toISOString();
         saveFlowsConfig().catch(() => {});
-        await processFlowSteps(smartFlow.steps, senderId, senderName);
+        await processFlowSteps(smartFlow.steps, senderId, senderName, new Set(), text);
         return;
       }
     }
@@ -1311,7 +1319,7 @@ async function handleMessage(event) {
     // 7. Flujo por Defecto (Si la IA no detecta intención)
     if (flowsConfig.defaultFlow?.steps) {
       console.log(`[Router] No hubo coincidencia. Ejecutando Default Flow.`);
-      await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName);
+      await processFlowSteps(flowsConfig.defaultFlow.steps, senderId, senderName, new Set(), text);
     }
   }
 }
@@ -1319,7 +1327,7 @@ async function handleMessage(event) {
 // ─────────────────────────────────────────────
 // Procesador de Pasos del Flujo
 // ─────────────────────────────────────────────
-async function processFlowSteps(steps, senderId, senderName, _visited = new Set()) {
+async function processFlowSteps(steps, senderId, senderName, _visited = new Set(), triggerText = null) {
   let customer = null;
   if (supabase) {
     try {
@@ -1374,7 +1382,7 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
       if (nextFlowId && !_visited.has(nextFlowId)) {
         _visited.add(nextFlowId);
         const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${nextFlowId}`);
-        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName, _visited);
+        if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName, _visited, triggerText);
       }
       break; // Detiene el array lineal actual porque la condición bifurca
     } else if (step.type === 'randomizer') {
@@ -1383,7 +1391,7 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
         if (randomPayload && !_visited.has(randomPayload)) {
           _visited.add(randomPayload);
           const nextFlow = flowsConfig.flows.find(f => f.id === `flow_${randomPayload}`);
-          if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName, _visited);
+          if (nextFlow) await processFlowSteps(nextFlow.steps, senderId, senderName, _visited, triggerText);
         }
       }
       break; // Detiene el array lineal actual
@@ -1420,7 +1428,7 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
       if (targetId && !_visited.has(targetId)) {
         _visited.add(targetId);
         const targetFlow = flowsConfig.flows.find(f => f.id === `flow_${targetId}` || f.id === targetId);
-        if (targetFlow) await processFlowSteps(targetFlow.steps, senderId, senderName, _visited);
+        if (targetFlow) await processFlowSteps(targetFlow.steps, senderId, senderName, _visited, triggerText);
         else broadcastLog('WARNING', `Goto: Flujo no encontrado: ${targetId}`);
       }
       break;
@@ -1432,6 +1440,16 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
           ignore_master_context: step.ignore_master_context || false  // FASE 3
         }).eq('instagram_id', senderId);
         broadcastLog('SYSTEM', `Agente IA activado para ${senderName}${step.ignore_master_context ? ' (modo standalone)' : ' (con Contexto Maestro)'}`);
+
+        // Responder de inmediato al mensaje que activó el flujo, en vez de
+        // esperar a que el cliente escriba otra vez. Reflejamos los valores
+        // recién guardados en el objeto local para que runAiAgent los use.
+        if (triggerText && customer) {
+          customer.current_ai_prompt = step.system_prompt || '';
+          customer.ignore_master_context = step.ignore_master_context || false;
+          customer.bot_state = 'ai_agent';
+          await runAiAgent(senderId, senderName, triggerText, customer);
+        }
       } else {
         console.warn('⚠️ Supabase no conectado. No se puede activar el Agente IA.');
       }
