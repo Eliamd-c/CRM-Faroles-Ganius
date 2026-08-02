@@ -425,11 +425,8 @@ app.get('/webhook', (req, res) => {
 // ─────────────────────────────────────────────
 // POST /webhook  — Recepción de eventos en tiempo real
 // ─────────────────────────────────────────────
-console.log('📝 [REGISTRO] Antes de registrar POST /webhook, app existe:', !!app);
-console.log('📝 [REGISTRO] typeof app.post:', typeof app.post);
 try {
   app.post('/webhook', async (req, res) => {
-    console.log('📨 [WEBHOOK] POST recibido en /webhook');
     // Verificación de Firma (Seguridad)
     const signature = req.headers['x-hub-signature-256'];
     const appSecret = (process.env.META_APP_SECRET || '').trim();
@@ -482,8 +479,7 @@ try {
         await handleTypingIndicator(event);
       }
       // Welcome Message Ads (Click en anuncio de bienvenida)
-      else if ((event.referral?.ref && (event.referral.ref.includes('welcome') || event.referral.source === 'ads')) ||
-               (event.postback?.title && event.postback.title.includes('welcome'))) {
+      else if (event.referral?.ref && event.referral.ref.includes('welcome')) {
         await handleWelcomeMessageAd(event);
       }
       // Postback (botones pulsados)
@@ -569,10 +565,8 @@ try {
     }
     }
   });
-  console.log('📝 [REGISTRO] POST /webhook registrado exitosamente');
 } catch (err) {
-  console.error('❌ [ERROR] Fallo al registrar POST /webhook:', err.message);
-  console.error(err);
+  console.error('❌ Fallo al registrar POST /webhook:', err.message);
 }
 
 // ─────────────────────────────────────────────
@@ -590,9 +584,10 @@ app.get('/api/instagram/media', async (req, res) => {
     // Usa el token ya validado por initBot (no reintroduce el token muerto).
     const token = ACCESS_TOKEN;
     if (!token) return res.status(503).json({ error: 'No access token configured' });
-    const url = `https://graph.facebook.com/v21.0/me/media?fields=id,media_type,thumbnail_url,media_url,caption,timestamp,permalink&limit=12&access_token=${token}`;
-    const r = await fetch(url);
-    const data = await r.json();
+    const r = await axios.get('https://graph.facebook.com/v21.0/me/media', {
+      params: { fields: 'id,media_type,thumbnail_url,media_url,caption,timestamp,permalink', limit: 12, access_token: token }
+    });
+    const data = r.data;
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2136,9 +2131,9 @@ async function handleStoryReaction(value) {
 
   if (supabase) {
     try {
+      const { data: existing } = await supabase.from('customers').select('fields').eq('instagram_id', fromId).single();
       await supabase.from('customers').update({
-        tags: (await supabase.from('customers').select('tags').eq('instagram_id', fromId).single()).data?.tags || [],
-        fields: { last_story_reaction: reaction, story_reaction_at: new Date().toISOString() }
+        fields: { ...(existing?.fields || {}), last_story_reaction: reaction, story_reaction_at: new Date().toISOString() }
       }).eq('instagram_id', fromId);
     } catch (e) {
       console.error('Error guardando story reaction:', e.message);
@@ -2172,8 +2167,9 @@ async function handleLocation(event) {
 
   if (supabase && coords) {
     try {
+      const { data: existing } = await supabase.from('customers').select('fields').eq('instagram_id', senderId).single();
       await supabase.from('customers').update({
-        fields: { last_location_lat: coords.lat, last_location_lng: coords.long }
+        fields: { ...(existing?.fields || {}), last_location_lat: coords.lat, last_location_lng: coords.long }
       }).eq('instagram_id', senderId);
     } catch (e) {
       console.error('Error guardando ubicación:', e.message);
@@ -2212,8 +2208,9 @@ async function handleUserReferral(event) {
 
   if (supabase) {
     try {
+      const { data: existing } = await supabase.from('customers').select('fields').eq('instagram_id', senderId).single();
       await supabase.from('customers').update({
-        fields: { referral_source: referral?.ref, referral_at: new Date().toISOString() }
+        fields: { ...(existing?.fields || {}), referral_source: referral?.ref, referral_at: new Date().toISOString() }
       }).eq('instagram_id', senderId);
     } catch (e) {
       console.error('Error guardando referral:', e.message);
@@ -2263,8 +2260,9 @@ async function handleOptIn(event) {
 
   if (supabase) {
     try {
+      const { data: existing } = await supabase.from('customers').select('fields').eq('instagram_id', senderId).single();
       await supabase.from('customers').update({
-        fields: { opted_in: true, opt_in_type: ref }
+        fields: { ...(existing?.fields || {}), opted_in: true, opt_in_type: ref }
       }).eq('instagram_id', senderId);
     } catch (e) {
       console.error('Error guardando opt-in:', e.message);
@@ -2285,8 +2283,10 @@ async function handlePayment(event) {
 
   if (supabase) {
     try {
+      const { data: existing } = await supabase.from('customers').select('fields').eq('instagram_id', senderId).single();
       await supabase.from('customers').update({
         fields: {
+          ...(existing?.fields || {}),
           last_payment: amount,
           last_payment_currency: currency,
           last_payment_at: new Date().toISOString()
@@ -2386,9 +2386,14 @@ async function handleWelcomeMessageAd(event) {
       f.keywords && f.keywords.includes(clickedButtonPayload)
     );
 
-    if (matchingFlow) {
+    if (matchingFlow && matchingFlow.steps) {
       console.log(`▶️ Ejecutando flujo para Welcome Message Ad: ${matchingFlow.name}`);
-      // Aquí se ejecutaría el flujo (por ahora solo se registra)
+      const profile = await getUserProfile(senderId);
+      const senderName = profile?.name || senderId;
+      matchingFlow.executionCount = (matchingFlow.executionCount || 0) + 1;
+      matchingFlow.lastExecutedAt = new Date().toISOString();
+      saveFlowsConfig().catch(() => {});
+      await processFlowSteps(matchingFlow.steps, senderId, senderName);
     }
   }
 }
@@ -2561,30 +2566,6 @@ async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPD
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando mensaje con tag:', errorMsg);
     broadcastLog('ERROR', `Error al enviar con tag: ${errorMsg}`);
-  }
-}
-
-// ─────────────────────────────────────────────
-// FASE 4: Enviar Media Autónomo (Agente IA)
-// ─────────────────────────────────────────────
-async function sendMediaMessage(recipientId, type, url) {
-  try {
-    await axios.post(
-      `${GRAPH_API}/me/messages`,
-      {
-        recipient: { id: recipientId },
-        message: {
-          attachment: { type, payload: { url, is_reusable: true } }
-        }
-      },
-      { params: { access_token: ACCESS_TOKEN }, timeout: 15000 }
-    );
-    console.log(`✅ Media (${type}) enviado a ${recipientId}`);
-    broadcastLog('SYSTEM', `Media enviado a ${recipientId}`);
-  } catch (err) {
-    const errorMsg = err.response?.data?.error?.message || err.message;
-    console.error('❌ Error enviando Media autónomo:', errorMsg);
-    broadcastLog('ERROR', `Error al enviar media: ${errorMsg}`);
   }
 }
 
