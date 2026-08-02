@@ -597,3 +597,119 @@ header {
   padding: 4px 10px; border-radius: 20px; margin-bottom: 8px;
 }
 .trigger-type-badge.comment { background: #f0fdf4; color: #15803d; }
+
+/* ══════════════════════════════════════════
+   UNSAVED CHANGES INDICATOR
+══════════════════════════════════════════ */
+.unsaved-indicator {
+  color: #f59e0b;
+  font-size: 10px;
+  margin-left: 4px;
+  line-height: 1;
+  vertical-align: middle;
+  animation: fg-pulse 1.6s ease-in-out infinite;
+}
+@keyframes fg-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ══════════════════════════════════════════
+   VALIDACIÓN PRE-GUARDADO (nodos incompletos)
+══════════════════════════════════════════ */
+.drawflow-node.has-validation-error {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35) !important;
+}
+.node-validation-badge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 20px;
+  height: 20px;
+  background: #f59e0b;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  z-index: 6;
+  cursor: help;
+  pointer-events: auto;
+}
+
+/* ══════════════════════════════════════════
+   HINT DE DESCUBRIBILIDAD (clic derecho)
+══════════════════════════════════════════ */
+.canvas-hint {
+  position: absolute;
+  top: var(--spacing-5, 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(17, 24, 39, 0.85);
+  color: #fff;
+  font-size: 12px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  z-index: 40;
+  max-width: 90%;
+}
+.canvas-hint button {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canvas-hint button:hover { background: rgba(255,255,255,0.3); }
+.canvas-hint.hidden { display: none; }
+
+.canvas-empty-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  color: var(--text-muted, #6b7280);
+  pointer-events: none;
+  z-index: 5;
+  max-width: 320px;
+}
+.canvas-empty-hint.visible { display: flex; }
+.canvas-empty-hint-icon { font-size: 32px; margin-bottom: 6px; }
+.canvas-empty-hint-title { font-size: 15px; font-weight: 600; color: var(--text-main, #111827); }
+.canvas-empty-hint-body { font-size: 13px; line-height: 1.5; }
+
+/* ══════════════════════════════════════════
+   UNDO / REDO TOOLBAR
+══════════════════════════════════════════ */
+.canvas-toolbar-undo {
+  top: var(--spacing-5, 20px);
+  right: var(--spacing-5, 20px);
+  bottom: auto;
+  flex-direction: row;
+}
+.canvas-toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}

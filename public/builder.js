@@ -66,6 +66,65 @@ const nodeGotoState = {};     // { nodeId: { flow_id: '' } }
 const nodeAiAgentState = {};  // { nodeId: { system_prompt: '' } }
 
 // ─────────────────────────────────────────────
+// Helpers: Sync / Rehydrate de estado de nodos
+// Usados por "Guardar" y por el sistema de Undo/Redo.
+// ─────────────────────────────────────────────
+
+// Vuelca los estados JS paralelos (nodeBlocksState, nodeActionsState, etc.)
+// dentro de editor.drawflow para que editor.export() los incluya.
+// (condition/randomizer/ai_agent ya se escriben directo en node.data al guardar su config)
+function syncAllNodeStateToDrawflow() {
+  const data = editor.drawflow.drawflow.Home.data;
+  const stateMap = {
+    _blocks: nodeBlocksState,
+    _action: nodeActionsState,
+    _input: nodeInputState,
+    _carousel: nodeCarouselState,
+    _gallery: nodeGalleryState,
+    _audio: nodeAudioState,
+    _video: nodeVideoState,
+    _file: nodeFileState,
+    _delay: nodeDelayState,
+    _goto: nodeGotoState
+  };
+  for (const key in stateMap) {
+    const store = stateMap[key];
+    for (const nodeId in store) {
+      if (data[nodeId] && store[nodeId] !== undefined && store[nodeId] !== null) {
+        data[nodeId].data[key] = JSON.stringify(store[nodeId]);
+      }
+    }
+  }
+}
+
+// Recorre todos los nodos actuales de Drawflow, repobla los estados JS
+// paralelos desde node.data y vuelve a renderizar el contenido visual de cada nodo.
+// Se usa después de editor.import() (undo/redo, carga de flujo).
+function rehydrateAllNodeVisuals() {
+  const data = editor.drawflow.drawflow.Home.data;
+  for (const nodeId in data) {
+    const node = data[nodeId];
+    if (!node) continue;
+    try {
+      if (node.name === 'trigger') { renderTriggerNode(nodeId); }
+      else if (node.name === 'message' && node.data._blocks) { nodeBlocksState[nodeId] = JSON.parse(node.data._blocks); renderBlocksInNode(nodeId); }
+      else if (node.name === 'action' && node.data._action) { nodeActionsState[nodeId] = JSON.parse(node.data._action); renderActionNode(nodeId); }
+      else if (node.name === 'input' && node.data._input) { nodeInputState[nodeId] = JSON.parse(node.data._input); renderInputNode(nodeId); }
+      else if (node.name === 'condition' && node.data._condition) { nodeConditionState[nodeId] = JSON.parse(node.data._condition); renderConditionNode(nodeId); }
+      else if (node.name === 'randomizer' && node.data._randomizer) { nodeRandomizerState[nodeId] = JSON.parse(node.data._randomizer); renderRandomizerNode(nodeId); }
+      else if (node.name === 'carousel' && node.data._carousel) { nodeCarouselState[nodeId] = JSON.parse(node.data._carousel); renderCarouselNode(nodeId); }
+      else if (node.name === 'gallery' && node.data._gallery) { nodeGalleryState[nodeId] = JSON.parse(node.data._gallery); renderGalleryNode(nodeId); }
+      else if (node.name === 'audio' && node.data._audio) { nodeAudioState[nodeId] = JSON.parse(node.data._audio); renderAudioNode(nodeId); }
+      else if (node.name === 'video' && node.data._video) { nodeVideoState[nodeId] = JSON.parse(node.data._video); renderVideoNode(nodeId); }
+      else if (node.name === 'file' && node.data._file) { nodeFileState[nodeId] = JSON.parse(node.data._file); renderFileNode(nodeId); }
+      else if (node.name === 'delay' && node.data._delay) { nodeDelayState[nodeId] = JSON.parse(node.data._delay); renderDelayNode(nodeId); }
+      else if (node.name === 'goto' && node.data._goto) { nodeGotoState[nodeId] = JSON.parse(node.data._goto); renderGotoNode(nodeId); }
+      else if (node.name === 'ai_agent' && node.data._ai) { nodeAiAgentState[nodeId] = JSON.parse(node.data._ai); renderAiAgentNode(nodeId); }
+    } catch (e) { console.warn('rehydrate: error en nodo', nodeId, e); }
+  }
+}
+
+// ─────────────────────────────────────────────
 // Catálogo de Acciones (C.1)
 // ─────────────────────────────────────────────
 const ACTION_CATALOG = {
@@ -1252,55 +1311,15 @@ function buildStepsFromNode(nodeId, nodes, flowsConfig) {
 // ─────────────────────────────────────────────
 document.getElementById('btn-save').addEventListener('click', async () => {
   // Sincronizar estado de bloques y acciones con Drawflow
-  for (const nodeId in nodeBlocksState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._blocks = JSON.stringify(nodeBlocksState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeActionsState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId] && nodeActionsState[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._action = JSON.stringify(nodeActionsState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeInputState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId] && nodeInputState[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._input = JSON.stringify(nodeInputState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeCarouselState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._carousel = JSON.stringify(nodeCarouselState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeGalleryState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._gallery = JSON.stringify(nodeGalleryState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeAudioState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._audio = JSON.stringify(nodeAudioState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeVideoState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._video = JSON.stringify(nodeVideoState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeFileState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._file = JSON.stringify(nodeFileState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeDelayState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._delay = JSON.stringify(nodeDelayState[nodeId]);
-    }
-  }
-  for (const nodeId in nodeGotoState) {
-    if (editor.drawflow.drawflow.Home.data[nodeId]) {
-      editor.drawflow.drawflow.Home.data[nodeId].data._goto = JSON.stringify(nodeGotoState[nodeId]);
-    }
+  syncAllNodeStateToDrawflow();
+
+  // Validación pre-guardado (no bloquea el guardado, solo avisa)
+  const validationIssues = validateFlow();
+  applyValidationBadges(validationIssues);
+  if (validationIssues.length > 0 && typeof Toast !== 'undefined') {
+    Toast.warning(`${validationIssues.length} nodo${validationIssues.length === 1 ? '' : 's'} incompleto${validationIssues.length === 1 ? '' : 's'}`, {
+      detail: 'Se guardó igual, pero revisa los nodos marcados con ⚠️ — puede que el flujo no funcione como esperas.'
+    });
   }
 
   const data = editor.export();
@@ -1333,6 +1352,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     if (res.ok) {
       btn.innerText = "✓ Guardado";
       btn.style.background = '#16a34a';
+      markSaved();
       setTimeout(() => {
         btn.innerText = "Guardar Cambios";
         btn.style.background = '';
@@ -1428,6 +1448,22 @@ document.getElementById('btn-publish')?.addEventListener('click', async () => {
   if (!currentLoadedFlowId) return;
   const btn = document.getElementById('btn-publish');
   const wasEnabled = currentFlowEnabled;
+
+  // No permitir activar un flujo con nodos incompletos
+  if (!wasEnabled) {
+    syncAllNodeStateToDrawflow();
+    const issues = validateFlow();
+    applyValidationBadges(issues);
+    if (issues.length > 0) {
+      if (typeof Toast !== 'undefined') {
+        Toast.error(`No se puede publicar: ${issues.length} nodo${issues.length === 1 ? '' : 's'} incompleto${issues.length === 1 ? '' : 's'}`, {
+          detail: 'Revisa los nodos marcados con ⚠️ en el lienzo antes de publicar.'
+        });
+      }
+      return;
+    }
+  }
+
   btn.disabled = true;
   btn.textContent = wasEnabled ? 'Pausando...' : 'Publicando...';
 
@@ -1612,24 +1648,330 @@ setTimeout(async () => {
       }
     }, 100);
   } else {
-    const nodes = editor.drawflow.drawflow.Home.data;
-    for (const nodeId in nodes) {
-       const node = nodes[nodeId];
-       if (node.name === 'message' && node.data._blocks) { nodeBlocksState[nodeId] = JSON.parse(node.data._blocks); renderBlocksInNode(nodeId); }
-       if (node.name === 'action' && node.data._action) { nodeActionsState[nodeId] = JSON.parse(node.data._action); renderActionNode(nodeId); }
-       if (node.name === 'input' && node.data._input) { nodeInputState[nodeId] = JSON.parse(node.data._input); renderInputNode(nodeId); }
-       if (node.name === 'condition' && node.data._condition) { nodeConditionState[nodeId] = JSON.parse(node.data._condition); renderConditionNode(nodeId); }
-       if (node.name === 'randomizer' && node.data._randomizer) { nodeRandomizerState[nodeId] = JSON.parse(node.data._randomizer); renderRandomizerNode(nodeId); }
-       if (node.name === 'carousel' && node.data._carousel) { nodeCarouselState[nodeId] = JSON.parse(node.data._carousel); renderCarouselNode(nodeId); }
-       if (node.name === 'gallery' && node.data._gallery) { nodeGalleryState[nodeId] = JSON.parse(node.data._gallery); renderGalleryNode(nodeId); }
-       if (node.name === 'audio' && node.data._audio) { nodeAudioState[nodeId] = JSON.parse(node.data._audio); renderAudioNode(nodeId); }
-       if (node.name === 'video' && node.data._video) { nodeVideoState[nodeId] = JSON.parse(node.data._video); renderVideoNode(nodeId); }
-       if (node.name === 'file' && node.data._file) { nodeFileState[nodeId] = JSON.parse(node.data._file); renderFileNode(nodeId); }
-       if (node.name === 'delay' && node.data._delay) { nodeDelayState[nodeId] = JSON.parse(node.data._delay); renderDelayNode(nodeId); }
-       if (node.name === 'goto' && node.data._goto) { nodeGotoState[nodeId] = JSON.parse(node.data._goto); renderGotoNode(nodeId); }
+    rehydrateAllNodeVisuals();
+  }
+
+  // Post-carga: inicializar Undo/Redo, validación y estado vacío del canvas
+  setTimeout(() => {
+    UndoRedo.init();
+    applyValidationBadges(validateFlow());
+    updateEmptyCanvasHint();
+    markSaved();
+  }, 250);
+}, 150);
+
+// ─────────────────────────────────────────────
+// Indicador de cambios sin guardar
+// ─────────────────────────────────────────────
+let hasUnsavedChanges = false;
+
+function markDirty() {
+  hasUnsavedChanges = true;
+  const ind = document.getElementById('unsaved-indicator');
+  if (ind) ind.style.display = '';
+}
+
+function markSaved() {
+  hasUnsavedChanges = false;
+  const ind = document.getElementById('unsaved-indicator');
+  if (ind) ind.style.display = 'none';
+}
+
+window.addEventListener('beforeunload', function (e) {
+  if (!hasUnsavedChanges) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+// ─────────────────────────────────────────────
+// Validación pre-guardado
+// ─────────────────────────────────────────────
+function validateFlow() {
+  const issues = [];
+  const data = editor.drawflow.drawflow.Home.data;
+
+  for (const nodeId in data) {
+    const node = data[nodeId];
+    if (!node) continue;
+    const d = node.data || {};
+
+    switch (node.name) {
+      case 'trigger': {
+        const triggerType = d.triggerType || 'message';
+        if (triggerType === 'comment') {
+          if (!d.commentKeyword || !d.commentKeyword.trim()) {
+            issues.push({ nodeId, type: 'trigger', message: 'Falta la palabra clave del comentario.' });
+          }
+        } else if (!d.keywords || !d.keywords.trim()) {
+          issues.push({ nodeId, type: 'trigger', message: 'Falta configurar la palabra clave del disparador.' });
+        }
+        break;
+      }
+      case 'message': {
+        const blocks = nodeBlocksState[nodeId];
+        if (!blocks || blocks.length === 0) {
+          issues.push({ nodeId, type: 'message', message: 'El mensaje no tiene contenido.' });
+        } else if (blocks.every(b => b.type === 'text' ? !(b.content || '').trim() : !b.url)) {
+          issues.push({ nodeId, type: 'message', message: 'El mensaje está vacío.' });
+        }
+        break;
+      }
+      case 'input': {
+        const conf = nodeInputState[nodeId];
+        if (!conf || !(conf.field || '').trim() || !(conf.prompt || '').trim()) {
+          issues.push({ nodeId, type: 'input', message: 'Falta el campo o la pregunta a mostrar.' });
+        }
+        break;
+      }
+      case 'condition': {
+        const conf = nodeConditionState[nodeId];
+        if (!conf || !(conf.field || '').trim()) {
+          issues.push({ nodeId, type: 'condition', message: 'Falta configurar la condición.' });
+        }
+        break;
+      }
+      case 'action': {
+        const conf = nodeActionsState[nodeId];
+        if (!conf || !conf.type) {
+          issues.push({ nodeId, type: 'action', message: 'No se eligió ninguna acción.' });
+        }
+        break;
+      }
+      case 'carousel': {
+        const conf = nodeCarouselState[nodeId];
+        if (!conf || !conf.elements || conf.elements.length === 0 || conf.elements.every(el => !(el.title || '').trim())) {
+          issues.push({ nodeId, type: 'carousel', message: 'El carrusel no tiene elementos con título.' });
+        }
+        break;
+      }
+      case 'gallery': {
+        const conf = nodeGalleryState[nodeId];
+        if (!conf || !conf.images || conf.images.length === 0 || conf.images.every(img => !img.url)) {
+          issues.push({ nodeId, type: 'gallery', message: 'La galería no tiene imágenes.' });
+        }
+        break;
+      }
+      case 'audio': {
+        const conf = nodeAudioState[nodeId];
+        if (!conf || !conf.audio_url) issues.push({ nodeId, type: 'audio', message: 'Falta el archivo de audio.' });
+        break;
+      }
+      case 'video': {
+        const conf = nodeVideoState[nodeId];
+        if (!conf || !conf.video_url) issues.push({ nodeId, type: 'video', message: 'Falta el archivo de video.' });
+        break;
+      }
+      case 'file': {
+        const conf = nodeFileState[nodeId];
+        if (!conf || !conf.file_url) issues.push({ nodeId, type: 'file', message: 'Falta el archivo adjunto.' });
+        break;
+      }
+      case 'delay': {
+        const conf = nodeDelayState[nodeId];
+        if (!conf || !conf.seconds || conf.seconds <= 0) issues.push({ nodeId, type: 'delay', message: 'El tiempo de espera debe ser mayor a 0.' });
+        break;
+      }
+      case 'goto': {
+        const conf = nodeGotoState[nodeId];
+        if (!conf || !(conf.flow_id || '').trim()) issues.push({ nodeId, type: 'goto', message: 'Falta elegir el flujo destino.' });
+        break;
+      }
+      case 'ai_agent': {
+        const conf = nodeAiAgentState[nodeId];
+        if (!conf || !(conf.system_prompt || '').trim()) issues.push({ nodeId, type: 'ai_agent', message: 'Falta el prompt del agente IA.' });
+        break;
+      }
+      default:
+        break;
     }
   }
-}, 150);
+
+  return issues;
+}
+
+function applyValidationBadges(issues) {
+  document.querySelectorAll('.node-validation-badge').forEach(el => el.remove());
+  document.querySelectorAll('.drawflow-node.has-validation-error').forEach(el => el.classList.remove('has-validation-error'));
+
+  issues.forEach(issue => {
+    const nodeEl = document.getElementById('node-' + issue.nodeId);
+    if (!nodeEl) return;
+    nodeEl.classList.add('has-validation-error');
+    const badge = document.createElement('div');
+    badge.className = 'node-validation-badge';
+    badge.textContent = '!';
+    badge.title = issue.message;
+    nodeEl.appendChild(badge);
+  });
+}
+
+// ─────────────────────────────────────────────
+// Hint de descubribilidad: cómo agregar nodos
+// ─────────────────────────────────────────────
+function updateEmptyCanvasHint() {
+  const empty = Object.keys(editor.drawflow.drawflow.Home.data).length === 0;
+  const el = document.getElementById('canvas-empty-hint');
+  if (el) el.classList.toggle('visible', empty);
+}
+
+(function initCanvasHint() {
+  const HINT_KEY = 'fg_builder_ctx_hint_dismissed';
+  const hint = document.getElementById('canvas-hint');
+  const closeBtn = document.getElementById('canvas-hint-close');
+  if (!hint) return;
+  try {
+    if (localStorage.getItem(HINT_KEY) === '1') hint.classList.add('hidden');
+  } catch (e) {}
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function () {
+      hint.classList.add('hidden');
+      try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {}
+    });
+  }
+})();
+
+// ─────────────────────────────────────────────
+// Undo / Redo — historial de snapshots del flujo
+// ─────────────────────────────────────────────
+const UndoRedo = (function () {
+  const MAX_HISTORY = 50;
+  let history = [];
+  let pointer = -1;
+  let restoring = false;
+  let debounceTimer = null;
+
+  function snapshotNow() {
+    syncAllNodeStateToDrawflow();
+    return JSON.stringify(editor.export());
+  }
+
+  function updateButtons() {
+    const undoBtn = document.getElementById('canvas-undo');
+    const redoBtn = document.getElementById('canvas-redo');
+    if (undoBtn) undoBtn.disabled = pointer <= 0;
+    if (redoBtn) redoBtn.disabled = pointer >= history.length - 1;
+  }
+
+  function pushSnapshot() {
+    if (restoring) return;
+    const snap = snapshotNow();
+    if (history[pointer] === snap) return; // sin cambios reales, evita ruido en el historial
+    history = history.slice(0, pointer + 1);
+    history.push(snap);
+    if (history.length > MAX_HISTORY) history.shift();
+    pointer = history.length - 1;
+    updateButtons();
+  }
+
+  function scheduleSnapshot() {
+    if (restoring) return;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(pushSnapshot, 500);
+  }
+
+  function restore(snap) {
+    restoring = true;
+    try {
+      closeInspector();
+      editor.import(JSON.parse(snap), false);
+      rehydrateAllNodeVisuals();
+      applyValidationBadges(validateFlow());
+      updateEmptyCanvasHint();
+      markDirty();
+    } finally {
+      restoring = false;
+    }
+    updateButtons();
+  }
+
+  function undo() {
+    clearTimeout(debounceTimer);
+    pushSnapshot();
+    if (pointer <= 0) return;
+    pointer--;
+    restore(history[pointer]);
+  }
+
+  function redo() {
+    if (pointer >= history.length - 1) return;
+    pointer++;
+    restore(history[pointer]);
+  }
+
+  return {
+    init: function () {
+      history = [snapshotNow()];
+      pointer = 0;
+      updateButtons();
+    },
+    schedule: scheduleSnapshot,
+    undo,
+    redo
+  };
+})();
+
+document.getElementById('canvas-undo').addEventListener('click', () => UndoRedo.undo());
+document.getElementById('canvas-redo').addEventListener('click', () => UndoRedo.redo());
+
+document.addEventListener('keydown', function (e) {
+  const tag = (e.target && e.target.tagName) || '';
+  const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable);
+  if (!(e.ctrlKey || e.metaKey) || isEditable) return;
+
+  if (e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    UndoRedo.undo();
+  } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+    e.preventDefault();
+    UndoRedo.redo();
+  }
+});
+
+// Enganchar cambios del lienzo (crear/borrar nodo, conexiones, mover) al historial
+editor.on('nodeCreated', function () {
+  markDirty();
+  UndoRedo.schedule();
+  updateEmptyCanvasHint();
+  setTimeout(() => applyValidationBadges(validateFlow()), 60);
+});
+editor.on('nodeRemoved', function () {
+  markDirty();
+  UndoRedo.schedule();
+  updateEmptyCanvasHint();
+  setTimeout(() => applyValidationBadges(validateFlow()), 60);
+});
+editor.on('nodeMoved', function () {
+  markDirty();
+  UndoRedo.schedule();
+});
+editor.on('connectionCreated', function () {
+  markDirty();
+  UndoRedo.schedule();
+});
+editor.on('connectionRemoved', function () {
+  markDirty();
+  UndoRedo.schedule();
+});
+
+// Enganchar ediciones dentro del panel de configuración (inputs, selects, botones)
+document.addEventListener('input', function (e) {
+  if (e.target.closest('#config-panel') || e.target.closest('#drawflow')) {
+    markDirty();
+    UndoRedo.schedule();
+  }
+});
+document.addEventListener('change', function (e) {
+  if (e.target.closest('#config-panel') || e.target.closest('#drawflow')) {
+    markDirty();
+    UndoRedo.schedule();
+  }
+});
+document.addEventListener('click', function (e) {
+  if (e.target.closest('#config-panel') || e.target.closest('#trigger-picker-overlay') || e.target.closest('.ctx-item') || e.target.closest('#ai-generate-modal')) {
+    markDirty();
+    UndoRedo.schedule();
+  }
+});
 
 // ─────────────────────────────────────────────
 // Pilar 1: Auto-Organizar (Dagre.js)

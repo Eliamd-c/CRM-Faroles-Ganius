@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="https://unpkg.com/drawflow@0.0.60/dist/drawflow.min.css">
 
     <!-- Builder CSS (compat legacy) -->
-    <link rel="stylesheet" href="builder.css?v=21">
+    <link rel="stylesheet" href="builder.css?v=22">
 </head>
 <body>
 
@@ -52,6 +52,7 @@
         <div id="flow-header-center" class="flow-header-center" style="display:none;">
             <div class="flow-name-wrapper">
                 <span id="flow-name-display" class="flow-name-display"></span>
+                <span id="unsaved-indicator" class="unsaved-indicator" title="Tienes cambios sin guardar" style="display:none;">●</span>
                 <input id="flow-name-input" class="flow-name-input" type="text" style="display:none;" maxlength="80" aria-label="Editar nombre del flujo" />
             </div>
             <span id="flow-status-chip" class="flow-status-chip"></span>
@@ -169,6 +170,25 @@
         <div class="col-right app-main">
             <div id="drawflow"></div>
 
+            <!-- Hint de descubribilidad: cómo agregar nodos -->
+            <div class="canvas-hint" id="canvas-hint">
+                <span>💡 Clic derecho en el lienzo para agregar un nodo, o arrastra uno desde la izquierda</span>
+                <button id="canvas-hint-close" aria-label="Cerrar aviso" title="Cerrar">×</button>
+            </div>
+
+            <!-- Estado vacío: primer nodo -->
+            <div class="canvas-empty-hint" id="canvas-empty-hint">
+                <div class="canvas-empty-hint-icon">👋</div>
+                <div class="canvas-empty-hint-title">Tu lienzo está vacío</div>
+                <div class="canvas-empty-hint-body">Haz <strong>clic derecho</strong> aquí para agregar tu primer nodo,<br>o arrastra un bloque desde la barra izquierda.</div>
+            </div>
+
+            <!-- Undo/Redo toolbar (nuevo) -->
+            <div class="canvas-toolbar canvas-toolbar-undo" aria-label="Deshacer y rehacer">
+                <button class="canvas-toolbar-btn" id="canvas-undo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶</button>
+                <button class="canvas-toolbar-btn" id="canvas-redo" title="Rehacer (Ctrl+Y)"  aria-label="Rehacer" disabled>↷</button>
+            </div>
+
             <!-- Zoom toolbar (nuevo) -->
             <div class="canvas-toolbar" aria-label="Controles de zoom">
                 <button class="canvas-toolbar-btn" id="canvas-zoom-in"  title="Acercar"  aria-label="Acercar">+</button>
@@ -283,7 +303,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
 
     <!-- App (accede al DOM al nivel del módulo — necesita el HTML estático de arriba) -->
-    <script src="builder.js?v=42"></script>
+    <script src="builder.js?v=43"></script>
 
     <!-- Post-init: enriquecer UI con nuevos comportamientos (después de builder.js) -->
     <script>
