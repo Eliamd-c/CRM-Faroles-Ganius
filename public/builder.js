@@ -1333,10 +1333,23 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
       const matchType = node.data.matchType || 'contains';
       const flowId = node.data._flowId || currentLoadedFlowId || `flow_${nodeId}`;
+      const triggerType = node.data.triggerType || (keywordsList.length ? 'message' : null);
+      const commentKeyword = (node.data.commentKeyword || '').trim();
       const newFlow = { id: flowId, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
+      if (triggerType) newFlow.triggerType = triggerType;
+      if (commentKeyword) newFlow.commentKeyword = commentKeyword;
       const nextNodeId = node.outputs.output_1?.connections[0]?.node;
       if (nextNodeId) newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
-      if (keywordsList.length > 0) flowsConfig.flows.push(newFlow);
+
+      // Incluir en el payload si:
+      //  - tiene keywords (trigger de mensaje clásico)
+      //  - tiene commentKeyword (trigger de comentario)
+      //  - o ya existe en el backend (mismo flowId que se cargó) — así el rename/edición
+      //    de flujos disparados por otros medios (welcome, primer mensaje, subflujos) persiste.
+      const isExisting = !!currentLoadedFlowId && flowId === currentLoadedFlowId;
+      if (keywordsList.length > 0 || commentKeyword || isExisting) {
+        flowsConfig.flows.push(newFlow);
+      }
     }
   }
 
@@ -1407,7 +1420,8 @@ function updateFlowHeader(flow) {
 }
 
 function commitFlowName(nameDisplay, nameInput) {
-  const newName = nameInput.value.trim() || nameDisplay.textContent;
+  const previousName = nameDisplay.textContent;
+  const newName = nameInput.value.trim() || previousName;
   nameDisplay.textContent = newName;
   nameInput.style.display = 'none';
   nameDisplay.style.display = '';
@@ -1419,6 +1433,26 @@ function commitFlowName(nameDisplay, nameInput) {
       nodes[nid].data.flowName = newName;
       break;
     }
+  }
+
+  // Persistir el rename inmediatamente vía PATCH (no depende del botón Guardar).
+  // Sin esto, un flujo sin keywords no se enviaba en el POST y el rename se perdía.
+  if (currentLoadedFlowId && newName !== previousName) {
+    fetch(`/api/flows/${encodeURIComponent(currentLoadedFlowId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ name: newName })
+    }).then(res => {
+      if (res.ok) {
+        if (typeof Toast !== 'undefined') Toast.success('Nombre actualizado', { duration: 1800 });
+      } else {
+        if (typeof Toast !== 'undefined') Toast.error('No se pudo actualizar el nombre');
+        nameDisplay.textContent = previousName;
+      }
+    }).catch(() => {
+      if (typeof Toast !== 'undefined') Toast.error('Sin conexión: nombre no guardado');
+      nameDisplay.textContent = previousName;
+    });
   }
 }
 
