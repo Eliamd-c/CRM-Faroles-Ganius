@@ -234,8 +234,11 @@ const {
   INSTAGRAM_ACCESS_TOKEN,
 } = process.env;
 
-// Fallback: si no está INSTAGRAM_ACCESS_TOKEN, usa PAGE_ACCESS_TOKEN
-const ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
+// Token de acceso: se prefiere INSTAGRAM_ACCESS_TOKEN, con PAGE_ACCESS_TOKEN
+// como respaldo. Es 'let' porque initBot() puede cambiarlo automáticamente al
+// respaldo si el token principal está muerto (evita quedar caído por un token
+// vencido cuando el otro sigue siendo válido).
+let ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
 
 const GRAPH_API = 'https://graph.facebook.com/v21.0';
 
@@ -245,22 +248,40 @@ const GRAPH_API = 'https://graph.facebook.com/v21.0';
 let BOT_USERNAME = process.env.BOT_USERNAME || null;
 const recentReplies = new Set(); // Para guardar textos de respuestas recientes y evitar ecos
 
-async function initBot() {
+// Prueba un token contra la Graph API; devuelve el username si es válido, o null.
+async function validarToken(token) {
+  if (!token) return null;
   try {
-    const res = await axios.get(`${GRAPH_API}/${INSTAGRAM_ACCOUNT_ID}`, {
-      params: { fields: 'username', access_token: ACCESS_TOKEN }
+    const res = await axios.get(`${GRAPH_API}/me`, {
+      params: { fields: 'username', access_token: token }, timeout: 10000
     });
-    BOT_USERNAME = res.data.username;
-    console.log(`🤖 Bot inicializado. Username: @${BOT_USERNAME}`);
-    // No podemos hacer broadcast aquí porque aún no hay clientes conectados,
-    // pero guardamos el estado.
+    return res.data?.username || res.data?.id || 'ok';
   } catch (err) {
-    console.error('❌ Error obteniendo datos del bot en inicio:', err.response?.data || err.message);
+    return null;
   }
 }
-if (!BOT_USERNAME) {
-  initBot();
+
+async function initBot() {
+  // Candidatos en orden de preferencia, sin duplicados ni vacíos.
+  const candidatos = [
+    { nombre: 'INSTAGRAM_ACCESS_TOKEN', token: INSTAGRAM_ACCESS_TOKEN },
+    { nombre: 'PAGE_ACCESS_TOKEN', token: PAGE_ACCESS_TOKEN },
+  ].filter((c, i, arr) => c.token && arr.findIndex(x => x.token === c.token) === i);
+
+  for (const c of candidatos) {
+    const username = await validarToken(c.token);
+    if (username) {
+      ACCESS_TOKEN = c.token;
+      BOT_USERNAME = username;
+      console.log(`🤖 Bot inicializado con ${c.nombre}. Username: @${BOT_USERNAME}`);
+      return;
+    }
+    console.warn(`⚠️ ${c.nombre} rechazado por Meta, probando el siguiente token...`);
+  }
+
+  console.error('❌ Ningún token de acceso es válido. El bot NO podrá enviar mensajes hasta renovar las credenciales en Meta.');
 }
+initBot();
 
 // ─────────────────────────────────────────────
 // GET /stream  — Server-Sent Events para el Dashboard UI
@@ -379,7 +400,8 @@ app.get('/api/flows', (req, res) => {
 // Obtener publicaciones recientes de Instagram para selector de comentarios
 app.get('/api/instagram/media', async (req, res) => {
   try {
-    const token = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN;
+    // Usa el token ya validado por initBot (no reintroduce el token muerto).
+    const token = ACCESS_TOKEN;
     if (!token) return res.status(503).json({ error: 'No access token configured' });
     const url = `https://graph.facebook.com/v21.0/me/media?fields=id,media_type,thumbnail_url,media_url,caption,timestamp,permalink&limit=12&access_token=${token}`;
     const r = await fetch(url);
