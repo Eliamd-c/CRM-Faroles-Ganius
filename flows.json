@@ -649,7 +649,20 @@
         },
         {
           "type": "text",
-          "message": "¡Excelente! Tu hogar se va a ver hermoso. 🏡✨\n\nAhora mismo tenemos una Compra Grupal activa: si te unes con familia, vecinos o tu grupo de iglesia y compran juntos, el precio unitario baja mucho.\n\nRevisa las opciones:\n\n📊 TABLA DE PRECIOS:\n\nSi compras...   Precio c/u   Total (6 paquetes)\n1-2             $28.000      $168.000\n3-5             $25.000      $150.000\n6+              $24.000      $144.000\n\nNota: Al ser un producto artesanal hecho a mano, nuestra capacidad de producción es limitada. ¡Asegura tus faroles antes de que se agoten!"
+          "message": "¡Excelente! Tu hogar se va a ver hermoso. 🏡✨\n\nAhora mismo tenemos una Compra Grupal activa: si te unes con familia, vecinos o tu grupo de iglesia y compran juntos, el precio unitario baja mucho.\n\nRevisa las opciones:"
+        },
+        {
+          "type": "gallery",
+          "images": [
+            {
+              "url": "https://quickchart.io/chart?c=%7B%22type%22:%22table%22,%22data%22:%7B%22headers%22:%5B%22Si%20compras%22,%22Precio%20c/u%22,%22Total%20(6%20paquetes)%22%5D,%22rows%22:%5B%5B%221-2%22,%22%2428.000%22,%22%24168.000%22%5D,%5B%223-5%22,%22%2425.000%22,%22%24150.000%22%5D,%5B%226%2B%22,%22%2424.000%22,%22%24144.000%22%5D%5D%7D%7D"
+            }
+          ],
+          "delay_between_ms": 300
+        },
+        {
+          "type": "text",
+          "message": "📊 Nota: Al ser un producto artesanal hecho a mano, nuestra capacidad de producción es limitada. ¡Asegura tus faroles antes de que se agoten!"
         },
         {
           "type": "delay",
