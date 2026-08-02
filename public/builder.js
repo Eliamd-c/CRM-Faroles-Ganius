@@ -1,3 +1,28 @@
+// ─────────────────────────────────────────────
+// Autenticación del Builder
+// ─────────────────────────────────────────────
+function getAuthToken() {
+  let token = localStorage.getItem('builder_auth_token');
+  if (!token) {
+    token = prompt('🔐 Ingresa el token de seguridad del Builder (puedes obtenerlo del administrador):');
+    if (token) {
+      localStorage.setItem('builder_auth_token', token.trim());
+    }
+  }
+  return token;
+}
+
+function getAuthHeader() {
+  const token = getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+// Verificar token antes de iniciar
+const authToken = getAuthToken();
+if (!authToken) {
+  alert('❌ Token requerido. Sin token no puedes guardar cambios.');
+}
+
 const id = document.getElementById("drawflow");
 const editor = new Drawflow(id);
 editor.reroute = true;
@@ -1300,7 +1325,11 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerText = "Guardando...";
   try {
-    const res = await fetch('/api/flows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flowsConfig) });
+    const res = await fetch('/api/flows', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(flowsConfig)
+    });
     if (res.ok) {
       btn.innerText = "✓ Guardado";
       btn.style.background = '#16a34a';

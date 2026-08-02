@@ -1,3 +1,22 @@
+// ─────────────────────────────────────────────
+// Autenticación del Panel de Automaciones
+// ─────────────────────────────────────────────
+function getAuthToken() {
+  let token = localStorage.getItem('builder_auth_token');
+  if (!token) {
+    token = prompt('🔐 Ingresa el token de seguridad (puedes obtenerlo del administrador):');
+    if (token) {
+      localStorage.setItem('builder_auth_token', token.trim());
+    }
+  }
+  return token;
+}
+
+function getAuthHeader() {
+  const token = getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
 let allFlows = [];
 let deleteTarget = null;
 
@@ -145,7 +164,9 @@ function renderFlows(flows) {
 
 async function loadFlows() {
   try {
-    const res = await fetch('/api/flows');
+    const res = await fetch('/api/flows', {
+      headers: getAuthHeader()
+    });
     const config = await res.json();
     allFlows = config.flows || [];
     renderFlows(allFlows);
@@ -158,7 +179,7 @@ async function toggleFlow(id, enabled) {
   try {
     const res = await fetch(`/api/flows/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify({ enabled })
     });
     if (!res.ok) throw new Error('Failed');
@@ -171,7 +192,10 @@ async function toggleFlow(id, enabled) {
 
 async function duplicateFlow(id) {
   try {
-    const res = await fetch(`/api/flows/${encodeURIComponent(id)}/duplicate`, { method: 'POST' });
+    const res = await fetch(`/api/flows/${encodeURIComponent(id)}/duplicate`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
     if (!res.ok) throw new Error('Failed');
     await loadFlows();
   } catch (err) {
@@ -193,7 +217,10 @@ function closeDeleteModal() {
 document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
   if (!deleteTarget) return;
   try {
-    const res = await fetch(`/api/flows/${encodeURIComponent(deleteTarget)}`, { method: 'DELETE' });
+    const res = await fetch(`/api/flows/${encodeURIComponent(deleteTarget)}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
     if (!res.ok) throw new Error('Failed');
     closeDeleteModal();
     await loadFlows();
