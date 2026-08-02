@@ -490,6 +490,7 @@ header {
 .config-header.type-delay     { border-top-color: #94a3b8; background: #f8fafc; }
 .config-header.type-goto      { border-top-color: #2dd4bf; background: #f0fdfa; }
 .config-header.type-file      { border-top-color: #a3a3a3; background: #fafafa; }
+.config-header.type-ai        { border-top-color: #8b5cf6; background: #f5f3ff; }
 
 .config-header-inner { display: flex; align-items: center; gap: 8px; }
 .config-header-icon  { font-size: 18px; line-height: 1; }

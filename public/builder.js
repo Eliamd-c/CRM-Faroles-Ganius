@@ -2417,7 +2417,7 @@ function renderTriggerNode(nodeId) {
         <div class="trigger-type-badge">💬 Mensaje directo</div>
         <div style="background:#eff6ff; padding:8px; border-radius:6px; font-size:11px;">
           <div style="color:#1d4ed8; font-weight:600; margin-bottom:3px;">${matchLabels[matchType] || 'Contiene'}</div>
-          <div style="color:#1e40af;">${kw}</div>
+          <div style="color:#1e40af; max-height:54px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;">${kw}</div>
         </div>`;
     } else {
       container.innerHTML = `
