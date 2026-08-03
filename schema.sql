@@ -19,3 +19,15 @@ CREATE TABLE IF NOT EXISTS public.customers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Crear tabla messages
+CREATE TABLE IF NOT EXISTS public.messages (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    instagram_id TEXT NOT NULL,
+    direction TEXT CHECK (direction IN ('inbound', 'outbound')),
+    message_type TEXT DEFAULT 'text',
+    content TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_instagram_id ON public.messages(instagram_id);

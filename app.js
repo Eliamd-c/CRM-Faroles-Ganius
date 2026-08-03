@@ -1220,6 +1220,54 @@ app.delete('/api/ai/knowledge/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Endpoint de Contactos y Mensajes
+// ─────────────────────────────────────────────
+app.get('/api/contacts/:instagram_id/messages', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { instagram_id } = req.params;
+    const { data, error } = await supabase.from('messages').select('*').eq('instagram_id', instagram_id).order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/contacts/:instagram_id/send', express.json(), async (req, res) => {
+  try {
+    const { instagram_id } = req.params;
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'Mensaje vacío' });
+
+    // Enviar el mensaje usando la función existente
+    await sendMessage(instagram_id, message);
+    
+    // Pausar el bot para este usuario (live chat takeover)
+    if (supabase) {
+      await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', instagram_id);
+    }
+    
+    res.json({ success: true, message: 'Mensaje enviado y bot pausado.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/contacts/:instagram_id/toggle-bot', express.json(), async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { instagram_id } = req.params;
+    const { bot_paused } = req.body;
+    const { error } = await supabase.from('customers').update({ bot_paused }).eq('instagram_id', instagram_id);
+    if (error) throw error;
+    res.json({ success: true, bot_paused });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────
 // FASE 8: Endpoint de Analytics del Agente IA
 // ─────────────────────────────────────────────
 app.get('/api/ai/analytics', async (req, res) => {
@@ -1760,12 +1808,14 @@ async function handleMessage(event) {
   // 1. Manejo de menciones en Historias
   if (storyMention) {
     broadcastLog('STORY', `@${senderName} te mencionó en su historia.`, profile);
+    logMessageToDB(senderId, 'inbound', 'story_mention', '[Mención en historia]');
     await sendMessage(senderId, `¡Hola @${senderName}! 👋 ¡Gracias por mencionarnos en tu historia! Nos encanta ❤️`);
     return;
   }
 
   // 2. Manejo de Mensajes Directos regulares (DM)
   broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
+  logMessageToDB(senderId, 'inbound', 'text', text || (hasAttachments ? '[Adjunto/s]' : ''));
 
   // 3. Verificar si el bot está pausado o en recolección de datos
   let customer = null;
@@ -2693,6 +2743,24 @@ async function handleWelcomeMessageAd(event) {
 }
 
 // ─────────────────────────────────────────────
+// Log Message to DB (Historial de Contactos)
+// ─────────────────────────────────────────────
+async function logMessageToDB(instagram_id, direction, type, content) {
+  if (!supabase) return;
+  try {
+    const textContent = typeof content === 'string' ? content : JSON.stringify(content);
+    await supabase.from('messages').insert({
+      instagram_id,
+      direction,
+      message_type: type,
+      content: textContent
+    });
+  } catch (err) {
+    console.error('⚠️ Error guardando mensaje en DB:', err.message);
+  }
+}
+
+// ─────────────────────────────────────────────
 // Enviar DM
 // DOC: https://developers.facebook.com/docs/messenger-platform/send-messages
 // ─────────────────────────────────────────────
@@ -2726,6 +2794,7 @@ async function sendMessage(recipientId, text, quickReplies = null) {
     );
     console.log(`✅ DM enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Respuesta enviada a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'text', text);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando DM:', errorMsg);
@@ -2767,6 +2836,7 @@ async function sendTemplate(recipientId, text, buttons) {
     );
     console.log(`✅ Plantilla enviada a ${recipientId}`);
     broadcastLog('SYSTEM', `Plantilla de botones enviada a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'template', text);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Plantilla:', errorMsg);
@@ -2801,6 +2871,7 @@ async function sendIceBreaker(recipientId, question, suggestions = []) {
     );
     console.log(`❄️ Ice Breaker enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Ice Breaker enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'text', question);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Ice Breaker:', errorMsg);
@@ -2834,6 +2905,7 @@ async function sendQuickReplies(recipientId, text, options = []) {
     );
     console.log(`⚡ Quick Replies enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Quick Replies enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'text', text);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Quick Replies:', errorMsg);
@@ -2861,6 +2933,7 @@ async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPD
     );
     console.log(`🏷️ Mensaje con tag "${messagingTag}" enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Mensaje con tag "${messagingTag}" enviado`);
+    logMessageToDB(recipientId, 'outbound', 'text', text);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando mensaje con tag:', errorMsg);
@@ -2885,6 +2958,7 @@ async function sendMediaMessage(recipientId, type, url) {
     );
     console.log(`✅ Media (${type}) enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Media enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', type, url);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Media autónomo:', errorMsg);
@@ -2931,6 +3005,7 @@ async function sendCard(recipientId, cardData, textFallback = null) {
     );
     console.log(`✅ Tarjeta enviada a ${recipientId}`);
     broadcastLog('SYSTEM', `Tarjeta (Imagen) enviada a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'template', cardData.title);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Tarjeta:', errorMsg);
@@ -2973,6 +3048,7 @@ async function sendCarousel(recipientId, elements) {
       { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Carrusel (${formattedElements.length} tarjetas) enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'template', '[Carrusel]');
   } catch (err) {
     const msg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando carrusel:', msg);
@@ -3001,6 +3077,7 @@ async function sendGallery(recipientId, images, delayBetweenMs = 300) {
     if (delayBetweenMs > 0) await new Promise(r => setTimeout(r, delayBetweenMs));
   }
   broadcastLog('SYSTEM', `Galería (${images.length} imágenes) enviada a ${recipientId}`);
+  logMessageToDB(recipientId, 'outbound', 'image', '[Galería de Imágenes]');
 }
 
 // ─────────────────────────────────────────────
@@ -3017,6 +3094,7 @@ async function sendAudio(recipientId, audioUrl) {
       { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Audio enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'audio', audioUrl);
   } catch (err) {
     const msg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando audio:', msg);
@@ -3038,6 +3116,7 @@ async function sendVideo(recipientId, videoUrl) {
       { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Video enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'video', videoUrl);
   } catch (err) {
     const msg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando video:', msg);
@@ -3059,6 +3138,7 @@ async function sendFile(recipientId, fileUrl) {
       { params: { access_token: ACCESS_TOKEN } }
     );
     broadcastLog('SYSTEM', `Archivo enviado a ${recipientId}`);
+    logMessageToDB(recipientId, 'outbound', 'file', fileUrl);
   } catch (err) {
     const msg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando archivo:', msg);

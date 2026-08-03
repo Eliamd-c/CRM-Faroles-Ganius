@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contactos - CRM 2.0</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="contacts.css">
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="nav-logo">
+        <i class="fa-solid fa-robot"></i>
+        <span>CRM 2.0</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="flow-builder.html">Flow Builder</a></li>
+        <li><a href="ai-config.html">AI Config</a></li>
+        <li><a href="contacts.html" class="active">Contactos</a></li>
+      </ul>
+      <div class="nav-user">
+        <button id="logoutBtn" class="btn-secondary"><i class="fa-solid fa-right-from-bracket"></i> Salir</button>
+      </div>
+    </nav>
+
+    <!-- Main Content: Contacts Layout -->
+    <main class="contacts-layout">
+      <!-- Left Sidebar: Contact List -->
+      <section class="contacts-sidebar">
+        <div class="sidebar-header">
+          <h2>Suscriptores</h2>
+          <div class="search-bar">
+            <i class="fa-solid fa-search"></i>
+            <input type="text" id="contactSearch" placeholder="Buscar contacto...">
+          </div>
+        </div>
+        <div class="contacts-list" id="contactsList">
+          <!-- Contacts will be rendered here dynamically -->
+          <div class="loading-contacts">Cargando...</div>
+        </div>
+      </section>
+
+      <!-- Center: Chat Window -->
+      <section class="chat-window">
+        <div class="chat-header">
+          <div class="chat-user-info" id="chatHeaderInfo">
+            <h3>Selecciona un contacto</h3>
+            <span class="status-indicator"></span>
+          </div>
+          <div class="chat-actions">
+            <button class="btn-toggle-bot" id="btnToggleBot" disabled>
+              <i class="fa-solid fa-robot"></i> <span id="botStatusText">Bot</span>
+            </button>
+          </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <!-- Messages will appear here -->
+          <div class="empty-chat-state">
+            <i class="fa-regular fa-comments"></i>
+            <p>Selecciona un contacto para ver el historial de mensajes</p>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <textarea id="messageInput" placeholder="Escribe un mensaje..." rows="1" disabled></textarea>
+          <button class="btn-send" id="btnSendMessage" disabled>
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Sidebar: Contact Profile -->
+      <section class="profile-sidebar" id="profileSidebar">
+        <div class="profile-empty">
+          <p>Sin contacto seleccionado</p>
+        </div>
+        <div class="profile-content hidden" id="profileContent">
+          <div class="profile-avatar">
+            <i class="fa-solid fa-user-circle"></i>
+          </div>
+          <h2 id="profileName">Nombre del Cliente</h2>
+          <p class="profile-ig">@<span id="profileIgId">instagram_id</span></p>
+
+          <div class="profile-section">
+            <h3>Estado del Bot</h3>
+            <div class="status-badge" id="profileBotStatus">Activo</div>
+          </div>
+
+          <div class="profile-section">
+            <h3>Etiquetas (Tags)</h3>
+            <div class="tags-container" id="profileTags">
+              <!-- Tags here -->
+            </div>
+          </div>
+
+          <div class="profile-section">
+            <h3>Última Actividad</h3>
+            <p class="text-muted" id="profileLastActive">-</p>
+          </div>
+          
+          <div class="profile-section">
+            <h3>Campos Personalizados</h3>
+            <pre class="custom-fields-json" id="profileFields">{}</pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="contacts.js"></script>
+</body>
+</html>
