@@ -245,7 +245,9 @@
       ],
       "enabled": true,
       "createdAt": "2026-07-30T02:40:41.511Z",
-      "updatedAt": "2026-07-30T11:26:59.667Z"
+      "updatedAt": "2026-07-30T11:26:59.667Z",
+      "executionCount": 1,
+      "lastExecutedAt": "2026-08-02T17:47:27.359Z"
     },
     {
       "id": "flow_agente_ia_ventas",

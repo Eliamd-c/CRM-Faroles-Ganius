@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración de IA - CRM 2.0</title>
+    <script src="auth.js"></script>
+    <link rel="stylesheet" href="ai-config.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>🧠 AI Brain Config</h1>
+            <nav class="nav-bar">
+                <a href="/">Monitor</a>
+                <a href="/automations.html">Automatizaciones</a>
+                <a href="/welcome-ads.html">Welcome Ads</a>
+                <a href="/builder.html">Builder</a>
+                <a href="/ai-config.html" class="active">Configuración IA</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <aside class="sidebar">
+            <nav class="tabs-nav">
+                <button class="tab-btn active" data-target="context-tab">
+                    <span class="icon">📝</span> Contexto Maestro
+                </button>
+                <button class="tab-btn" data-target="learned-tab">
+                    <span class="icon">🗣️</span> Respuestas Aprendidas
+                </button>
+                <button class="tab-btn" data-target="knowledge-tab">
+                    <span class="icon">📚</span> Base de Conocimiento
+                </button>
+            </nav>
+        </aside>
+
+        <section class="content-area">
+            <!-- TAB 1: Contexto Maestro -->
+            <div id="context-tab" class="tab-content active">
+                <div class="tab-header">
+                    <h2>Contexto Maestro y Persona</h2>
+                    <p>Modifica el archivo base (<code>.md</code>) que define la personalidad y las reglas principales del agente de Inteligencia Artificial.</p>
+                </div>
+                <div class="editor-container">
+                    <textarea id="master-context-editor" placeholder="Cargando contexto maestro..."></textarea>
+                </div>
+                <div class="action-bar">
+                    <button id="save-context-btn" class="btn primary">Guardar Contexto</button>
+                </div>
+            </div>
+
+            <!-- TAB 2: Respuestas Aprendidas -->
+            <div id="learned-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Respuestas Aprendidas (Manual Q&A)</h2>
+                    <p>Las respuestas aquí forzarán a la IA a contestar exactamente lo definido cuando el usuario haga preguntas similares (basado en semántica).</p>
+                    <button id="add-learned-btn" class="btn secondary">+ Aprender Respuesta</button>
+                </div>
+                
+                <div id="learned-form-container" class="form-card hidden">
+                    <h3>Añadir Nuevo Aprendizaje</h3>
+                    <div class="form-group">
+                        <label>Pregunta típica del cliente</label>
+                        <input type="text" id="learned-q" placeholder="Ej. ¿Cuánto vale el envío a Bogotá?">
+                    </div>
+                    <div class="form-group">
+                        <label>Respuesta exacta (Tu contestación)</label>
+                        <textarea id="learned-a" placeholder="El envío a Bogotá tiene un costo de $15.000 COP..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button id="cancel-learned-btn" class="btn ghost">Cancelar</button>
+                        <button id="save-learned-btn" class="btn primary">Guardar</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="learned-table">
+                        <thead>
+                            <tr>
+                                <th>Pregunta</th>
+                                <th>Respuesta Forzada</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Llenado dinámico -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 3: Base de Conocimiento (RAG) -->
+            <div id="knowledge-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Base de Conocimiento (RAG)</h2>
+                    <p>Agrega fragmentos de conocimiento, manuales o políticas. La IA los buscará y utilizará para construir sus respuestas cuando sea relevante.</p>
+                    <button id="add-knowledge-btn" class="btn secondary">+ Agregar Conocimiento</button>
+                </div>
+
+                <div id="knowledge-form-container" class="form-card hidden">
+                    <h3>Añadir Fragmento RAG</h3>
+                    <div class="form-group">
+                        <label>Título de la Sección (Tema)</label>
+                        <input type="text" id="knowledge-title" placeholder="Ej. Política de Garantías de Faroles">
+                    </div>
+                    <div class="form-group">
+                        <label>Contenido Detallado</label>
+                        <textarea id="knowledge-content" placeholder="Escribe toda la información relevante aquí..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button id="cancel-knowledge-btn" class="btn ghost">Cancelar</button>
+                        <button id="save-knowledge-btn" class="btn primary">Procesar y Guardar</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="knowledge-table">
+                        <thead>
+                            <tr>
+                                <th>Título</th>
+                                <th>Contenido Parcial</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Llenado dinámico -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast">Notificación</div>
+
+    <script src="ai-config.js"></script>
+</body>
+</html>

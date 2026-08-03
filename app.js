@@ -121,8 +121,10 @@ async function loadFlowsFromSupabase() {
 // ─────────────────────────────────────────────────────────────────
 // FASE 2: Cargar Contexto Maestro del Agente IA al arrancar
 // El archivo .md se lee una sola vez y se guarda en memoria.
-// Al ponerlo al inicio del prompt se activa el Prompt Caching
-// de OpenAI (50% ahorro en tokens de entrada, -80% latencia).
+// ⚠️ NOTA SOBRE PROMPT CACHING: La arquitectura intenta usar prompt caching,
+// pero NO funciona correctamente porque el prefijo del sistema varía con cada
+// mensaje (RAG + learnedContext cambian). OpenAI solo cachea prefijos idénticos.
+// Solución futura: Usar caché manual o separar contexto estático de dinámico.
 // ─────────────────────────────────────────────────────────────────
 let AI_MASTER_CONTEXT = '';
 let AI_BASE_PERSONA = ''; // FASE 6
@@ -139,9 +141,11 @@ try {
 
 // ─────────────────────────────────────────────────────────────────
 // FASE 6: Recuperación de Contexto (RAG con pgvector)
+// Devuelve SOLO la parte dinámica (learned + rag). La persona base se
+// inyecta aparte como primer system message para que OpenAI la cachee.
 // ─────────────────────────────────────────────────────────────────
-async function retrieveRelevantContext(query) {
-  if (!supabase || !process.env.OPENAI_API_KEY) return AI_MASTER_CONTEXT;
+async function retrieveDynamicContext(query) {
+  if (!supabase || !process.env.OPENAI_API_KEY) return '';
   try {
     const embedRes = await axios.post(
       'https://api.openai.com/v1/embeddings',
@@ -149,9 +153,9 @@ async function retrieveRelevantContext(query) {
       { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }, timeout: 15000 }
     );
     const queryEmbedding = embedRes.data.data[0].embedding;
-    
+
     // FASE 7: Buscar primero en respuestas aprendidas
-    let learnedContext = "";
+    let learnedContext = '';
     const { data: learned, error: errLearned } = await supabase.rpc('match_learned_responses', {
       query_embedding: queryEmbedding,
       match_threshold: 0.85,
@@ -167,16 +171,15 @@ async function retrieveRelevantContext(query) {
       match_threshold: 0.30,
       match_count: 5
     });
-    
-    if (error || !chunks || chunks.length === 0) return AI_MASTER_CONTEXT;
-    
-    let ragContext = "\n\n=== CONOCIMIENTO RECUPERADO (RAG) ===\nÚsalo para responder al cliente:\n";
+
+    if (error || !chunks || chunks.length === 0) return learnedContext;
+
+    let ragContext = '\n\n=== CONOCIMIENTO RECUPERADO (RAG) ===\nÚsalo para responder al cliente:\n';
     chunks.forEach(c => ragContext += `\n[${c.section_title}]\n${c.content}\n`);
-    
-    return AI_BASE_PERSONA + learnedContext + ragContext;
+    return learnedContext + ragContext;
   } catch (err) {
     console.error('Error en RAG:', err.message);
-    return AI_MASTER_CONTEXT;
+    return '';
   }
 }
 
@@ -215,6 +218,28 @@ const AI_TOOLS = [
           customer_summary: { type: 'string', description: 'Resumen del cliente: qué quiere, qué datos ya dio, en qué quedó la conversación' }
         },
         required: ['reason', 'customer_summary']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'save_customer_data',
+      description: 'Guarda datos del cliente en su ficha (nombre, ciudad, teléfono, dirección, comunidad, interés, tamaño de pedido, etc.) y/o le agrega tags de segmentación. Úsalo cada vez que el cliente comparta información útil para futuras conversaciones o para el equipo humano.',
+      parameters: {
+        type: 'object',
+        properties: {
+          fields: {
+            type: 'object',
+            description: 'Pares clave-valor a guardar en customer.fields. Ejemplos de claves: "ciudad", "telefono", "direccion", "comunidad", "tamano_interes", "cantidad", "fecha_evento". Usa snake_case en las claves.',
+            additionalProperties: { type: 'string' }
+          },
+          tags_to_add: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Tags que reflejan el estado del cliente. Valores válidos: "considerando", "listo_compra", "aliado_fase1", "cliente_detal", "cliente_confirmado", "pagado", "objecion_precio", "objecion_durabilidad", "interesado_kit_aliado". Usa solo los relevantes.'
+          }
+        }
       }
     }
   }
@@ -880,23 +905,72 @@ app.post('/api/upload', (req, res, next) => {
 // ─────────────────────────────────────────────
 // IA Asistente de Textos (Fase 4 - Opción 3)
 // ─────────────────────────────────────────────
-const aiRateLimits = new Map();
-const MAX_AI_CALLS_PER_HOUR = 10;
-// setInterval(() => aiRateLimits.clear(), 3600000); eliminado
-function checkAiRateLimit(key) {
+const aiAgentRateLimits = new Map();
+const smartTriggerRateLimits = new Map();
+const MAX_AI_AGENT_CALLS_PER_HOUR = 100;        // Conversación directa con el agente
+const MAX_SMART_TRIGGER_CALLS_PER_HOUR = 30;   // Fallback de IA para detectar intención
+
+function checkAiAgentRateLimit(key) {
   if (!key) return true;
   const now = Date.now();
-  let timestamps = aiRateLimits.get(key) || [];
-  // Limpiar timestamps más antiguos de 1 hora
+  let timestamps = aiAgentRateLimits.get(key) || [];
   timestamps = timestamps.filter(ts => now - ts < 3600000);
-  
-  if (timestamps.length >= MAX_AI_CALLS_PER_HOUR) {
-    aiRateLimits.set(key, timestamps); // Guardar el array limpio
+
+  if (timestamps.length >= MAX_AI_AGENT_CALLS_PER_HOUR) {
+    aiAgentRateLimits.set(key, timestamps);
     return false;
   }
   timestamps.push(now);
-  aiRateLimits.set(key, timestamps);
+  aiAgentRateLimits.set(key, timestamps);
   return true;
+}
+
+function checkSmartTriggerRateLimit(key) {
+  if (!key) return true;
+  const now = Date.now();
+  let timestamps = smartTriggerRateLimits.get(key) || [];
+  timestamps = timestamps.filter(ts => now - ts < 3600000);
+
+  if (timestamps.length >= MAX_SMART_TRIGGER_CALLS_PER_HOUR) {
+    smartTriggerRateLimits.set(key, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  smartTriggerRateLimits.set(key, timestamps);
+  return true;
+}
+
+// Recorta el historial AI de forma segura, evitando orphaned tool messages
+function trimAiHistorySafely(history, maxMessages = 12) {
+  if (history.length <= maxMessages) return history;
+
+  const trimmed = history.slice(history.length - maxMessages);
+
+  // Si empieza con un tool message, buscamos el tool_calls precedente
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i].role === 'tool') {
+      // Buscar hacia atrás un message con tool_calls que coincida
+      const toolCallId = trimmed[i].tool_call_id;
+      let foundMatch = false;
+      for (let j = i - 1; j >= 0; j--) {
+        if (trimmed[j].role === 'assistant' && trimmed[j].tool_calls) {
+          if (trimmed[j].tool_calls.some(tc => tc.id === toolCallId)) {
+            foundMatch = true;
+            break;
+          }
+        }
+      }
+      // Si no encontramos el tool_calls precedente, sacamos desde aquí (mínimo de 4 msgs)
+      if (!foundMatch) {
+        const cleaned = trimmed.slice(i + 1);
+        // Pero no retornar menos de 2 pares de conversación (user-assistant) para mantener contexto
+        return cleaned.length >= 4 ? cleaned : trimmed.slice(Math.max(0, trimmed.length - 4));
+      }
+      break;
+    }
+  }
+
+  return trimmed;
 }
 
 app.get('/api/ai/status', (req, res) => {
@@ -1057,6 +1131,95 @@ app.post('/api/ai/learn', express.json(), async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Endpoint de Configuración IA
+// ─────────────────────────────────────────────
+app.get('/api/ai/master-context', (req, res) => {
+  res.json({ context: AI_MASTER_CONTEXT });
+});
+
+app.post('/api/ai/master-context', express.json(), async (req, res) => {
+  const { context } = req.body;
+  if (!context) return res.status(400).json({ error: 'Contexto vacío' });
+  try {
+    const contextPath = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro.md');
+    await fs.promises.writeFile(contextPath, context, 'utf8');
+    AI_MASTER_CONTEXT = context; // Update in memory
+    const splitIdx = AI_MASTER_CONTEXT.indexOf('## 5. HISTORIAS DE ÉXITO');
+    AI_BASE_PERSONA = splitIdx !== -1 ? AI_MASTER_CONTEXT.substring(0, splitIdx) : AI_MASTER_CONTEXT;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving master context:', err);
+    res.status(500).json({ error: 'Error al guardar el contexto maestro' });
+  }
+});
+
+app.get('/api/ai/learned', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { data, error } = await supabase.from('learned_responses').select('id, question, answer, created_at').order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/ai/learned/:id', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { error } = await supabase.from('learned_responses').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/ai/knowledge', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { data, error } = await supabase.from('ai_knowledge').select('id, section_title, content, created_at').order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/ai/knowledge', express.json(), async (req, res) => {
+  if (!supabase || !process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'Configuración incompleta' });
+  try {
+    const { section_title, content } = req.body;
+    if (!section_title || !content) return res.status(400).json({ error: 'Faltan datos' });
+    
+    // Create embedding
+    const embedRes = await axios.post(
+      'https://api.openai.com/v1/embeddings',
+      { input: `${section_title}\n${content}`, model: 'text-embedding-3-small' },
+      { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }, timeout: 15000 }
+    );
+    const embedding = embedRes.data.data[0].embedding;
+    
+    const { error } = await supabase.from('ai_knowledge').insert({ section_title, content, embedding });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/ai/knowledge/:id', async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { error } = await supabase.from('ai_knowledge').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────
 // FASE 8: Endpoint de Analytics del Agente IA
 // ─────────────────────────────────────────────
 app.get('/api/ai/analytics', async (req, res) => {
@@ -1121,8 +1284,8 @@ async function getUserProfile(senderId) {
 // ─────────────────────────────────────────────
 async function detectIntentWithAI(text, flows, senderId) {
   if (!process.env.OPENAI_API_KEY) return null;
-  if (!checkAiRateLimit(senderId)) {
-    console.log(`[Smart Trigger] Fallback abortado: Límite de IA excedido para ${senderId}`);
+  if (!checkSmartTriggerRateLimit(senderId)) {
+    console.log(`[Smart Trigger] Fallback abortado: Límite de Smart Trigger excedido para ${senderId}`);
     return null;
   }
   
@@ -1166,11 +1329,19 @@ Si el mensaje del usuario tiene la misma intención o significado que la "Intenc
       console.log(`[Smart Trigger] Sin respuesta válida de OpenAI`);
       return null;
     }
-    
+
     if (reply === 'NULL' || reply === 'null') {
       console.log(`[Smart Trigger] IA determinó que no hay coincidencia (NULL)`);
       return null;
     }
+
+    // Validar que la respuesta sea uno de los IDs candidatos (protección contra inyección)
+    const validIds = new Set(candidateFlows.map(f => f.id));
+    if (!validIds.has(reply)) {
+      console.log(`[Smart Trigger] Respuesta rechazada: "${reply}" no es un ID válido`);
+      return null;
+    }
+
     return reply;
   } catch (err) {
     console.error('OpenAI API Error (detectIntentWithAI):', err.response?.status, err.message);
@@ -1268,7 +1439,7 @@ async function runAiAgent(senderId, senderName, text, customer) {
     await sendMessage(senderId, "⚠️ El agente de IA no está configurado (Falta API Key).");
     return;
   }
-  if (!checkAiRateLimit(senderId)) {
+  if (!checkAiAgentRateLimit(senderId)) {
     await sendMessage(senderId, "⚠️ Has alcanzado el límite de consultas a la IA por ahora. Intenta más tarde.");
     return;
   }
@@ -1284,7 +1455,7 @@ async function runAiAgent(senderId, senderName, text, customer) {
     systemPrompt = nodePrompt || 'Eres un asistente útil y amigable.';
   } else {
     // FASE 6: RAG dinámico
-    const dynamicContext = await retrieveRelevantContext(text);
+    const dynamicContext = await retrieveDynamicContext(text);
 
     if (nodePrompt) {
       systemPrompt = dynamicContext + '\n\n---\n## INSTRUCCIONES ADICIONALES PARA ESTE FLUJO\n' + nodePrompt;
@@ -1301,11 +1472,28 @@ async function runAiAgent(senderId, senderName, text, customer) {
   const arma = seleccionarArma(momento, intencion);
   const debeEscalarSugerido = intencion === 'escape_word' || intencion === 'listo_compra' || momento === 'Momento 4: Post-Compra';
 
+  // Datos ya conocidos del cliente (para que el agente no vuelva a preguntarlos)
+  const knownFields = customer.fields && Object.keys(customer.fields).length > 0
+    ? Object.entries(customer.fields).map(([k, v]) => `  - ${k}: ${v}`).join('\n')
+    : '  (ninguno todavía)';
+  const knownTags = Array.isArray(customer.tags) && customer.tags.length > 0
+    ? customer.tags.join(', ')
+    : '(ninguno)';
+
   systemPrompt += `\n\n---\n## 🎯 GUÍA ESTRATÉGICA PARA ESTA RESPUESTA (Framework Hall + Cialdini)
 - Momento del cliente: ${momento}
 - Intención detectada en su mensaje: ${intencion}
 - Arma de persuasión a activar: ${arma}
-- Recuerda las 3 máximas de Grice: cantidad (ni mucho ni poco, ideal 50-300 palabras), calidad (solo verdad, números verificables), relación (responde SU pregunta específica) y manera (claro, estructurado, con bullets/números si es larga).${debeEscalarSugerido ? '\n- ⚠️ Señal fuerte de escalado: usa la herramienta escalate_to_human si el cliente confirma que quiere comprar, pide hablar con un asesor/humano, o ya es cliente confirmado.' : ''}`;
+- Recuerda las 3 máximas de Grice: cantidad (ni mucho ni poco, ideal 50-300 palabras), calidad (solo verdad, números verificables), relación (responde SU pregunta específica) y manera (claro, estructurado, con bullets/números si es larga).${debeEscalarSugerido ? '\n- ⚠️ Señal fuerte de escalado: usa la herramienta escalate_to_human si el cliente confirma que quiere comprar, pide hablar con un asesor/humano, o ya es cliente confirmado.' : ''}
+
+## 👤 DATOS QUE YA TIENES DEL CLIENTE (NO los vuelvas a pedir)
+Nombre: ${customer.name || senderName}
+Tags actuales: ${knownTags}
+Campos guardados:
+${knownFields}
+
+## 💾 GUARDA DATOS NUEVOS
+Cuando el cliente comparta información útil (ciudad, teléfono, comunidad, cantidad de faroles, fecha del evento, etc.) LLAMA a la herramienta save_customer_data para persistirla. También agrega tags cuando detectes su estado (considerando, listo_compra, objecion_precio, etc.). Esto es crítico para que el equipo humano y las próximas conversaciones tengan contexto.`;
 
   let history = customer.ai_history || [];
   
@@ -1342,17 +1530,39 @@ async function runAiAgent(senderId, senderName, text, customer) {
     if (cachedTokens > 0) {
       console.log(`💾 Prompt Cache activo: ${cachedTokens}/${usage.prompt_tokens} tokens cacheados (ahorro ~50%)`);
     }
-    
+
+    // Acumular tokens de ambas llamadas para analytics
+    let totalPromptTokens = usage?.prompt_tokens || 0;
+    let totalCompletionTokens = usage?.completion_tokens || 0;
+    let totalCachedTokens = cachedTokens;
+
     history.push({ role: 'user', content: text });
-    
+
     if (choice.finish_reason === 'tool_calls') {
       // FASE 5: Procesar las llamadas a herramientas
+      if (!supabase) {
+        console.error('⚠️ Supabase desconectado: no se pueden procesar herramientas del agente IA');
+        await sendMessage(senderId, 'Lo siento, tuve un problema procesando tu solicitud. Por favor intenta de nuevo.');
+        return;
+      }
+
       history.push(choice.message); // Añadir el tool_call al historial
       let escalatedToHuman = false;
 
       for (const toolCall of choice.message.tool_calls) {
-        const args = JSON.parse(toolCall.function.arguments);
-        
+        let args;
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch (parseErr) {
+          console.error(`Error parseando argumentos de herramienta ${toolCall.function.name}:`, parseErr.message);
+          history.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: 'Error interno: argumentos inválidos en la herramienta.'
+          });
+          continue;
+        }
+
         if (toolCall.function.name === 'send_product_media') {
           const { data: medias } = await supabase
             .from('media_catalog')
@@ -1381,7 +1591,9 @@ async function runAiAgent(senderId, senderName, text, customer) {
           }
         } else if (toolCall.function.name === 'escalate_to_human') {
           escalatedToHuman = true;
-          await supabase.from('customers').update({ bot_state: 'paused' }).eq('instagram_id', senderId);
+          // Solo usar bot_paused (bandera canónica); mantener bot_state='active' para que si
+          // el humano lo despausa después, no quede en un estado 'paused' extraño.
+          await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', senderId);
           await sendMessage(senderId, "Perfecto, voy a pasarte con alguien de nuestro equipo para confirmar detalles... 🕯️");
           broadcastLog('ESCALATION', `${senderName}: ${args.reason}`);
 
@@ -1390,39 +1602,94 @@ async function runAiAgent(senderId, senderName, text, customer) {
             tool_call_id: toolCall.id,
             content: 'Escalado exitosamente a humano. El bot está pausado.'
           });
+        } else if (toolCall.function.name === 'save_customer_data') {
+          const updates = {};
+          const summary = [];
+
+          if (args.fields && typeof args.fields === 'object') {
+            const newFields = { ...(customer.fields || {}), ...args.fields };
+            updates.fields = newFields;
+            customer.fields = newFields;
+            summary.push(`fields: ${Object.keys(args.fields).join(', ')}`);
+          }
+
+          if (Array.isArray(args.tags_to_add) && args.tags_to_add.length > 0) {
+            const currentTags = Array.isArray(customer.tags) ? customer.tags : [];
+            const newTags = [...new Set([...currentTags, ...args.tags_to_add])];
+            updates.tags = newTags;
+            customer.tags = newTags;
+            summary.push(`tags: ${args.tags_to_add.join(', ')}`);
+          }
+
+          if (Object.keys(updates).length > 0) {
+            const { error: saveErr } = await supabase.from('customers').update(updates).eq('instagram_id', senderId);
+            if (saveErr) {
+              console.error('Error guardando customer data:', saveErr.message);
+              history.push({ role: 'tool', tool_call_id: toolCall.id, content: `Error al guardar: ${saveErr.message}` });
+            } else {
+              broadcastLog('SYSTEM', `Datos guardados de ${senderName}: ${summary.join(' | ')}`);
+              history.push({ role: 'tool', tool_call_id: toolCall.id, content: `Datos guardados correctamente: ${summary.join(' | ')}` });
+            }
+          } else {
+            history.push({ role: 'tool', tool_call_id: toolCall.id, content: 'Nada que guardar (no se pasaron fields ni tags).' });
+          }
         }
       }
 
       // SEGUNDA LLAMADA A OPENAI para respuesta final (se omite si ya se escaló a un humano,
       // el mensaje fijo de escalate_to_human ya es suficiente y el bot quedó en pausa)
       if (!escalatedToHuman) {
-        const secondResponse = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-4o',
-            messages: [{ role: 'system', content: systemPrompt }, ...history],
-            temperature: 0.7,
-            max_tokens: 500
-          },
-          {
-            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            timeout: 15000
-          }
-        );
+        try {
+          const secondResponse = await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+              model: 'gpt-4o',
+              messages: [{ role: 'system', content: systemPrompt }, ...history],
+              temperature: 0.7,
+              max_tokens: 500
+            },
+            {
+              headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+              timeout: 15000
+            }
+          );
 
-        const finalChoice = secondResponse?.data?.choices?.[0];
-        if (finalChoice && finalChoice.message?.content) {
-          const finalReply = finalChoice.message.content.trim();
-          const griceProblemas = validarGrice(finalReply);
-          if (griceProblemas.length > 0) {
-            console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
+          const finalChoice = secondResponse?.data?.choices?.[0];
+          if (finalChoice && finalChoice.message?.content) {
+            const finalReply = finalChoice.message.content.trim();
+            const griceProblemas = validarGrice(finalReply);
+            if (griceProblemas.length > 0) {
+              console.warn(`⚠️ Grice (${senderName}): ${griceProblemas.join(' | ')}`);
+            }
+            history.push({ role: 'assistant', content: finalReply });
+            await sendMessage(senderId, finalReply);
+          } else {
+            // Fallback si la segunda llamada no devuelve contenido
+            console.warn(`⚠️ Segunda llamada de IA sin contenido válido (finish_reason: ${finalChoice?.finish_reason || 'unknown'})`);
+            const fallbackReply = "Gracias por tu paciencia. Te conectaré con alguien para ayudarte mejor. 🕯️";
+            history.push({ role: 'assistant', content: fallbackReply });
+            await sendMessage(senderId, fallbackReply);
           }
-          history.push({ role: 'assistant', content: finalReply });
-          await sendMessage(senderId, finalReply);
+
+          // Acumular tokens de la segunda llamada
+          const secondUsage = secondResponse?.data?.usage;
+          if (secondUsage) {
+            totalPromptTokens += secondUsage.prompt_tokens || 0;
+            totalCompletionTokens += secondUsage.completion_tokens || 0;
+            const secondCachedTokens = secondUsage.prompt_tokens_details?.cached_tokens || 0;
+            if (secondCachedTokens > 0) {
+              totalCachedTokens += secondCachedTokens;
+            }
+          }
+        } catch (secondErr) {
+          console.error('Error en segunda llamada OpenAI:', secondErr.message);
+          const errorFallback = "Disculpa, hubo un problema. Te conectaré con nuestro equipo. 🕯️";
+          history.push({ role: 'assistant', content: errorFallback });
+          await sendMessage(senderId, errorFallback);
         }
       }
 
-      if (history.length > 15) history = history.slice(history.length - 15);
+      history = trimAiHistorySafely(history, 12);
       await supabase.from('customers').update({
         ai_history: history
       }).eq('instagram_id', senderId);
@@ -1439,7 +1706,7 @@ async function runAiAgent(senderId, senderName, text, customer) {
       }
 
       history.push({ role: 'assistant', content: aiReply });
-      if (history.length > 10) history = history.slice(history.length - 10);
+      history = trimAiHistorySafely(history, 12);
 
       await supabase.from('customers').update({
         ai_history: history
@@ -1449,14 +1716,14 @@ async function runAiAgent(senderId, senderName, text, customer) {
       broadcastLog('SYSTEM', `Agente IA respondió a ${senderName} [${momento} | ${intencion} | ${arma}] (${Date.now() - aiStartTime}ms)`);
     }
 
-    // FASE 8: Registrar métricas de Analytics
+    // FASE 8: Registrar métricas de Analytics (incluyendo tokens de ambas llamadas)
     if (supabase) {
       const latency_ms = Date.now() - aiStartTime;
       supabase.from('ai_analytics').insert({
         instagram_id: senderId,
-        prompt_tokens: usage?.prompt_tokens || 0,
-        completion_tokens: usage?.completion_tokens || 0,
-        cached_tokens: cachedTokens,
+        prompt_tokens: totalPromptTokens,
+        completion_tokens: totalCompletionTokens,
+        cached_tokens: totalCachedTokens,
         latency_ms: latency_ms,
         has_tool_call: choice.finish_reason === 'tool_calls'
       }).then(({ error }) => {
@@ -1523,16 +1790,25 @@ async function handleMessage(event) {
   // 3.5 Welcome Message: Primer contacto
   if (!customer && supabase) {
     try {
-      const { error: insertErr } = await supabase
+      const { data: newCustomer, error: insertErr } = await supabase
         .from('customers')
-        .insert([{ instagram_id: senderId, name: senderName, tags: [], fields: {}, bot_paused: false, bot_state: 'active' }]);
-      if (!insertErr) {
+        .insert([{ instagram_id: senderId, name: senderName, tags: [], fields: {}, bot_paused: false, bot_state: 'active' }])
+        .select()
+        .single();
+
+      if (!insertErr && newCustomer) {
+        customer = newCustomer;
         broadcastLog('SYSTEM', `Nuevo contacto creado: ${senderName}`);
         if (flowsConfig.welcomeFlow?.steps?.length > 0) {
           broadcastLog('SYSTEM', `Ejecutando Welcome Flow para ${senderName}`);
-          await processFlowSteps(flowsConfig.welcomeFlow.steps, senderId, senderName);
+          // Pasar `text` como triggerText para que si el Welcome Flow incluye un
+          // nodo ai_agent, el agente responda de inmediato al primer mensaje del cliente.
+          await processFlowSteps(flowsConfig.welcomeFlow.steps, senderId, senderName, new Set(), text);
           return;
         }
+      } else if (insertErr) {
+        console.error('[DB] Error creando nuevo contacto:', insertErr.message);
+        broadcastLog('SYSTEM', `⚠️ Error creando cliente: ${insertErr.message}`);
       }
     } catch (e) {
       console.error('[DB] Error creando nuevo contacto:', e.message);
@@ -1541,15 +1817,26 @@ async function handleMessage(event) {
 
   // 3.8 Máquina de Estados: Agente IA
   if (customer && customer.bot_state === 'ai_agent') {
-    const escapeWords = ['salir', 'menu', 'menú', 'humano', 'asesor', 'agente'];
-    const lowerTxt = text.trim().toLowerCase();
-    
-    if (escapeWords.includes(lowerTxt)) {
-      await supabase.from('customers').update({ bot_state: 'active' }).eq('instagram_id', senderId);
-      await sendMessage(senderId, "Saliendo del asistente IA...");
-      customer.bot_state = 'active'; 
-      // Continuar con el código para que dispare flujos normales si coincide
+    const lowerTxt = text.trim().toLowerCase().replace(/\s+/g, ' ');
+
+    // Solo salir explícitamente si el usuario lo pide de forma clara (palabra completa)
+    const exitPatterns = [/^(salir|exit|quit|menu|menú)$/, /^(volver al menú|menu principal)$/];
+    const shouldExit = exitPatterns.some(pattern => pattern.test(lowerTxt));
+
+    if (shouldExit) {
+      try {
+        await supabase.from('customers').update({ bot_state: 'active' }).eq('instagram_id', senderId);
+        customer.bot_state = 'active';
+        await sendMessage(senderId, "Saliendo del asistente IA...");
+        // Continuar con el código para que dispare flujos normales si coincide
+      } catch (e) {
+        console.error('[DB] Error cambiando estado al salir del ai_agent:', e.message);
+        await sendMessage(senderId, "Error al salir del asistente. Por favor intenta de nuevo.");
+        return;
+      }
     } else {
+      // Palabras como "humano", "asesor", "agente" son manejadas por el agente IA mismo,
+      // que tiene la herramienta escalate_to_human para ese caso
       await runAiAgent(senderId, senderName, text, customer);
       return;
     }
@@ -1581,7 +1868,7 @@ async function handleMessage(event) {
     if (isValid) {
       const updates = { bot_state: 'active' };
       if (customer.awaiting_input_field) {
-        updates.fields = { ...customer.fields, [customer.awaiting_input_field]: lowerTxt };
+        updates.fields = { ...(customer.fields || {}), [customer.awaiting_input_field]: lowerTxt };
       }
       await supabase.from('customers').update(updates).eq('instagram_id', senderId);
       broadcastLog('SYSTEM', `Dato capturado: ${lowerTxt} guardado en ${customer.awaiting_input_field}`);
@@ -1652,7 +1939,9 @@ async function handleMessage(event) {
   if (matchedFlow && matchedFlow.steps) {
     matchedFlow.executionCount = (matchedFlow.executionCount || 0) + 1;
     matchedFlow.lastExecutedAt = new Date().toISOString();
-    saveFlowsConfig().catch(() => {});
+    saveFlowsConfig().catch(err => {
+      console.warn('⚠️ Error guardando flujos (no-bloqueante):', err.message);
+    });
     await processFlowSteps(matchedFlow.steps, senderId, senderName, new Set(), text);
   } else {
     // 6. Smart Triggers (IA Fallback)
@@ -1665,7 +1954,9 @@ async function handleMessage(event) {
       if (smartFlow && smartFlow.steps) {
         smartFlow.executionCount = (smartFlow.executionCount || 0) + 1;
         smartFlow.lastExecutedAt = new Date().toISOString();
-        saveFlowsConfig().catch(() => {});
+        saveFlowsConfig().catch(err => {
+          console.warn('⚠️ Error guardando smart trigger (no-bloqueante):', err.message);
+        });
         await processFlowSteps(smartFlow.steps, senderId, senderName, new Set(), text);
         return;
       }
@@ -1792,7 +2083,8 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
         await supabase.from('customers').update({
           bot_state: 'ai_agent',
           current_ai_prompt: step.system_prompt || '',
-          ignore_master_context: step.ignore_master_context || false  // FASE 3
+          ignore_master_context: step.ignore_master_context || false,  // FASE 3
+          ai_history: []  // Limpiar historial al activar nuevo nodo para evitar contexto de flujo anterior
         }).eq('instagram_id', senderId);
         broadcastLog('SYSTEM', `Agente IA activado para ${senderName}${step.ignore_master_context ? ' (modo standalone)' : ' (con Contexto Maestro)'}`);
 
@@ -2392,7 +2684,9 @@ async function handleWelcomeMessageAd(event) {
       const senderName = profile?.name || senderId;
       matchingFlow.executionCount = (matchingFlow.executionCount || 0) + 1;
       matchingFlow.lastExecutedAt = new Date().toISOString();
-      saveFlowsConfig().catch(() => {});
+      saveFlowsConfig().catch(err => {
+        console.warn('⚠️ Error guardando ejecución de Welcome Message Ad (no-bloqueante):', err.message);
+      });
       await processFlowSteps(matchingFlow.steps, senderId, senderName);
     }
   }
@@ -2404,8 +2698,13 @@ async function handleWelcomeMessageAd(event) {
 // ─────────────────────────────────────────────
 async function sendMessage(recipientId, text, quickReplies = null) {
   try {
+    if (!ACCESS_TOKEN) {
+      console.error('❌ Error enviando DM: ACCESS_TOKEN no configurado');
+      return;
+    }
+
     const messagePayload = { text };
-    
+
     // Si hay botones de respuesta rápida, agregarlos al formato de Meta
     if (quickReplies && quickReplies.length > 0) {
       messagePayload.quick_replies = quickReplies.map(qr => ({

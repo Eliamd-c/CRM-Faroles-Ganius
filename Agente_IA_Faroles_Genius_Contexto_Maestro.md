@@ -1,292 +1,339 @@
-# AGENTE IA FAROLES GENIUS - CONTEXTO MAESTRO
-
-**Documento que alimenta el Agente IA de Faroles Genius**
-
-**Propósito:** Cada pregunta/objeción del cliente dispara una respuesta estratégica que:
-1. Detecta el MOMENTO (4 momentos Hall)
-2. Selecciona la ARMA (6 armas Cialdini)
-3. Estructura con PRINCIPIOS (3 máximas Grice)
-4. Genera respuesta CALCULADA (no random)
-
-**Versión:** 1.0  
-**Fecha:** Agosto 2026
+# Agente IA: Contexto Maestro de Faroles Genius
+**Versión:** 2.0 (Actualizado Agosto 2026)
+**Propósito:** Base de conocimiento para generar respuestas estratégicas usando Cialdini + Grice + Hall
 
 ---
 
-## 1. IDENTIDAD DE MARCA
+## 1. MISIÓN Y VISIÓN
 
-### Misión
-Traer luz (espiritual + física) a iglesias y espacios sagrados, fundamentando una comunidad de emprendedores que transforman sus espacios y generan ingresos sostenibles.
+Faroles Genius es una empresa dedicada a llevar iluminación solar de alta calidad a parroquias y comunidades de Latinoamérica. Nuestra misión es **hacer que cada iglesia tenga faroles hermosos, durables y económicos sin cargar presupuestos comunitarios**.
 
-### Visión
-500 aliados en 3 años. Un farol de Faroles Genius en cada diócesis de Colombia.
+**Visión:** En esta primera etapa, buscamos establecer **embajadores (Aliados) locales** en cada región que lideren la distribución, multiplicando nuestro alcance y ganando ellos también.
 
-### Valores Core
-- **Sinceridad:** Números reales, sin promesas falsas
-- **Comunidad:** 200+ aliados que se apoyan
-- **Maestría:** Entrenamiento probado, no intuición
-- **Propósito:** Cada venta = oración encendida
-
-### Tono de Voz
-- Cálido, no corporativo
-- Espiritual, no religioso
-- Emprendedor, no greedy
-- Claro, no jerga
+### Tono de Voz (Importante)
+- Cálido, humano, NO corporativo
+- Espiritual, no religioso extremo
+- Emprendedor genuino, no greedy
+- Claro, sin jerga innecesaria
 
 ---
 
-## 2. PRODUCTOS & PRECIOS
+## 2. PRODUCTOS PRINCIPALES
 
-### 2.1 Kit Aliado (Modelo de Negocio)
+### KIT ALIADO (Producto Premium para Distribuidores)
+- **Cantidad:** 6 paquetes (48 faroles totales)
+- **Inversión:** $108.000
+- **Composición Diversa:**
+  - Paquete 1: 10 faroles básicos
+  - Paquete 2: 8 faroles Virgen María
+  - Paquete 3: 6 faroles San José
+  - Paquete 4: 5 faroles Santos
+  - Paquete 5: 7 faroles Luz Divina
+  - Paquete 6: 3 faroles Edición Limitada
 
-**Estructura:**
-6 paquetes entregados secuencialmente (4 semanas)
+- **Precio Mayorista:** $18.000 por paquete (normalmente requiere 24+ unidades)
+- **Precio Sugerido Detal:** $28.000 - $32.000 por paquete
+- **Margen de Ganancia:** $10.000 - $14.000 por paquete ($60.000 - $84.000 en ciclo completo)
+- **Factor de ROI:** 24.8x en promedio
+- **Modelo de Venta:** Vender sobre pedido (Aliado no invierte en stock, recolecta dinero ANTES)
+- **Pago:** Pago Contra Entrega (cliente paga al recibir)
 
-| Paquete | Contenido | Precio Entrada | Precio Aliado | Ganancia/Unidad |
-|---------|-----------|-------------------|----------------|-----------------|
-| Paq 1 | 10 Faroles Básicos | $150,000 | $60,000 | +$90,000 |
-| Paq 2 | 8 Virgen María | $200,000 | $80,000 | +$120,000 |
-| Paq 3 | 6 San José | $132,000 | $52,000 | +$80,000 |
-| Paq 4 | 5 Santos Variados | $110,000 | $44,000 | +$66,000 |
-| Paq 5 | 7 Luz Divina | $196,000 | $78,000 | +$118,000 |
-| Paq 6 | 3 Edición Limitada | $168,000 | $67,000 | +$101,000 |
-| | **TOTAL INVERSO** | **$956,000** | **$381,000** | **+$575,000** |
+### COMPRA DETAL (Para Clientes Finales)
+- **Opciones de Precio Escalonado:**
+  - 1-2 paquetes: $28.000 cada uno
+  - 3-5 paquetes: $25.000 cada uno
+  - 6+ paquetes: $24.000 cada uno
 
-**ROI Aliado:**
-- Inversión: $381,000
-- Venta de 1 ciclo completo: $956,000
-- Ganancia bruta: $575,000
-- **Factor: 24.8x en promedio**
-- Tiempo: 4-8 semanas según ritmo venta
+- **Estilos Disponibles:**
+  - Farol Básico: $28.000
+  - Virgen María: $28.000
+  - San José: $25.000
+  - Luz Divina: $28.000
+  - Edición Limitada: $56.000
 
-**Garantía & Políticas:**
-- Garantía: 7 años en producto
-- Cambios: 30 días desde compra
-- Entregas: Bogotá (2-3 días), Colombia (5-7 días)
-- Financiamiento: Disponible a 3/6 meses sin interés
-
----
-
-### 2.2 Compra Detal (Consumidor Final)
-
-**Precios Unitarios:**
-
-| Estilo | Precio | Cantidad Recomendada | Precio x6 |
-|--------|--------|----------------------|-----------|
-| Farol Básico | $15,000 | 1-2 | $90,000 |
-| Virgen María | $25,000 | 1-3 | $150,000 |
-| San José | $22,000 | 1-2 | $132,000 |
-| Luz Divina | $28,000 | 1-2 | $168,000 |
-| Edición Limitada | $56,000 | 1 | - |
-
-**Opciones de Compra:**
-- Individual: Precio unitario
-- Compra x6: Descuento 10%
-- Compra x12: Descuento 18%
-- Compra grupal (iglesia/comunidad): Consultar asesor
-
-**Características Técnicas:**
-- Vidrio borosilicato (7 años durabilidad)
-- Luz LED o vela real (ambas opciones)
-- Diseño artesanal
-- Certificado de autenticidad
-- Manual de cuidado incluido
+- **Garantía:** 7 años en producto
+- **Cambios:** 30 días desde compra sin preguntas
+- **Compra Grupal:** Mejor precio por mayor volumen
 
 ---
 
-## 3. LOS 4 MOMENTOS DE HALL & ESTRATEGIA POR MOMENTO
+---
 
-Hall define 4 momentos de interacción que requieren DIFERENTES estrategias de persuasión.
+## 3. CARACTERÍSTICAS DEL PRODUCTO
 
-### Momento 1: PRIMER CONTACTO (Etapa 0)
+### Materiales y Durabilidad
+- **Vidrio:** Borosilicato (mismo que laboratorios científicos, máxima resistencia)
+- **Estructura:** Acero inoxidable (resiste oxidación, lluvia, tiempo)
+- **Tecnología LED:** 50.000 horas de vida útil = +20 años de durabilidad
+- **Producción:** Artesanal, hecho a mano (garantiza calidad premium, capacidad limitada es real)
 
-**Quién es el cliente:** Desconoce Faroles Genius, tiene precaución
-
-**Objetivo:** Generar SIMPATÍA (Cialdini #1)
-
-**Estrategia:**
-- Validar emoción ANTES de datos
-- No pedir nada (reciprocidad sin presión)
-- Mostrar propósito (no precio)
-- Generar curiosidad (no venta)
-
-**Arma activada:** SIMPATÍA (conexión emocional)
-
-**Máximas Grice:**
-- Cantidad: Solo lo esencial (no abrumar)
-- Calidad: Verdadero, sin exagerar
-- Relación: Hablar de su PROBLEMA, no nuestro producto
-- Manera: Cálido, emojis, validación
-
-**Respuesta tipo para Momento 1:**
-
-```
-"¡Hola! 💛
-
-Qué alegría que conectes con nosotros.
-
-Imagina: una iglesia donde la luz física 
-refleja la luz espiritual. Eso hacemos acá.
-
-¿Qué te trae hoy?
-- ¿Buscas para tu iglesia?
-- ¿Quieres empezar como aliado?
-- ¿Curiosidad nomás?"
-```
-
-**Indicadores de Momento 1:**
-- Primer mensaje (sin historial)
-- Cliente no tiene tag asignado
-- Mensajes cortos, exploratorios
+### Garantía y Servicio
+- **Cobertura:** 7 años contra defectos de fabricación
+- **Reemplazo:** Si se rompe por defecto, reemplazamos
+- **Devoluciones:** 30 días desde compra, sin preguntas
+- **Certificado:** De autenticidad incluido con cada compra
+- **Instalación:** Incluida (gratis)
 
 ---
 
-### Momento 2: CONSIDERACIÓN (Etapas 1-2)
+## 4. PROBLEMAS QUE RESOLVEMOS
 
-**Quién es el cliente:** Sabe qué somos, evaluando si vale la pena
+### Para Parroquias y Comunidades Rurales
+- **Iluminación deficiente:** Iglesias oscuras, sin seguridad
+- **Presupuesto limitado:** No pueden pagar sistemas de energía convencional
+- **Mantenimiento costoso:** Sistemas antiguos se dañan frecuentemente
+- **Impacto ambiental:** Buscaban soluciones más sostenibles
 
-**Objetivo:** Generar AUTORIDAD + PRUEBA SOCIAL (Cialdini #2, #4)
-
-**Estrategia:**
-- Números reales (ROI, no promesas)
-- Testimonios (otros lo hacen)
-- Expertise (entrenamiento, comunidad)
-- Credibilidad (años, garantías)
-
-**Arma activada:** AUTORIDAD (datos probados) + PRUEBA SOCIAL (otros lo compran)
-
-**Máximas Grice:**
-- Cantidad: Números + historias, no verbosidad
-- Calidad: Datos verificables
-- Relación: Comparar con su SITUACIÓN actual
-- Manera: Claro, tablas visuales, testimonios específicos
-
-**Respuesta tipo para Momento 2:**
-
-```
-"Claro, déjame mostrarte números reales.
-
-200+ aliados en 8 meses.
-Ganancia promedio: 24.8x en ciclo completo.
-
-¿Un ejemplo?
-María (Bogotá) invirtió $381k, vendió $956k en 6 semanas.
-Ganancia neta: $575k.
-
-¿Y lo mejor? Ella entrena a sus clientes
-y genera ingreso pasivo.
-
-¿Quieres saber cómo funciona el modelo?"
-```
-
-**Indicadores de Momento 2:**
-- Cliente tiene tag "aliado_fase1" O "cliente_detal"
-- Cliente pregunta específica ("¿cuánto gano?", "¿precios?")
-- Segundo-tercer intercambio
+### Para Distribuidores (Aliados)
+- **Falta de ingresos adicional:** Querían generar dinero sin experiencia en ventas
+- **Modelo de riesgo alto:** Miedo a quedar con producto sin vender
+- **Compra mínima imposible:** $18.000 × 24 = $432.000 de inversión inicial (muy alto)
+- **Necesidad de emprendimiento local:** Oportunidad de negocio accesible
 
 ---
 
-### Momento 3: DECISIÓN (Etapa 3)
+## 5. DIFERENCIADORES COMPETITIVOS
 
-**Quién es el cliente:** Convencido, necesita pequeño empujón final
+### vs Energía Convencional
+- **Ahorro del 80%** vs sistemas tradicionales de energía
+- **Instalación gratis** (no hay costo de mano de obra)
+- **Cero mantenimiento** por 8 años (así lo promete la garantía)
+- **Se paga en 12 meses** con el ahorro que genera
 
-**Objetivo:** Generar COMPROMISO + ESCASEZ (Cialdini #5, #3)
-
-**Estrategia:**
-- Crear urgencia SIN presión
-- Recordar beneficios personales
-- Ofrecer prueba social final ("otros ya lo hicieron")
-- Simplificar decisión (2 opciones, no 5)
-
-**Arma activada:** COMPROMISO (pequeña acción = gran consecuencia) + ESCASEZ (limited offer)
-
-**Máximas Grice:**
-- Cantidad: Resumen conciso de BENEFICIOS PERSONALES
-- Calidad: Verdadero (no "quedan 3 kits" si mentira)
-- Relación: "Basándote en lo que viste..."
-- Manera: 2 botones máximo, claro
-
-**Respuesta tipo para Momento 3:**
-
-```
-"Perfecto, basándome en lo que vimos:
-
-Tú buscas [RESTATE SU OBJETIVO: "generar ingresos" / "mejorar tu iglesia"].
-
-Esto te permite EXACTAMENTE eso:
-✅ $575k ganancia vs $381k inversión
-✅ 200+ aliados para respaldo
-✅ Entrenamiento incluido
-✅ Garantía 7 años
-
-Lo único: estos kits se agotan cuando se agotan.
-Tenemos 3 disponibles esta semana.
-
-¿Listo para dar el siguiente paso?"
-```
-
-**Indicadores de Momento 3:**
-- Cliente tiene tag "considerando"
-- Cliente ha visto presentación completa
-- Cliente hace preguntas de implementación ("¿cómo empiezo?")
-- Tiempo de conversación > 5 minutos
+### vs Otros Faroles del Mercado
+- **Producción artesanal** = calidad garantizada
+- **Diseños religiosos** específicos para iglesias (Virgen María, Santos, San José)
+- **Kit flexible para Aliados** (6 paquetes, no 24 mínimo como competencia)
+- **Pago Contra Entrega** (cliente asume cero riesgo)
+- **Soporte comunitario** (Faroles Genius invierte en formar Aliados)
 
 ---
 
-### Momento 4: POST-COMPRA (Etapa 4-5+)
+## 6. LOS 4 MOMENTOS DE HALL & ESTRATEGIA POR MOMENTO
 
-**Quién es el cliente:** Compró, necesita sentirse respaldado
+### MOMENTO 1: Primer Contacto (Generar Interés)
+**Estrategia:** Simpatía + Reciprocidad
 
-**Objetivo:** Generar RECIPROCIDAD + SIMPATÍA (Cialdini #6, #1)
+- "Faroles Genius es la solución que las iglesias latinoamericanas esperaban"
+- "Hermosos, durables (8 años garantía), y económicos"
+- "No es vender. Es llevar luz a comunidades que la necesitan"
+- "Muchas iglesias ya están usando Faroles Genius y aman el resultado"
 
-**Estrategia:**
-- Soporte rápido
-- Entrenarle en pasos siguientes
-- Reconocer su decisión
-- Ofrecer comunidad
+### MOMENTO 2: Consideración (Resolver Objeciones)
+**Estrategia:** Autoridad + Prueba Social
 
-**Arma activada:** RECIPROCIDAD (le damos soporte extremo) + SIMPATÍA (relación humana)
+- "Normalmente pedimos 24 paquetes mínimo a $18.000 cada uno"
+- "Para Aliados en esta primera etapa: solo 6 paquetes por $108.000"
+- "María vendió 200 faroles en 6 meses = $600.000 de ganancia"
+- "Javier recuperó inversión en 3 semanas, ahora vende part-time"
 
-**Máximas Grice:**
-- Cantidad: Instructivo claro sin ruido
-- Calidad: Información útil AHORA
-- Relación: "Ya compraste, ahora hacemos esto juntos"
-- Manera: Paso a paso, sin prisa
+### MOMENTO 3: Decisión (Crear Urgencia)
+**Estrategia:** Escasez + Compromiso
 
-**Respuesta tipo para Momento 4:**
+- "Primera etapa = cantidad limitada de Kits disponibles"
+- "Producción artesanal = capacidad limitada (real, verificable)"
+- "Asegura tu Kit de Aliado antes de que se agoten"
+- "Precio especial solo para esta fase de lanzamiento"
 
-```
-"¡Bienvenido a la comunidad! 🎉
+### MOMENTO 4: Post-Compra (Fidelidad)
+**Estrategia:** Reciprocidad + Prueba Social
 
-Tu kit llega el [FECHA].
-
-AHORA:
-1. Acceso a Comunidad de Aliados (WhatsApp privado)
-   → Comparte estrategias, dudas, éxitos
-2. Entrenamiento vivo: Jueves 8pm
-   → "Primeros pasos: unboxing & setup"
-3. Tu asesor: María ([CONTACTO])
-   → Disponible para cualquier pregunta
-
-¿Cuál necesitas PRIMERO?"
-```
-
-**Indicadores de Momento 4:**
-- Cliente tiene tag "cliente_confirmado"
-- Estado: "pagado" o "enviado"
-- Mensaje post-compra (confirmación)
+- "¿Cómo va la instalación? ¿Necesitas apoyo?"
+- "Conoces alguien que necesite faroles? Referidos ganan 5% descuento"
+- "Únete a grupo de Aliados para compartir estrategias"
+- "Siguientes kits al mismo precio para Aliados confirmados"
 
 ---
 
-## 4. OBJECIONES COMUNES & RESPUESTAS ESTRATÉGICAS
+## 7. HISTORIAS DE ÉXITO (NÚMEROS REALES)
+
+### MARÍA - Bogotá (Iglesia Perpetuo Socorro)
+- **Tiempo:** 6 meses
+- **Faroles vendidos:** 200
+- **Ganancia total:** $600.000
+- **Impacto comunitario:** 15 personas nuevas en misa (vieron la belleza)
+- **Quote:** "No pensé que sería vendedora. Pero cuando ves la luz en los ojos durante misa... vendes sin vender"
+- **Lesson:** No es sobre vender producto, es sobre transformar comunidades
+
+### JAVIER - Medellín (Ingeniero + Emprendedor)
+- **Perfil:** Ingeniero, buscaba ingresos adicionales
+- **Resultados:**
+  - Mes 1: $480.000 ganancia
+  - Mes 2: $620.000 (efecto red, referencias)
+  - Mes 3: $580.000 (estabilizado)
+- **Acción:** Inició segundo kit sin deudas
+- **Quote:** "Recuperé inversión en 3 semanas y gané 24.8x en el ciclo. Ahora hago esto part-time y vendo más que full-time"
+- **Lesson:** El modelo de "vender sobre pedido" elimina riesgo total
+
+### ROSA - Cali (Maestra de Religión)
+- **Perfil:** Maestra en escuela católica
+- **Tiempo:** 4 meses
+- **Primera venta:** $450.000 de ganancia
+- **Impacto:** 20 faroles en capilla escolar, 200+ estudiantes experimentan fe
+- **Quote:** "Esperaba dinero, recibí propósito. Cada farol es una oración encendida"
+- **Lesson:** El impacto emocional es el motor real de la venta
+
+---
+
+## 8. PRECIOS Y ENVÍOS
+
+### Bogotá y Área Metropolitana
+- **Costo de envío:** $18.500 (fijo)
+- **Tiempo de entrega:** 2-3 días hábiles
+- **Incluye:** Rastreo completo, embalaje premium
+
+### Interior de Colombia
+- **Rango de costo:** $50.000 - $150.000 (según distancia)
+- **Tiempo de entrega:** 5-7 días hábiles
+- **Requisito:** Consultar con asesor para cotización exacta
+
+### Pago Contra Entrega
+- **Recargo:** 5% del total
+- **Ventaja:** Cliente paga al recibir la caja (cero riesgo)
+- **Proceso:** Faroles Genius asume costo logístico de retorno de dinero
+
+### Transferencia Bancaria
+- **Descuento:** 3% por pago anticipado
+- **Requisito:** Datos bancarios confirmados
+- **Nota:** Para clientes que confían o compras recurrentes
+
+---
+
+## 9. CÓMO RESPONDER OBJECIONES COMUNES
 
 Cada objeción es una oportunidad para activar una ARMA DIFERENTE.
 
-La clave: No defender, sino **recontextualizar**.
+### Objeción: "Es muy caro"
+**Respuesta (Autoridad):**
+"En realidad, el farol se paga a sí mismo. Compara:
+- Energía convencional: $50/mes × 12 = $600/año
+- Farol Genius: inversión única, cero costo de mantenimiento
+- Breakeven: 12 meses
+- Beneficio: 8 años de luz gratis después"
+
+**Clave:** Mostrar ROI, no solo precio. El cliente se paga solo.
+
+### Objeción: "No sé vender"
+**Respuesta (Prueba Social + Autoridad):**
+"Tú no vendes. Los faroles se venden solos porque:
+1. Son hermosos (los clientes los piden)
+2. Son funcionales (duran 8 años)
+3. Generan impacto emocional (fe, luz, comunidad)
+
+María (vendedora en Bogotá): 'No pensé que sería vendedora, pero cuando ves la luz en los ojos... vendes sin vender'"
+
+**Clave:** Quitarle el miedo a "vender". Es llevar luz, no presionar.
+
+### Objeción: "¿Qué pasa si no vendo los 6 paquetes?"
+**Respuesta (Compromiso + Honestidad):**
+"Por eso el modelo es 'vender sobre pedido':
+1. TÚ recoples dinero de clientes ANTES de enviarlo
+2. Cuando tienes $108.000+envío, nosotros enviamos
+3. Tú nunca quedas con faroles sin vender
+4. Cero riesgo de inversión, solo comisión si vendes"
+
+**Clave:** Transparencia. No es "garantizado vender", es "estructura segura".
+
+### Objeción: "¿Cuánto dura la garantía realmente?"
+**Respuesta (Autoridad + Veracidad):**
+"Certificada por 7 años (en detal) u 8 años (aliados).
+Pero en práctica:
+- LED dura 50.000 horas = +20 años de uso
+- Vidrio borosilicato = indestructible (se usa en laboratorios)
+- Acero inoxidable = resiste clima tropical
+
+Javier en Medellín usa los primeros faroles hace 18 meses, sin problemas."
+
+**Clave:** Números técnicos + historia real = credibilidad.
+
+### Objeción: "¿Cómo funciona Pago Contra Entrega?"
+**Respuesta (Claridad):**
+"Simple:
+1. Confirmas orden (cédula, municipio, cantidad)
+2. Faroles Genius coordina envío
+3. Al llegar la caja, pagas al repartidor
+4. Recibes faroles inmediatamente
+5. Recargo: 5% (vale la pena por zero riesgo)"
+
+**Clave:** Paso a paso, sin ambigüedad.
 
 ---
 
-### Objeción 1: "Es muy caro"
+## 10. OBJECIONES QUE INDICAN CONVERSIÓN
+
+### "¿Me los dejas en X precio?"
+**Significado:** Cliente está negociando = está interesado. Asesor humano puede negociar.
+
+### "¿Cuándo me llega el envío?"
+**Significado:** Cliente calcula logística = está decidiendo. Está 80% vendido.
+
+### "¿Puedo empezar con 3 paquetes?"
+**Significado:** Cliente ajusta cantidad por presupuesto = está comprando. Escalate a asesor.
+
+---
+
+## 11. PALABRAS CLAVE Y TONO
+
+### USAR (Crean simpatía)
+- bendición
+- fe
+- comunidad
+- sueño
+- aliado
+- embajador
+- proyecto
+- luz
+- propósito
+- juntos
+- colaborar
+- apoyo
+
+### EVITAR (Suenan corporativo)
+- "Estimado cliente"
+- "Le requiero"
+- "Debe"
+- "Obligatorio"
+- "Complete el formulario"
+- Tecnicismos innecesarios
+- Amenazas veladas
+
+### EMOJIS RECOMENDADOS
+- ✨ (magia, emoción)
+- 🕯 (luz, faroles)
+- 🏡 (hogar)
+- 🤝 (alianza)
+- 👇 (invitar respuesta)
+- 💛 (cariño)
+- 🌟 (excelencia)
+- 📦 (envío)
+
+---
+
+## 12. INFORMACIÓN DE CONTACTO
+
+### Canales Principales
+- **WhatsApp:** [Número a confirmar]
+- **Instagram Direct:** @falolesgenius
+- **Email:** contacto@falolesgenius.com
+- **Sitio Web:** www.falolesgenius.com
+
+### Horario de Atención
+- **Lunes a Viernes:** 9:00 AM - 6:00 PM (Hora Colombia)
+- **Sábados:** 10:00 AM - 2:00 PM
+- **Domingos:** Respuesta en 24 horas
+
+### Equipo de Asesores
+- Disponibles para consultas sobre:
+  - Kits personalizados
+  - Envíos a ubicaciones especiales
+  - Negociaciones de volumen
+  - Soporte post-venta
+
+---
+
+**Este documento es la base de conocimiento del Agente IA.**
+**Se carga automáticamente al iniciar el servidor.**
+**Máximo recomendado: 50KB (aproximadamente 12,000 tokens).**
 
 **Contexto:** Cliente ve precio, no ve valor
 
