@@ -6,6 +6,19 @@
  */
 
 import { TriggerNodeConfig } from './nodes/trigger.js';
+import { MessageNodeConfig } from './nodes/message.js';
+import { ActionNodeConfig } from './nodes/action.js';
+import { InputNodeConfig } from './nodes/input.js';
+import { ConditionNodeConfig } from './nodes/condition.js';
+import { RandomizerNodeConfig } from './nodes/randomizer.js';
+import { CarouselNodeConfig } from './nodes/carousel.js';
+import { GalleryNodeConfig } from './nodes/gallery.js';
+import { AudioNodeConfig } from './nodes/audio.js';
+import { VideoNodeConfig } from './nodes/video.js';
+import { FileNodeConfig } from './nodes/file.js';
+import { DelayNodeConfig } from './nodes/delay.js';
+import { GotoNodeConfig } from './nodes/goto.js';
+import { AiAgentNodeConfig } from './nodes/ai-agent.js';
 
 /**
  * Node Registry - Maps node types to configurations
@@ -149,148 +162,44 @@ class NodeRegistry {
     // Register trigger node
     this.register('trigger', TriggerNodeConfig);
 
-    // Register message node (stub - to be implemented)
-    this.register('message', {
-      type: 'message',
-      label: 'Enviar mensaje',
-      icon: '💬',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-content"><div class="mc-header"><span>💬</span> Send Message</div><div class="box node-blocks-container"></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Mensaje</div>',
-    });
+    // Register message node
+    this.register('message', MessageNodeConfig);
 
-    // Register action node (stub)
-    this.register('action', {
-      type: 'action',
-      label: 'Acción',
-      icon: '⚡',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-action"><div class="mc-header"><span>⚡</span> Action</div><div class="box action-node-preview"><em style="color:#8492a6; font-size:11px;">Sin configurar</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Acción</div>',
-    });
+    // Register action node
+    this.register('action', ActionNodeConfig);
 
-    // Register input node (stub)
-    this.register('input', {
-      type: 'input',
-      label: 'Entrada del Usuario',
-      icon: '📥',
-      inputs: 1,
-      outputs: 2,
-      html: '<div class="mc-node mc-action"><div class="mc-header"><span>📥</span> User Input</div><div class="box input-node-preview"><em style="color:#8492a6; font-size:11px;">Sin configurar</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Entrada</div>',
-    });
+    // Register input node
+    this.register('input', InputNodeConfig);
 
-    // Register condition node (stub)
-    this.register('condition', {
-      type: 'condition',
-      label: 'Condición',
-      icon: '🔀',
-      inputs: 1,
-      outputs: 2,
-      html: '<div class="mc-node mc-logic"><div class="mc-header"><span>🔀</span> Condition</div><div class="box condition-node-preview"><em style="color:#8492a6; font-size:11px;">Configura en el panel...</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Condición</div>',
-    });
+    // Register condition node
+    this.register('condition', ConditionNodeConfig);
 
-    // Register randomizer node (stub)
-    this.register('randomizer', {
-      type: 'randomizer',
-      label: 'Aleatorizador',
-      icon: '🎲',
-      inputs: 1,
-      outputs: 2,
-      html: '<div class="mc-node mc-logic"><div class="mc-header"><span>🎲</span> Randomizer</div><div class="box randomizer-node-preview"><em style="color:#8492a6; font-size:11px;">Configura salidas en el panel...</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Aleatorio</div>',
-    });
+    // Register randomizer node
+    this.register('randomizer', RandomizerNodeConfig);
 
-    // Register carousel node (stub)
-    this.register('carousel', {
-      type: 'carousel',
-      label: 'Carrusel',
-      icon: '🖼️',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-content"><div class="mc-header"><span>🖼️</span> Carrusel</div><div class="box carousel-node-preview"><em style="color:#8492a6; font-size:11px;">Sin tarjetas configuradas</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Carrusel</div>',
-    });
+    // Register carousel node
+    this.register('carousel', CarouselNodeConfig);
 
-    // Register gallery node (stub)
-    this.register('gallery', {
-      type: 'gallery',
-      label: 'Galería',
-      icon: '📸',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-content"><div class="mc-header"><span>📸</span> Galería</div><div class="box gallery-node-preview"><em style="color:#8492a6; font-size:11px;">Sin imágenes</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Galería</div>',
-    });
+    // Register gallery node
+    this.register('gallery', GalleryNodeConfig);
 
-    // Register audio node (stub)
-    this.register('audio', {
-      type: 'audio',
-      label: 'Audio',
-      icon: '🎵',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-content"><div class="mc-header"><span>🎵</span> Audio</div><div class="box audio-node-preview"><em style="color:#8492a6; font-size:11px;">Sin audio configurado</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Audio</div>',
-    });
+    // Register audio node
+    this.register('audio', AudioNodeConfig);
 
-    // Register video node (stub)
-    this.register('video', {
-      type: 'video',
-      label: 'Video',
-      icon: '🎥',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-content"><div class="mc-header"><span>🎥</span> Video</div><div class="box video-node-preview"><em style="color:#8492a6; font-size:11px;">Sin video configurado</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Video</div>',
-    });
+    // Register video node
+    this.register('video', VideoNodeConfig);
 
-    // Register file node (stub)
-    this.register('file', {
-      type: 'file',
-      label: 'Archivo',
-      icon: '📄',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-content"><div class="mc-header"><span>📄</span> Archivo / PDF</div><div class="box file-node-preview"><em style="color:#8492a6; font-size:11px;">Sin archivo configurado</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Archivo</div>',
-    });
+    // Register file node
+    this.register('file', FileNodeConfig);
 
-    // Register delay node (stub)
-    this.register('delay', {
-      type: 'delay',
-      label: 'Espera',
-      icon: '⏱',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-action"><div class="mc-header"><span>⏱</span> Espera</div><div class="box delay-node-preview"><em style="color:#8492a6; font-size:11px;">Sin duración</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Espera</div>',
-    });
+    // Register delay node
+    this.register('delay', DelayNodeConfig);
 
-    // Register goto node (stub)
-    this.register('goto', {
-      type: 'goto',
-      label: 'Saltar',
-      icon: '↗️',
-      inputs: 1,
-      outputs: 0,
-      html: '<div class="mc-node mc-logic"><div class="mc-header"><span>↗️</span> Goto / Saltar</div><div class="box goto-node-preview"><em style="color:#8492a6; font-size:11px;">Sin destino</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Saltar</div>',
-    });
+    // Register goto node
+    this.register('goto', GotoNodeConfig);
 
-    // Register AI agent node (stub)
-    this.register('ai_agent', {
-      type: 'ai_agent',
-      label: 'Agente IA',
-      icon: '🧠',
-      inputs: 1,
-      outputs: 1,
-      html: '<div class="mc-node mc-ai"><div class="mc-header"><span>🧠</span> Agente IA</div><div class="box ai-agent-node-preview" style="padding: 12px; background: #f8fafc; text-align: center; border-radius: 6px;"><em style="color:#64748b; font-size:11px;">Sin Prompt Configurado</em></div></div>',
-      render: (nodeId, data) => '<div class="nd-placeholder">Agente IA</div>',
-    });
+    // Register AI agent node
+    this.register('ai_agent', AiAgentNodeConfig);
   }
 }
 
