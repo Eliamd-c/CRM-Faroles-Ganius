@@ -303,35 +303,37 @@
         }
 
         // Connect to SSE stream
-        const evtSourceToken = localStorage.getItem('API_SECRET') || '';
-        const evtSource = new EventSource("/stream?token=" + encodeURIComponent(evtSourceToken));
+        function setupEventSource() {
+            const evtSourceToken = localStorage.getItem('API_SECRET') || '';
+            const evtSource = new EventSource("/stream?token=" + encodeURIComponent(evtSourceToken));
 
-        evtSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            // Si es un mensaje de conexión pero ya tenemos logs, lo ignoramos para no hacer spam visual
-            if (data.type === 'SYSTEM' && data.message.includes('Conectado') && logsContainer.children.length > 1) {
-                return;
-            }
+            evtSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                // Si es un mensaje de conexión pero ya tenemos logs, lo ignoramos para no hacer spam visual
+                if (data.type === 'SYSTEM' && data.message.includes('Conectado') && logsContainer.children.length > 1) {
+                    return;
+                }
 
-            if (emptyState) {
-                emptyState.style.display = 'none';
-            }
+                if (emptyState) {
+                    emptyState.style.display = 'none';
+                }
 
-            const logEl = createLogElement(data);
-            logsContainer.prepend(logEl);
+                const logEl = createLogElement(data);
+                logsContainer.prepend(logEl);
 
-            // Keep max 50 logs in UI
-            if (logsContainer.children.length > 50) {
-                logsContainer.lastElementChild.remove();
-            }
-        };
+                // Keep max 50 logs in UI
+                if (logsContainer.children.length > 50) {
+                    logsContainer.lastElementChild.remove();
+                }
+            };
 
-        evtSource.onerror = (err) => {
-            // El navegador reconectará automáticamente. 
-            // Mantenemos el error solo en la consola para no asustar al usuario visualmente.
-            console.warn("La conexión en vivo se interrumpió temporalmente (EventSource). Reconectando de forma silenciosa...");
-        };
+            evtSource.onerror = (err) => {
+                // El navegador reconectará automáticamente. 
+                // Mantenemos el error solo en la consola para no asustar al usuario visualmente.
+                console.warn("La conexión en vivo se interrumpió temporalmente (EventSource). Reconectando de forma silenciosa...");
+            };
+        }
 
         // Setup SSE for Logs
         setupEventSource();
