@@ -26,6 +26,24 @@ const { PAGE_ACCESS_TOKEN, VERIFY_TOKEN, PORT = 3000, INSTAGRAM_ACCESS_TOKEN } =
 state.ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
 state.INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
+// Cargar configuración de base de datos
+(async () => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('app_config').select('*').in('key', ['INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID']);
+      if (!error && data && data.length > 0) {
+        const tokenConfig = data.find(d => d.key === 'INSTAGRAM_ACCESS_TOKEN');
+        const idConfig = data.find(d => d.key === 'INSTAGRAM_ACCOUNT_ID');
+        if (tokenConfig) state.ACCESS_TOKEN = tokenConfig.value;
+        if (idConfig) state.INSTAGRAM_ACCOUNT_ID = idConfig.value;
+        console.log('✅ Configuración de Instagram OAuth cargada desde la base de datos');
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ No se pudo cargar la configuración desde Supabase:', err.message);
+  }
+})();
+
 // Cargar contexto maestro IA
 try {
   const contextPath = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro.md');
