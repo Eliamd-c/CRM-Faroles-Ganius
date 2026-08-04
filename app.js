@@ -319,11 +319,12 @@ function broadcastLog(type, message, profile = null) {
 
 const {
   PAGE_ACCESS_TOKEN,
-  INSTAGRAM_ACCOUNT_ID,
   VERIFY_TOKEN,
   PORT = 3000,
   INSTAGRAM_ACCESS_TOKEN,
 } = process.env;
+
+let INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
 // Token de acceso: se prefiere INSTAGRAM_ACCESS_TOKEN, con PAGE_ACCESS_TOKEN
 // como respaldo. Es 'let' porque initBot() puede cambiarlo automáticamente al
