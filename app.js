@@ -14,6 +14,9 @@ const openai = require('./src/services/openai.service');
 const flowService = require('./src/services/flow.service');
 const handlers = require('./src/handlers/webhook.handlers');
 
+// ─── Clean Architecture Bootstrap ───
+const bootstrap = require('./src/infrastructure/bootstrap');
+
 // ─── Inicialización de estado ───
 const { PAGE_ACCESS_TOKEN, VERIFY_TOKEN, PORT = 3000, INSTAGRAM_ACCESS_TOKEN } = process.env;
 state.ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
@@ -32,6 +35,16 @@ try {
 
 // Cargar flujos desde archivo
 flowService.loadFlowsFromFile();
+
+// ─── Inicializar Clean Architecture DI Container ───
+const di = bootstrap({
+  state,
+  flowsConfig: state.flowsConfig,
+  supabaseClient: supabase,
+  broadcastLog,
+  recentReplies: state.recentReplies
+});
+console.log('✅ Clean Architecture initialized (Gateways + UseCases)');
 
 // ─── Express setup ───
 const app = express();
@@ -157,10 +170,46 @@ app.post('/webhook', async (req, res) => {
       else if (event.payment) await handlers.handlePayment(event);
       else if (event.sponsored_message) await handlers.handleSponsoredMessage(event);
       else if (event.message_edit) { /* no-op */ }
-      else if (event.message?.text || event.message?.quick_reply) await handlers.handleMessage(event);
+      else if (event.message?.text || event.message?.quick_reply) {
+        // ✅ DUAL EXECUTION: Old handlers + New UseCases (in parallel for validation)
+        try {
+          const senderId = event.sender?.id;
+          const text = event.message?.quick_reply?.payload || event.postback?.payload || event.message?.text || "";
+          const storyMention = event.message?.story?.mention;
+          const hasAttachments = event.message?.attachments && event.message.attachments.length > 0;
+
+          // NEW: Clean Architecture UseCase
+          di.handleIncomingMessageUseCase.execute({
+            senderId,
+            text,
+            storyMention,
+            hasAttachments,
+            event
+          }).catch(err => console.error('[Clean Architecture] Error:', err.message));
+        } catch (err) {
+          console.error('[UseCase Error]', err.message);
+        }
+
+        // OLD: Original handlers (still active for now)
+        await handlers.handleMessage(event);
+      }
     }
     for (const change of entry.changes || []) {
-      if (change.field === 'comments') await handlers.handleComment(change.value);
+      if (change.field === 'comments') {
+        // ✅ DUAL EXECUTION: Old handlers + New UseCases
+        try {
+          const { id, text, from } = change.value;
+          di.handleCommentUseCase.execute({
+            commentId: id,
+            text,
+            fromName: from?.username,
+            fromId: from?.id
+          }).catch(err => console.error('[Comment UseCase] Error:', err.message));
+        } catch (err) {
+          console.error('[Comment UseCase Error]', err.message);
+        }
+        await handlers.handleComment(change.value);
+      }
       else if (change.field === 'live_comments') { /* handleLiveComment */ }
       else if (change.field === 'mentions') await handlers.handleMention(change.value);
       else if (change.field === 'story_reactions') await handlers.handleStoryReaction(change.value);
