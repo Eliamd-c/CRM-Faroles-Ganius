@@ -336,7 +336,26 @@ app.post('/api/flows/:id/duplicate', async (req, res) => {
 // ═══════════════════════════════════════════════
 // WELCOME MESSAGE FLOWS (Meta API)
 // ═══════════════════════════════════════════════
-app.get('/api/welcome-flows', async (req, res) => {
+
+function validateWelcomeFlowPayload(data) {
+  const { name, message_text, quick_replies } = data;
+  if (!name || name.trim().length === 0) return { valid: false, error: 'Nombre requerido' };
+  if (name.length > 100) return { valid: false, error: 'Nombre muy largo (máx 100 caracteres)' };
+  if (!message_text || message_text.trim().length === 0) return { valid: false, error: 'Mensaje requerido' };
+  if (message_text.length > 2000) return { valid: false, error: 'Mensaje muy largo (máx 2000 caracteres)' };
+  if (quick_replies && Array.isArray(quick_replies)) {
+    if (quick_replies.length > 13) return { valid: false, error: 'Máximo 13 botones permitidos (Meta límite)' };
+    for (const qr of quick_replies) {
+      if (!qr.title || qr.title.trim().length === 0) return { valid: false, error: 'Título de botón requerido' };
+      if (qr.title.length > 20) return { valid: false, error: 'Título de botón muy largo (máx 20 caracteres)' };
+      if (!qr.payload || qr.payload.trim().length === 0) return { valid: false, error: 'Payload de botón requerido' };
+      if (qr.payload.length > 1000) return { valid: false, error: 'Payload de botón muy largo (máx 1000 caracteres)' };
+    }
+  }
+  return { valid: true };
+}
+
+app.get('/api/welcome-flows', requireAuth, async (req, res) => {
   try {
     if (!state.ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
     const response = await axios.get(`https://graph.instagram.com/v26.0/me/welcome_message_flows`, { params: { access_token: state.ACCESS_TOKEN } });
@@ -350,11 +369,13 @@ app.get('/api/welcome-flows', async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Failed to get welcome flows from Meta' }); }
 });
 
-app.post('/api/welcome-flows', express.json(), async (req, res) => {
+app.post('/api/welcome-flows', requireAuth, express.json(), async (req, res) => {
   try {
+    const validation = validateWelcomeFlowPayload(req.body);
+    if (!validation.valid) return res.status(400).json({ error: validation.error });
+
     if (!state.ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
     const { name, message_text, quick_replies } = req.body;
-    if (!name || !message_text) return res.status(400).json({ error: 'name y message_text son requeridos' });
     const metaPayload = {
       eligible_platforms: ['instagram'], name,
       welcome_message_flow: [{ message: { text: message_text, quick_replies: (quick_replies || []).map(qr => ({ content_type: 'text', title: qr.title, payload: qr.payload })) } }]
@@ -364,8 +385,11 @@ app.post('/api/welcome-flows', express.json(), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err?.response?.data?.error?.message || 'Failed to create welcome flow in Meta' }); }
 });
 
-app.patch('/api/welcome-flows/:id', express.json(), async (req, res) => {
+app.patch('/api/welcome-flows/:id', requireAuth, express.json(), async (req, res) => {
   try {
+    const validation = validateWelcomeFlowPayload(req.body);
+    if (!validation.valid) return res.status(400).json({ error: validation.error });
+
     if (!state.ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
     const { name, message_text, quick_replies } = req.body;
     const params = new URLSearchParams();
@@ -381,7 +405,7 @@ app.patch('/api/welcome-flows/:id', express.json(), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err?.response?.data?.error?.message || 'Failed to update welcome flow in Meta' }); }
 });
 
-app.delete('/api/welcome-flows/:id', async (req, res) => {
+app.delete('/api/welcome-flows/:id', requireAuth, async (req, res) => {
   try {
     if (!state.ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
     await axios.delete(`https://graph.instagram.com/v26.0/me/welcome_message_flows`, { params: { access_token: state.ACCESS_TOKEN, flow_id: req.params.id } });
