@@ -3550,9 +3550,15 @@ app.get('/auth/callback', async (req, res) => {
       </div>
     `);
   } catch (e) {
-    const errMsg = e.response?.data?.error_message || e.message;
-    console.error('Error OAuth:', errMsg, e.response?.data);
-    res.send('<h1 style="color:red;">Error en Autenticación OAuth</h1><p>' + errMsg + '</p>');
+    const fbError = e.response?.data?.error?.message || e.response?.data?.error_message || e.message;
+    console.error('Error OAuth detallado:', e.response?.data || e.message);
+    res.send(`
+      <div style="font-family:sans-serif; text-align:center; padding: 50px;">
+        <h1 style="color:red;">Error en Autenticación OAuth</h1>
+        <p><strong>Detalle del error:</strong> ${fbError}</p>
+        <p><em>Posible causa: El App ID o App Secret en tu servidor de producción no coinciden, o la clave secreta es incorrecta.</em></p>
+      </div>
+    `);
   }
 });
 
