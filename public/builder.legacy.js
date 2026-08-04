@@ -1338,7 +1338,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       const flowId = node.data._flowId || currentLoadedFlowId;
       const triggerType = node.data.triggerType || (keywordsList.length ? 'message' : null);
       const commentKeyword = (node.data.commentKeyword || '').trim();
-      const newFlow = { id: flowId, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
+      const newFlow = { id: flowId, name: node.data.flowName || `Nueva Automatización`, keywords: keywordsList, matchType, steps: [] };
       if (triggerType) newFlow.triggerType = triggerType;
       if (commentKeyword) newFlow.commentKeyword = commentKeyword;
       const nextNodeId = node.outputs.output_1?.connections[0]?.node;
@@ -1675,8 +1675,12 @@ setTimeout(async () => {
       console.warn('Could not load flow:', flowId);
     }
   } else if (Object.keys(editor.drawflow.drawflow.Home.data).length === 0) {
-    editor.addNode('trigger', 0, 1, 100, 200, 'trigger', { keywords: 'precio, valor' }, htmlTrigger);
+    editor.addNode('trigger', 0, 1, 100, 200, 'trigger', { keywords: '' }, htmlTrigger);
     const msgId = addMessageNode(450, 200);
+    
+    // Inicializar el header para que el usuario pueda ponerle nombre
+    updateFlowHeader({ name: 'Nueva Automatización', enabled: false });
+
     setTimeout(() => {
       editor.addConnection(1, msgId, 'output_1', 'input_1');
       if (nodeBlocksState[msgId]) {
