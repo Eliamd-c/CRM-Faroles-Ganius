@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (data.success) {
           alert(`Sincronización completa. ${data.conversations_checked} chats revisados, ${data.messages_synced} mensajes nuevos guardados.`);
-          await loadContacts();
+          await fetchContacts();
         } else {
           alert(`Error: ${data.error}`);
         }

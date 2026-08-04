@@ -1,104 +1,26 @@
 /* contacts.css - Estilos del módulo de Contactos */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-color: #0f1115;
   --panel-bg: rgba(25, 28, 36, 0.6);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --text-primary: #f0f2f5;
-  --text-secondary: #a0aabf;
   --accent-color: #6366f1;
   --accent-hover: #4f46e5;
   --bot-active: #10b981;
   --bot-paused: #f59e0b;
   --msg-in: rgba(255, 255, 255, 0.05);
   --msg-out: #6366f1;
-  --danger: #ef4444;
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
   --glass-backdrop: blur(12px);
 }
 
 body {
-  margin: 0;
-  font-family: 'Inter', sans-serif;
-  background: var(--bg-color);
-  color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
-}
-
-/* ================== NAVBAR ================== */
-.navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1.5rem;
-  height: 56px;
-  background: rgba(15, 17, 21, 0.95);
-  border-bottom: 1px solid var(--border-color);
-  backdrop-filter: var(--glass-backdrop);
-}
-
-.nav-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--accent-color);
-}
-
-.nav-links {
-  display: flex;
-  list-style: none;
-  gap: 0.25rem;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-links a {
-  color: var(--text-secondary);
-  text-decoration: none;
-  padding: 0.4rem 0.9rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.nav-links a:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.nav-links a.active {
-  color: var(--text-primary);
-  background: rgba(99, 102, 241, 0.15);
-}
-
-.nav-user .btn-secondary {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  padding: 0.35rem 0.9rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.82rem;
-  transition: all 0.2s;
-}
-
-.nav-user .btn-secondary:hover {
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
 }
 
 /* ================== LAYOUT ================== */
 .contacts-layout {
   display: grid;
   grid-template-columns: 320px 1fr 300px;
-  height: calc(100vh - 56px);
+  height: calc(100vh - var(--header-height, 64px));
   gap: 1px;
   background-color: var(--border-color);
 }

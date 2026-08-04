@@ -3490,7 +3490,9 @@ app.post('/api/comment-triggers', async (req, res) => {
 const META_REDIRECT_URI = process.env.META_REDIRECT_URI || 'http://localhost:3000/auth/callback';
 
 app.get('/auth/instagram', (req, res) => {
-  const url = `https://www.instagram.com/oauth/authorize?client_id=${process.env.META_APP_ID}&redirect_uri=${META_REDIRECT_URI}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish`;
+  const host = req.get('host');
+  const redirectUri = process.env.META_REDIRECT_URI || `${req.protocol}://${host}/auth/callback`;
+  const url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${process.env.META_APP_ID}&display=page&extras={"setup":{"channel":"IG_API"}}&redirect_uri=${redirectUri}&response_type=code&scope=instagram_basic,instagram_manage_messages,instagram_manage_comments,pages_show_list,pages_read_engagement`;
   res.redirect(url);
 });
 
@@ -3499,24 +3501,33 @@ app.get('/auth/callback', async (req, res) => {
   if (!code) return res.send('Error: Código de autorización no proporcionado.');
   
   try {
-    // 1. Obtener Token de corta duración
-    const formData = new URLSearchParams();
-    formData.append('client_id', process.env.META_APP_ID);
-    formData.append('client_secret', process.env.META_APP_SECRET);
-    formData.append('grant_type', 'authorization_code');
-    formData.append('redirect_uri', META_REDIRECT_URI);
-    formData.append('code', code.replace('#_', ''));
+    const host = req.get('host');
+    const redirectUri = process.env.META_REDIRECT_URI || `${req.protocol}://${host}/auth/callback`;
 
-    const tokenRes = await axios.post('https://api.instagram.com/oauth/access_token', formData);
-    const shortToken = tokenRes.data.access_token;
+    // 1. Obtener User Access Token
+    const tokenRes = await axios.get(`https://graph.facebook.com/v21.0/oauth/access_token?client_id=${process.env.META_APP_ID}&redirect_uri=${redirectUri}&client_secret=${process.env.META_APP_SECRET}&code=${code}`);
+    let userToken = tokenRes.data.access_token;
     
-    // 2. Intercambiar por Token de larga duración (60 días)
-    const longRes = await axios.get(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${process.env.META_APP_SECRET}&access_token=${shortToken}`);
-    const longToken = longRes.data.access_token;
+    // 2. Intercambiar por Token de larga duración
+    const longRes = await axios.get(`https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${userToken}`);
+    if (longRes.data && longRes.data.access_token) {
+        userToken = longRes.data.access_token;
+    }
     
-    // 3. Obtener el ID de la cuenta de Instagram usando el nuevo token
-    const meRes = await axios.get(`https://graph.instagram.com/v21.0/me?fields=user_id,username&access_token=${longToken}`);
-    const igAccountId = meRes.data.user_id || meRes.data.data?.[0]?.user_id; // Depende de la estructura de la API v21.0
+    // 3. Obtener cuentas de Facebook e Instagram asociadas
+    const pagesRes = await axios.get(`https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token,instagram_business_account&access_token=${userToken}`);
+    
+    const page = pagesRes.data.data.find(p => p.instagram_business_account) || pagesRes.data.data[0];
+    
+    if (!page) {
+        return res.send('Error: No se encontró una página de Facebook asociada.');
+    }
+    
+    const igAccountId = page.instagram_business_account?.id;
+    const pageToken = page.access_token;
+    
+    // En la API de FB, usamos el pageToken o el userToken para llamadas a IG.
+    const longToken = pageToken || userToken;
     
     // 4. Guardar en Supabase
     if (supabase) {
