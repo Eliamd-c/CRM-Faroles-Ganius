@@ -109,7 +109,7 @@ function stepTypeIcons(types) {
 function renderFlows(flows) {
   const referencedIds = getReferencedFlowIds(flows);
   const visible = flows.filter(f => !isInternalSubFlow(f, referencedIds));
-  const tbody = document.getElementById('flows-body');
+  const tbody = document.getElementById('flows-tbody');
   const empty = document.getElementById('empty-state');
   const count = document.getElementById('flow-count');
 
@@ -206,15 +206,15 @@ async function duplicateFlow(id) {
 function openDeleteModal(id, name) {
   deleteTarget = id;
   document.getElementById('delete-flow-name').textContent = name;
-  document.getElementById('delete-modal').classList.add('visible');
+  document.getElementById('modal-delete').style.display = 'flex';
 }
 
 function closeDeleteModal() {
   deleteTarget = null;
-  document.getElementById('delete-modal').classList.remove('visible');
+  document.getElementById('modal-delete').style.display = 'none';
 }
 
-document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
+async function confirmDelete() {
   if (!deleteTarget) return;
   try {
     const res = await fetch(`/api/flows/${encodeURIComponent(deleteTarget)}`, {
@@ -228,6 +228,6 @@ document.getElementById('btn-confirm-delete').addEventListener('click', async ()
     console.error('Error deleting flow:', err);
     closeDeleteModal();
   }
-});
+}
 
 document.addEventListener('DOMContentLoaded', loadFlows);
