@@ -35,7 +35,7 @@ editor.start();
 window.AI_ENABLED = true;
 (async function initAI() {
   try {
-    const res = await fetch('/api/ai/status');
+    const res = await fetch('/api/ai/status', { headers: getAuthHeader() });
     const data = await res.json();
     window.AI_ENABLED = data.configured;
     if (!window.AI_ENABLED) {
@@ -930,7 +930,7 @@ window.improveTextWithAI = async (nodeId, idx) => {
   try {
     const res = await fetch('/api/ai/improve-text', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify({ text: originalText })
     });
     
@@ -959,7 +959,7 @@ window.uploadBlockImage = async (input, nodeId, idx) => {
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    const res = await fetch('/api/upload', { method: 'POST', body: formData, headers: getAuthHeader() });
     const data = await res.json();
     if (res.ok && data.url) {
       window.updateBlockUrl(nodeId, idx, data.url);
@@ -1506,7 +1506,7 @@ document.getElementById('btn-publish')?.addEventListener('click', async () => {
 
   const res = await fetch(`/api/flows/${encodeURIComponent(currentLoadedFlowId)}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
     body: JSON.stringify({ enabled: !wasEnabled })
   });
 
@@ -1553,7 +1553,9 @@ function createMessageNodeFromStep(posX, posY, step) {
 
 async function loadFlowIntoBuilder(flowId) {
   try {
-    const res = await fetch(`/api/flows/${encodeURIComponent(flowId)}`);
+    const res = await fetch(`/api/flows/${encodeURIComponent(flowId)}`, {
+      headers: getAuthHeader()
+    });
     if (!res.ok) return false;
     const flow = await res.json();
 
@@ -2524,7 +2526,7 @@ async function uploadMediaFile(nodeId, type, inputEl) {
   const formData = new FormData();
   formData.append('file', file);
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    const res = await fetch('/api/upload', { method: 'POST', body: formData, headers: getAuthHeader() });
     const data = await res.json();
     if (data.url) {
       if (type === 'audio') {
@@ -2758,7 +2760,7 @@ window.loadInstagramMedia = async function(nodeId) {
   btn.disabled = true;
 
   try {
-    const res = await fetch('/api/instagram/media');
+    const res = await fetch('/api/instagram/media', { headers: getAuthHeader() });
     const data = await res.json();
     const items = data.data || [];
 
@@ -2985,7 +2987,7 @@ window.generateFlowFromAI = async function() {
   try {
     const res = await fetch('/api/ai/generate-flow', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify({ prompt })
     });
     
