@@ -78,7 +78,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Auth middleware ───
 function requireAuth(req, res, next) {
-  if (req.path === '/webhook' || req.path === '/chat-init') return next();
+  if (req.path === '/webhook' || req.path === '/chat-init' || req.path === '/status' || req.path === '/status/detailed') return next();
   const validToken = process.env.API_SECRET;
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
