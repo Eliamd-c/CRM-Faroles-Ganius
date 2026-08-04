@@ -6,7 +6,7 @@ const state = {
   ACCESS_TOKEN: null,
   INSTAGRAM_ACCOUNT_ID: null,
   BOT_USERNAME: null,
-  GRAPH_API: 'https://graph.instagram.com/v21.0',
+  GRAPH_API: 'https://graph.facebook.com/v21.0',
   AI_MASTER_CONTEXT: '',
   AI_BASE_PERSONA: '',
   flowsConfig: { flows: [], defaultFlow: null },
