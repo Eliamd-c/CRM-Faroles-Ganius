@@ -17,6 +17,10 @@ const handlers = require('./src/handlers/webhook.handlers');
 // ─── Clean Architecture Bootstrap ───
 const bootstrap = require('./src/infrastructure/bootstrap');
 
+// ─── PHASE 2: Integration Layer ───
+const BuilderIntegration = require('./public/builder-integration.js');
+const FeatureFlags = require('./public/services/feature-flags.js');
+
 // ─── Inicialización de estado ───
 const { PAGE_ACCESS_TOKEN, VERIFY_TOKEN, PORT = 3000, INSTAGRAM_ACCESS_TOKEN } = process.env;
 state.ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
@@ -45,6 +49,28 @@ const di = bootstrap({
   recentReplies: state.recentReplies
 });
 console.log('✅ Clean Architecture initialized (Gateways + UseCases)');
+
+// ─── PHASE 2: Initialize Feature Flags ───
+const featureFlags = new FeatureFlags({
+  dualExecution: true,
+  newAsPrimary: true,
+  legacyFallback: true,
+  compareResults: true,
+  logDiscrepancies: true,
+  trafficShift: false,
+  trafficShiftPercentage: 50
+});
+console.log('✅ Feature Flags initialized (Runtime configuration ready)');
+
+// ─── PHASE 2: Initialize Integration Layer ───
+// Wrapper for dual execution (new + legacy handlers in parallel)
+const builderIntegration = new BuilderIntegration({
+  legacyBuilder: handlers,  // Old builder.js handlers
+  newBuilder: di,           // New DI container with use-cases
+  logger: console,
+  featureFlags: featureFlags.getAll()
+});
+console.log('✅ BuilderIntegration initialized (Dual execution ready)');
 
 // ─── Express setup ───
 const app = express();
@@ -171,44 +197,22 @@ app.post('/webhook', async (req, res) => {
       else if (event.sponsored_message) await handlers.handleSponsoredMessage(event);
       else if (event.message_edit) { /* no-op */ }
       else if (event.message?.text || event.message?.quick_reply) {
-        // ✅ DUAL EXECUTION: Old handlers + New UseCases (in parallel for validation)
+        // ✅ PHASE 2: Integration Layer (Dual execution via builderIntegration)
         try {
-          const senderId = event.sender?.id;
-          const text = event.message?.quick_reply?.payload || event.postback?.payload || event.message?.text || "";
-          const storyMention = event.message?.story?.mention;
-          const hasAttachments = event.message?.attachments && event.message.attachments.length > 0;
-
-          // NEW: Clean Architecture UseCase
-          di.handleIncomingMessageUseCase.execute({
-            senderId,
-            text,
-            storyMention,
-            hasAttachments,
-            event
-          }).catch(err => console.error('[Clean Architecture] Error:', err.message));
+          await builderIntegration.handleMessageEvent(event);
         } catch (err) {
-          console.error('[UseCase Error]', err.message);
+          console.error('[BuilderIntegration Message] Error:', err.message);
         }
-
-        // OLD: Original handlers (still active for now)
-        await handlers.handleMessage(event);
       }
     }
     for (const change of entry.changes || []) {
       if (change.field === 'comments') {
-        // ✅ DUAL EXECUTION: Old handlers + New UseCases
+        // ✅ PHASE 2: Integration Layer (Dual execution via builderIntegration)
         try {
-          const { id, text, from } = change.value;
-          di.handleCommentUseCase.execute({
-            commentId: id,
-            text,
-            fromName: from?.username,
-            fromId: from?.id
-          }).catch(err => console.error('[Comment UseCase] Error:', err.message));
+          await builderIntegration.handleCommentEvent(change.value);
         } catch (err) {
-          console.error('[Comment UseCase Error]', err.message);
+          console.error('[BuilderIntegration Comment] Error:', err.message);
         }
-        await handlers.handleComment(change.value);
       }
       else if (change.field === 'live_comments') { /* handleLiveComment */ }
       else if (change.field === 'mentions') await handlers.handleMention(change.value);
@@ -218,6 +222,160 @@ app.post('/webhook', async (req, res) => {
       else if (change.field === 'messaging_handover') handlers.handleMessagingHandover(change.value);
     }
   }
+});
+
+// ═══════════════════════════════════════════════
+// PHASE 2: HEALTH CHECK & METRICS ENDPOINTS
+// ═══════════════════════════════════════════════
+
+// Health Check Endpoint
+app.get('/health/builder', (req, res) => {
+  const health = builderIntegration.getHealthStatus();
+  const statusCode = health.status === 'HEALTHY' ? 200 : (health.status === 'DEGRADED' ? 200 : 503);
+
+  res.status(statusCode).json({
+    status: health.status,
+    timestamp: health.timestamp,
+    metrics: {
+      total_events: health.metrics.total_events,
+      success_rate: health.metrics.success_rate,
+      match_rate: health.metrics.match_rate,
+      avg_latency_ms: health.metrics.avg_latency_ms,
+      discrepancies_count: health.metrics.discrepancies_count,
+      recent_errors: health.metrics.recent_errors
+    }
+  });
+});
+
+// Detailed Metrics Dashboard Endpoint
+app.get('/dashboard/builder-metrics', (req, res) => {
+  const metrics = builderIntegration.getMetrics();
+  const discrepancies = builderIntegration.getDiscrepancies(10);
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    summary: {
+      status: metrics.health,
+      total_events: metrics.events.total,
+      success_rate: (
+        (metrics.events.new_success + metrics.events.legacy_success) /
+        (metrics.events.total * 2) * 100
+      ).toFixed(2) + '%',
+      match_rate: metrics.events.results_match > 0 || metrics.events.results_differ > 0
+        ? ((metrics.events.results_match / (metrics.events.results_match + metrics.events.results_differ)) * 100).toFixed(2) + '%'
+        : 'N/A'
+    },
+    events: {
+      total: metrics.events.total,
+      by_type: metrics.events.by_type,
+      new_handler: {
+        success: metrics.events.new_success,
+        error: metrics.events.new_error
+      },
+      legacy_handler: {
+        success: metrics.events.legacy_success,
+        error: metrics.events.legacy_error
+      },
+      results: {
+        match: metrics.events.results_match,
+        differ: metrics.events.results_differ
+      }
+    },
+    timings: {
+      new_handler: {
+        average: metrics.timings.new_handler_avg,
+        min: metrics.timings.new_handler_min,
+        max: metrics.timings.new_handler_max
+      },
+      legacy_handler: {
+        average: metrics.timings.legacy_handler_avg,
+        min: metrics.timings.legacy_handler_min,
+        max: metrics.timings.legacy_handler_max
+      },
+      total: {
+        average: metrics.timings.total_avg
+      }
+    },
+    feature_flags: featureFlags.getSummary(),
+    recent_errors: metrics.recentErrors.slice(-10),
+    recent_discrepancies: discrepancies
+  });
+});
+
+// Admin: Feature Flag Control Endpoint
+app.post('/admin/builder-flags', (req, res) => {
+  // Check admin authentication
+  const adminToken = process.env.ADMIN_TOKEN || process.env.API_SECRET;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing authorization' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  if (token !== adminToken) {
+    return res.status(403).json({ error: 'Invalid or insufficient permissions' });
+  }
+
+  const { flag, value, percentage } = req.body;
+
+  if (!flag) {
+    return res.status(400).json({ error: 'Flag name is required' });
+  }
+
+  let result;
+
+  // Handle different flag types
+  if (flag === 'TRAFFIC_SHIFT_PERCENTAGE' && percentage !== undefined) {
+    result = featureFlags.setTrafficShift(percentage);
+  } else if (flag === 'ENABLE_TRAFFIC_SHIFT') {
+    result = featureFlags.enableTrafficShift();
+  } else if (flag === 'DISABLE_TRAFFIC_SHIFT') {
+    result = featureFlags.disableTrafficShift();
+  } else if (flag === 'RESET_ALL') {
+    result = featureFlags.reset();
+  } else if (value !== undefined) {
+    result = featureFlags.updateFlag(flag, value);
+  } else {
+    return res.status(400).json({ error: 'Flag value or percentage is required' });
+  }
+
+  if (result.success) {
+    console.log(`[Admin] Flag updated: ${flag}`, result);
+    res.json({
+      success: true,
+      change: result,
+      all_flags: featureFlags.getAll(),
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    res.status(400).json({
+      success: false,
+      error: result.error
+    });
+  }
+});
+
+// Admin: View Feature Flags Endpoint
+app.get('/admin/builder-flags', (req, res) => {
+  // Check admin authentication
+  const adminToken = process.env.ADMIN_TOKEN || process.env.API_SECRET;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing authorization' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  if (token !== adminToken) {
+    return res.status(403).json({ error: 'Invalid or insufficient permissions' });
+  }
+
+  res.json({
+    flags: featureFlags.getSummary(),
+    change_history: featureFlags.getChangeHistory(50),
+    timestamp: new Date().toISOString()
+  });
 });
 
 // ═══════════════════════════════════════════════
