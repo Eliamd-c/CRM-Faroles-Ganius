@@ -1332,7 +1332,10 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       const keywordsRaw = node.data.keywords || '';
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
       const matchType = node.data.matchType || 'contains';
-      const flowId = node.data._flowId || currentLoadedFlowId || `flow_${nodeId}`;
+      if (!node.data._flowId && !currentLoadedFlowId) {
+          node.data._flowId = `flow_${Date.now()}_${nodeId}`;
+      }
+      const flowId = node.data._flowId || currentLoadedFlowId;
       const triggerType = node.data.triggerType || (keywordsList.length ? 'message' : null);
       const commentKeyword = (node.data.commentKeyword || '').trim();
       const newFlow = { id: flowId, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
