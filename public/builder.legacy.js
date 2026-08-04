@@ -1324,13 +1324,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 
   const data = editor.export();
   const nodes = data.drawflow.Home.data;
-  
-  const btn = document.getElementById('btn-save');
-  btn.disabled = true;
-  btn.innerText = "Guardando...";
-
-  const promises = [];
-  let mainFlowCreatedId = null;
+  const flowsConfig = { flows: [], defaultFlow: null };
 
   for (const nodeId in nodes) {
     const node = nodes[nodeId];
@@ -1338,96 +1332,52 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       const keywordsRaw = node.data.keywords || '';
       const keywordsList = keywordsRaw.split(',').map(k => k.trim()).filter(k => k);
       const matchType = node.data.matchType || 'contains';
+      const flowId = node.data._flowId || currentLoadedFlowId || `flow_${nodeId}`;
       const triggerType = node.data.triggerType || (keywordsList.length ? 'message' : null);
       const commentKeyword = (node.data.commentKeyword || '').trim();
-      
+      const newFlow = { id: flowId, name: node.data.flowName || `Flujo Visual ${nodeId}`, keywords: keywordsList, matchType, steps: [] };
+      if (triggerType) newFlow.triggerType = triggerType;
+      if (commentKeyword) newFlow.commentKeyword = commentKeyword;
       const nextNodeId = node.outputs.output_1?.connections[0]?.node;
-      // buildStepsFromNode now receives a dummy object instead of flowsConfig since it's not needed for extraction
-      const steps = nextNodeId ? buildStepsFromNode(nextNodeId, nodes, { flows: [] }) : [];
+      if (nextNodeId) newFlow.steps = buildStepsFromNode(nextNodeId, nodes, flowsConfig);
 
-      const payload = {
-        name: node.data.flowName || document.getElementById('flow-name-input').value.trim() || `Flujo Visual ${nodeId}`,
-        keywords: keywordsList,
-        matchType: matchType,
-        steps: steps,
-        enabled: currentFlowEnabled
-      };
-
-      if (triggerType) payload.triggerType = triggerType;
-      if (commentKeyword) payload.commentKeyword = commentKeyword;
-
-      // Ensure at least one step exists to satisfy the backend validation
-      if (payload.steps.length === 0) {
-          if (typeof Toast !== 'undefined') {
-              Toast.warning('El flujo debe tener al menos un paso (nodo) conectado al trigger.');
-          }
-          continue;
-      }
-
-      // Check if it's an existing flow (we loaded it via ?flowId=) or a new one
-      // If we loaded a flow, it overrides the auto-generated flowId logic
-      let targetFlowId = currentLoadedFlowId;
-      
-      if (targetFlowId) {
-        // PUT /api/flows/:id
-        promises.push(
-          fetch(`/api/flows/${encodeURIComponent(targetFlowId)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-            body: JSON.stringify(payload)
-          }).then(res => {
-             if (!res.ok) throw new Error('Error guardando');
-             return res.json();
-          })
-        );
-      } else {
-        // POST /api/flows
-        promises.push(
-          fetch('/api/flows', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-            body: JSON.stringify(payload)
-          }).then(res => {
-            if (!res.ok) throw new Error('Error creando');
-            return res.json();
-          }).then(data => {
-            // Retrieve new flow ID and update current state so subsequent saves use PUT
-            const newId = data.id || (data.flow && data.flow.id) || data.flowId;
-            if (newId && !mainFlowCreatedId) {
-              mainFlowCreatedId = newId;
-              currentLoadedFlowId = newId; 
-              node.data._flowId = newId;
-              // Also update the URL so reloading doesn't lose the context
-              const newUrl = new URL(window.location);
-              newUrl.searchParams.set('flowId', newId);
-              window.history.replaceState({}, '', newUrl);
-            }
-            return data;
-          })
-        );
-      }
+      // Eliminada la restricción de keywords. Siempre guardamos el flujo,
+      // permitiendo flujos en borrador o subflujos invocados por otros medios.
+      flowsConfig.flows.push(newFlow);
     }
   }
 
-  if (promises.length === 0) {
-    btn.innerText = "Nada para guardar";
-    setTimeout(() => { btn.innerText = "Guardar Cambios"; btn.disabled = false; }, 2000);
-    return;
+  // Ensure there's something to save
+  if (flowsConfig.flows.length === 0) {
+      if (typeof Toast !== 'undefined') Toast.warning('No se encontraron flujos válidos para guardar.');
+      // return; // Let it save empty to allow deleting all flows if desired? Actually no, this is bulk save.
   }
 
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.innerText = "Guardando...";
   try {
-    await Promise.all(promises);
-    btn.innerText = "✓ Guardado";
-    btn.style.background = '#16a34a';
-    markSaved();
-    setTimeout(() => {
-      btn.innerText = "Guardar Cambios";
-      btn.style.background = '';
-      btn.disabled = false;
-    }, 2000);
+    const res = await fetch('/api/flows', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify(flowsConfig)
+    });
+    if (res.ok) {
+      btn.innerText = "✓ Guardado";
+      btn.style.background = '#16a34a';
+      markSaved();
+      setTimeout(() => {
+        btn.innerText = "Guardar Cambios";
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 2000);
+    } else {
+      btn.innerText = "Error al guardar";
+      btn.style.background = '#dc2626';
+      setTimeout(() => { btn.innerText = "Guardar Cambios"; btn.style.background = ''; btn.disabled = false; }, 2500);
+    }
   } catch(e) {
-    console.error(e);
-    btn.innerText = "Error al guardar";
+    btn.innerText = "Sin conexión";
     btn.style.background = '#dc2626';
     setTimeout(() => { btn.innerText = "Guardar Cambios"; btn.style.background = ''; btn.disabled = false; }, 2500);
   }
