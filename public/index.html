@@ -341,40 +341,41 @@
                 const response = await fetch('/api/status');
                 const status = await response.json();
 
-                const badge = document.querySelector('.status-badge');
-                const statusText = document.getElementById('status-text');
+                const badge = document.querySelector('.crm-status-badge');
+                if (!badge) return;
 
-                if (!badge || !statusText) return;
-
-                // Limpiar clases previas
-                badge.className = 'status-badge';
+                let statusText = '';
+                let statusTitle = '';
+                let statusClass = 'connected';
 
                 // Aplicar estado basado en diagnóstico real
                 if (!status.details.configured) {
-                    badge.className += ' error';
-                    statusText.textContent = '🔴 No configurado - .env incompleto';
-                    badge.title = 'Faltan variables en .env: PAGE_ACCESS_TOKEN, VERIFY_TOKEN, API_SECRET, INSTAGRAM_ACCOUNT_ID';
+                    statusClass = 'error';
+                    statusText = '🔴 No configurado';
+                    statusTitle = 'Faltan variables en .env: PAGE_ACCESS_TOKEN, VERIFY_TOKEN, API_SECRET, INSTAGRAM_ACCOUNT_ID';
                 } else if (!status.details.webhookReady) {
-                    badge.className += ' warning';
-                    statusText.textContent = '🟡 Webhook no configurado';
-                    badge.title = 'Verifica VERIFY_TOKEN y META_APP_SECRET en .env';
+                    statusClass = 'warning';
+                    statusText = '🟡 Webhook no configurado';
+                    statusTitle = 'Verifica VERIFY_TOKEN y META_APP_SECRET en .env';
                 } else if (!status.details.instagramConnected) {
-                    badge.className += ' warning';
-                    statusText.textContent = '🟡 Instagram desconectado';
-                    badge.title = 'Verifica PAGE_ACCESS_TOKEN en .env';
+                    statusClass = 'warning';
+                    statusText = '🟡 Instagram desconectado';
+                    statusTitle = 'Verifica PAGE_ACCESS_TOKEN en .env';
                 } else if (!status.details.monitorConnected) {
-                    badge.className += ' warning';
-                    statusText.textContent = '🟡 Monitor esperando conexión';
-                    badge.title = 'Abre esta página en el navegador para conectar Monitor';
+                    statusClass = 'warning';
+                    statusText = '🟡 Monitor esperando';
+                    statusTitle = 'Abre esta página en el navegador para conectar Monitor';
                 } else {
-                    badge.className += ' connected';
-                    statusText.textContent = '🟢 Conectado y funcionando';
-                    badge.title = 'Listo para recibir mensajes';
+                    statusClass = 'connected';
+                    statusText = '🟢 Conectado';
+                    statusTitle = 'Listo para recibir mensajes';
                 }
+
+                badge.className = `crm-status-badge ${statusClass}`;
+                badge.innerHTML = `<div class="pulse"></div>${statusText}`;
+                badge.title = statusTitle;
             } catch (err) {
                 console.error('Error fetching status:', err);
-                const statusText = document.getElementById('status-text');
-                if (statusText) statusText.textContent = '⚠️ Error verificando estado';
             }
         }
 
