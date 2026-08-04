@@ -49,18 +49,22 @@ class StatusMonitor {
    */
   checkConfiguration() {
     const required = [
-      'PAGE_ACCESS_TOKEN',
       'VERIFY_TOKEN',
       'API_SECRET',
-      'INSTAGRAM_ACCOUNT_ID'
     ];
 
-    const configured = required.every(key => process.env[key]);
+    const hasEnvVars = required.every(key => process.env[key]);
+    const hasIgAccess = !!state.ACCESS_TOKEN && !!state.INSTAGRAM_ACCOUNT_ID;
+    
+    const configured = hasEnvVars && hasIgAccess;
     this.status.configured = configured;
 
     return {
       configured,
-      missing: required.filter(key => !process.env[key])
+      missing: [
+        ...required.filter(key => !process.env[key]),
+        ...(hasIgAccess ? [] : ['state.ACCESS_TOKEN o state.INSTAGRAM_ACCOUNT_ID'])
+      ]
     };
   }
 
@@ -86,8 +90,8 @@ class StatusMonitor {
    * Strategy 3: Access token validity
    */
   checkInstagramConnection() {
-    const hasToken = !!process.env.PAGE_ACCESS_TOKEN;
-    const hasAccountId = !!process.env.INSTAGRAM_ACCOUNT_ID;
+    const hasToken = !!state.ACCESS_TOKEN;
+    const hasAccountId = !!state.INSTAGRAM_ACCOUNT_ID;
 
     this.status.instagramConnected = hasToken && hasAccountId;
 

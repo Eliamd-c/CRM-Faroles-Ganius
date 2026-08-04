@@ -215,8 +215,7 @@ app.post('/webhook', async (req, res) => {
 // Status Endpoint - Real connection status
 app.get('/api/status', (req, res) => {
   const status = statusMonitor.getHealthCheck();
-  const statusCode = status.healthy ? 200 : 503;
-  res.status(statusCode).json(status);
+  res.status(200).json(status);
 });
 
 // Detailed Status (Admin)
