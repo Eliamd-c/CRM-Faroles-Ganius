@@ -514,6 +514,12 @@
           <button class="btn btn-secondary" id="btnClear">
             <i class="fas fa-trash"></i> Clear
           </button>
+          <button class="btn btn-secondary" id="btnLoad">
+            <i class="fas fa-folder-open"></i> Load
+          </button>
+          <button class="btn btn-secondary" id="btnExport">
+            <i class="fas fa-download"></i> Export
+          </button>
           <button class="btn btn-secondary" id="btnTest">
             <i class="fas fa-play"></i> Test
           </button>
@@ -555,6 +561,18 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeTestModal()">Cancel</button>
         <button class="btn btn-primary" onclick="runTest()">Run Test</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Load Flow</div>
+      <div class="modal-body">
+        <div id="flowsList" style="max-height: 400px; overflow-y: auto;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeLoadModal()">Cancel</button>
       </div>
     </div>
   </div>

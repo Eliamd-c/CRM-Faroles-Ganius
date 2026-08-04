@@ -444,9 +444,14 @@ function setupEventHandlers() {
   document.getElementById('btnSave').addEventListener('click', saveFlow);
   document.getElementById('btnClear').addEventListener('click', clearCanvas);
   document.getElementById('btnTest').addEventListener('click', openTestModal);
+  document.getElementById('btnLoad').addEventListener('click', openLoadModal);
+  document.getElementById('btnExport').addEventListener('click', exportFlow);
 
   document.getElementById('flowName').addEventListener('change', (e) => {
-    currentFlowId = e.target.value;
+    // Only update if it's not programmatic
+    if (e.target.value && !currentFlowId) {
+      currentFlowId = null;
+    }
   });
 }
 
@@ -458,19 +463,48 @@ function buildFlowData() {
     return null;
   }
 
-  const exportedData = editor.export.node;
+  if (!editor.nodes || Object.keys(editor.nodes).length === 0) {
+    showStatus('❌ Add at least one node to the flow', 'error');
+    return null;
+  }
 
-  // Convert Drawflow format to Flow format
-  const steps = [];
+  // Convert Drawflow nodes to Flow steps
+  const steps = convertNodesToSteps(editor.nodes);
 
-  // For now, we'll return a basic structure
-  // Full conversion will be implemented in Step 2.3
   return {
     name: flowName,
     keywords: flowName.toLowerCase().split(' '),
     matchType: 'contains',
     steps: steps
   };
+}
+
+function convertNodesToSteps(nodes) {
+  const steps = [];
+  const nodesList = Object.values(nodes);
+
+  // Sort by position (top to bottom, left to right)
+  nodesList.sort((a, b) => {
+    if (a.pos_y !== b.pos_y) return a.pos_y - b.pos_y;
+    return a.pos_x - b.pos_x;
+  });
+
+  // Convert each node to a step
+  nodesList.forEach(node => {
+    if (!node.data) return;
+
+    const step = { ...node.data };
+
+    // Ensure required fields
+    if (!step.type) {
+      console.warn('Node missing type:', node);
+      return;
+    }
+
+    steps.push(step);
+  });
+
+  return steps;
 }
 
 async function saveFlow() {
@@ -480,8 +514,14 @@ async function saveFlow() {
   try {
     showStatus('💾 Saving flow...', 'success');
 
-    const response = await fetch('/api/flows-builder', {
-      method: 'POST',
+    // If updating existing flow, use PUT; otherwise POST for new
+    const method = currentFlowId ? 'PUT' : 'POST';
+    const url = currentFlowId
+      ? `/api/flows-builder/${currentFlowId}`
+      : '/api/flows-builder';
+
+    const response = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_SECRET}`
@@ -489,13 +529,22 @@ async function saveFlow() {
       body: JSON.stringify(flowData)
     });
 
-    if (!response.ok) throw new Error('Failed to save');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to save');
+    }
 
     const result = await response.json();
     currentFlowId = result.flow.id;
+
+    // Update UI to show saved state
+    document.getElementById('flowName').value = result.flow.name;
+
     showStatus(`✅ Flow "${result.flow.name}" saved!`, 'success');
+    console.log('✅ Flow saved:', result.flow);
   } catch (error) {
     showStatus(`❌ Error: ${error.message}`, 'error');
+    console.error('Save error:', error);
   }
 }
 
@@ -511,8 +560,106 @@ async function loadFlowsFromAPI() {
 
     const result = await response.json();
     console.log(`✅ Loaded ${result.count} flows from API`);
+    return result.flows || [];
   } catch (error) {
     console.warn('⚠️ Could not load flows:', error.message);
+    return [];
+  }
+}
+
+async function loadFlow(flowId) {
+  try {
+    showStatus('📂 Loading flow...', 'success');
+
+    const response = await fetch(`/api/flows-builder/${flowId}`, {
+      headers: {
+        'Authorization': `Bearer ${API_SECRET}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Flow not found');
+
+    const result = await response.json();
+    const flow = result.flow;
+
+    // Clear canvas
+    editor.clear();
+    nodeCounter = 0;
+
+    // Restore flow name
+    document.getElementById('flowName').value = flow.name;
+    currentFlowId = flow.id;
+
+    // Restore nodes from steps
+    restoreNodesFromSteps(flow.steps);
+
+    showStatus(`✅ Flow "${flow.name}" loaded!`, 'success');
+    console.log('✅ Flow loaded:', flow);
+    return flow;
+  } catch (error) {
+    showStatus(`❌ Error loading flow: ${error.message}`, 'error');
+    console.error('Load error:', error);
+  }
+}
+
+function restoreNodesFromSteps(steps) {
+  if (!steps || !Array.isArray(steps)) return;
+
+  let x = 100;
+  let y = 100;
+
+  steps.forEach((stepData) => {
+    if (!stepData || !stepData.type) return;
+
+    const nodeId = nodeCounter++;
+    const nodeKey = `${stepData.type}_${nodeId}`;
+    const nodeHTML = generateNodeHTML(stepData.type, stepData);
+
+    editor.addNode(nodeKey, 1, 1, x, y, stepData.type, stepData, nodeHTML);
+
+    x += 250;
+    if (x > 800) {
+      x = 100;
+      y += 150;
+    }
+  });
+
+  console.log(`✅ Restored ${steps.length} nodes`);
+}
+
+async function exportFlow() {
+  if (!currentFlowId) {
+    showStatus('❌ Please save flow first', 'error');
+    return;
+  }
+
+  try {
+    showStatus('📥 Exporting flow...', 'success');
+
+    const response = await fetch(`/api/flows-builder/${currentFlowId}/export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_SECRET}`
+      },
+      body: JSON.stringify({ format: 'json' })
+    });
+
+    if (!response.ok) throw new Error('Export failed');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `flow_${currentFlowId}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    showStatus('✅ Flow exported!', 'success');
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
   }
 }
 
@@ -532,6 +679,56 @@ function openTestModal() {
 
 window.closeTestModal = function() {
   document.getElementById('testModal').classList.remove('active');
+};
+
+async function openLoadModal() {
+  const modal = document.getElementById('loadModal');
+  const listDiv = document.getElementById('flowsList');
+
+  try {
+    showStatus('📂 Loading flows...', 'success');
+    const flows = await loadFlowsFromAPI();
+
+    if (flows.length === 0) {
+      listDiv.innerHTML = '<p style="color: #999; padding: 20px;">No flows found</p>';
+      modal.classList.add('active');
+      return;
+    }
+
+    listDiv.innerHTML = flows.map(flow => `
+      <div style="
+        padding: 12px;
+        margin: 8px 0;
+        background: #f5f5f5;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-left: 4px solid ${flow.enabled ? '#667eea' : '#ccc'};
+      "
+      onmouseover="this.style.background='#e9e9e9'"
+      onmouseout="this.style.background='#f5f5f5'"
+      onclick="loadFlowFromModal('${flow.id}')">
+        <strong>${flow.name}</strong><br>
+        <small style="color: #999;">
+          ${flow.keywords.join(', ')} • ${flow.steps.length} steps
+          ${flow.enabled ? '✅' : '⚪'}
+        </small>
+      </div>
+    `).join('');
+
+    modal.classList.add('active');
+  } catch (error) {
+    showStatus(`❌ Error: ${error.message}`, 'error');
+  }
+}
+
+window.closeLoadModal = function() {
+  document.getElementById('loadModal').classList.remove('active');
+};
+
+window.loadFlowFromModal = async function(flowId) {
+  await loadFlow(flowId);
+  closeLoadModal();
 };
 
 window.runTest = async function() {

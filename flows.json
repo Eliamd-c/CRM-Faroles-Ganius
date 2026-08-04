@@ -1,44 +1,981 @@
 {
   "flows": [
     {
-      "id": "flow_1785873967070",
-      "name": "Updated via UseCase",
+      "id": "flow_price",
+      "name": "Información de Precios",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Claro que sí! 💰 Nuestros faroles tienen diferentes precios según el tamaño y el estilo. ¿Estás buscando algo para interior o exterior?"
+        }
+      ],
+      "enabled": true,
       "keywords": [
-        "test",
+        "precio",
+        "cuanto vale",
+        "cuanto cuesta",
+        "valor",
+        "costo"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "contains",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_info",
+      "name": "Información General",
+      "steps": [
+        {
+          "type": "text",
+          "message": "📍 Nos especializamos en la fabricación de faroles artesanales de alta calidad. Hacemos envíos a todo el país. ¿Te gustaría ver nuestro catálogo?"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "info",
+        "informacion",
+        "ubicacion",
+        "donde estan",
+        "direccion"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "contains",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_prueba",
+      "name": "Flujo de Prueba Completo",
+      "steps": [
+        {
+          "type": "text",
+          "message": "Hola {username}, este es un flujo de prueba. Vamos a recorrer varias funcionalidades."
+        },
+        {
+          "type": "delay",
+          "seconds": 2
+        },
+        {
+          "type": "text",
+          "message": "Paso 2: Este mensaje llegó después de una pausa de 2 segundos."
+        },
+        {
+          "type": "template",
+          "buttons": [
+            {
+              "type": "postback",
+              "title": "Opción A",
+              "payload": "PRUEBA_OPCION_A"
+            },
+            {
+              "type": "postback",
+              "title": "Opción B",
+              "payload": "PRUEBA_OPCION_B"
+            },
+            {
+              "url": "https://faroles-genius.com",
+              "type": "web_url",
+              "title": "Visitar web"
+            }
+          ],
+          "message": "Paso 3: Elige una opción con botones:"
+        },
+        {
+          "type": "carousel",
+          "elements": [
+            {
+              "title": "Producto 1",
+              "buttons": [
+                {
+                  "type": "postback",
+                  "title": "Ver más",
+                  "payload": "PRUEBA_PROD_1"
+                }
+              ],
+              "subtitle": "Descripción del primer producto de ejemplo",
+              "image_url": "https://picsum.photos/400/300?random=1"
+            },
+            {
+              "title": "Producto 2",
+              "buttons": [
+                {
+                  "type": "postback",
+                  "title": "Ver más",
+                  "payload": "PRUEBA_PROD_2"
+                }
+              ],
+              "subtitle": "Descripción del segundo producto de ejemplo",
+              "image_url": "https://picsum.photos/400/300?random=2"
+            },
+            {
+              "title": "Producto 3",
+              "buttons": [
+                {
+                  "type": "postback",
+                  "title": "Ver más",
+                  "payload": "PRUEBA_PROD_3"
+                }
+              ],
+              "subtitle": "Descripción del tercer producto de ejemplo",
+              "image_url": "https://picsum.photos/400/300?random=3"
+            }
+          ]
+        },
+        {
+          "type": "delay",
+          "seconds": 1
+        },
+        {
+          "type": "text",
+          "message": "Paso 5: Prueba completada. Todos los bloques funcionaron correctamente."
+        }
+      ],
+      "enabled": true,
+      "keywords": [
         "prueba"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "exact",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_PRUEBA_OPCION_A",
+      "name": "Ruta Opción A",
+      "steps": [
+        {
+          "type": "text",
+          "message": "Elegiste la Opción A. Este es un sub-flujo activado por postback."
+        },
+        {
+          "type": "action",
+          "params": {
+            "tag": "prueba_opcion_a"
+          },
+          "actionType": "add_tag"
+        },
+        {
+          "type": "text",
+          "message": "Se te asignó la etiqueta 'prueba_opcion_a'."
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "PRUEBA_OPCION_A"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "exact",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_PRUEBA_OPCION_B",
+      "name": "Ruta Opción B",
+      "steps": [
+        {
+          "type": "text",
+          "message": "Elegiste la Opción B. Ahora te pediremos un dato."
+        },
+        {
+          "type": "input",
+          "field": "email_prueba",
+          "prompt": "Por favor escribe tu email de prueba:",
+          "inputType": "email",
+          "failPayload": "PRUEBA_INPUT_FAIL",
+          "retryMessage": "Ese no parece un email válido. Intenta de nuevo:",
+          "successPayload": "PRUEBA_INPUT_OK"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "PRUEBA_OPCION_B"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "exact",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_PRUEBA_INPUT_OK",
+      "name": "Input Prueba OK",
+      "steps": [
+        {
+          "type": "text",
+          "message": "Email capturado correctamente. Dato guardado en campo 'email_prueba'."
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "PRUEBA_INPUT_OK"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "exact",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_PRUEBA_INPUT_FAIL",
+      "name": "Input Prueba Fallo",
+      "steps": [
+        {
+          "type": "text",
+          "message": "No se pudo capturar el email después de 3 intentos. No te preocupes, puedes intentarlo más tarde."
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "PRUEBA_INPUT_FAIL"
+      ],
+      "createdAt": "2026-07-30T02:40:41.520Z",
+      "matchType": "exact",
+      "updatedAt": "2026-07-30T02:40:41.520Z"
+    },
+    {
+      "id": "flow_welcome",
+      "name": "Mensaje de Bienvenida",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Hola, {username}! 👋 Bienvenido a Faroles Genius. ¿En qué podemos ayudarte hoy?"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "hola",
+        "buenas",
+        "saludos",
+        "buenos dias",
+        "buenas tardes",
+        "buenas noches"
+      ],
+      "createdAt": "2026-07-30T02:40:41.511Z",
+      "matchType": "contains",
+      "updatedAt": "2026-07-30T11:26:59.667Z",
+      "executionCount": 1,
+      "lastExecutedAt": "2026-08-02T17:47:27.359Z"
+    },
+    {
+      "id": "flow_agente_ia_ventas",
+      "name": "Agente IA - Ventas y Objeciones",
+      "steps": [
+        {
+          "type": "ai_agent",
+          "system_prompt": "",
+          "ignore_master_context": false
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "caro",
+        "no se vender",
+        "duran",
+        "garantia",
+        "envian al exterior",
+        "funciona de verdad",
+        "asesor",
+        "kit aliado"
+      ],
+      "createdAt": "2026-08-02T00:51:09.840Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T01:10:50.315Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_primer_mensaje",
+      "name": "Primer Mensaje",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Qué bendición! Eres esa puerta que necesitamos abrir. 🚪✨\n\nComo viste en el video, nuestra meta en esta primera etapa es que los faroles lleguen a cada parroquia del país a un precio mucho más accesible para la comunidad.\n\nPara hacerlo posible, hemos diseñado una herramienta exclusiva: un Kit de Muestra para Aliados.\n\n¿Cómo te gustaría sumarte a esta iniciativa? 👇"
+        },
+        {
+          "type": "delay",
+          "seconds": 1
+        },
+        {
+          "type": "buttons",
+          "buttons": [
+            {
+              "type": "postback",
+              "title": "🤝 Quiero ser Aliado",
+              "payload": "AGENTE_SOY_ALIADO"
+            },
+            {
+              "type": "postback",
+              "title": "🏡 Busco faroles para mi hogar",
+              "payload": "AGENTE_SOY_DETAL"
+            }
+          ],
+          "message": "¿Cuál es tu camino? 👇"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_soy_aliado",
+      "name": "Aliado - Elección de ruta",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "tipo",
+            "value": "aliado"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "tag": "aliado_fase1"
+          },
+          "actionType": "add_tag"
+        },
+        {
+          "type": "delay",
+          "seconds": 1
+        },
+        {
+          "type": "text",
+          "message": "¡Excelente elección! 🌟\n\nTe explico cómo funciona:\n\n📊 LA NORMA:\nNormalmente, para acceder a nuestro precio mayorista de $18.000 por paquete, exigimos una compra mínima de 24 unidades.\n\n🎁 LA EXCEPCIÓN (Para ti):\nPero como nuestra prioridad es establecer aliados locales en esta primera etapa, creamos el Kit de Muestra de 6 paquetes por solo $108.000.\n\n💡 LA ESTRATEGIA:\nLa idea es que uses estos 6 paquetes para armar una exhibición en tu parroquia y recoger pedidos grandes con pago por adelantado.\n\n💰 TU GANANCIA:\nCompras cada paquete a $18.000.\nVendes a $28.000-$32.000 (precio detal sugerido).\nTU GANANCIA: $10.000-$14.000 por paquete.\n\nCon 6 paquetes = $60.000-$84.000 en tu bolsillo (o para fondos de tu grupo).\n\n🔄 LA SEGURIDAD:\nY para que inicies con total tranquilidad, manejamos Pago Contra Entrega (pagas cuando recibes tu caja). 📦🤝"
+        },
+        {
+          "type": "delay",
+          "seconds": 2
+        },
+        {
+          "type": "randomizer",
+          "paths": [
+            "agente_historia_maria",
+            "agente_historia_javier",
+            "agente_historia_rosa"
+          ]
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "AGENTE_SOY_ALIADO"
+      ],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "exact",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_historia_maria",
+      "name": "Aliado - Historia María",
+      "steps": [
+        {
+          "type": "text",
+          "message": "📍 María - Iglesia del Perpetuo Socorro, Bogotá\n\n\"En 6 meses, 200 faroles vendidos en la comunidad.\nGanancia: $600.000.\nLa iglesia se transformó completamente.\n15 personas nuevas en la comunidad (atraídas por la belleza).\n\nNo pensé que sería vendedora. Pero cuando ves la luz reflejada en los ojos de la gente durante misa... vendes sin vender. Esto cambió mi vida.\""
+        },
+        {
+          "type": "delay",
+          "seconds": 3
+        },
+        {
+          "type": "goto",
+          "flow_id": "agente_cta1"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_historia_javier",
+      "name": "Aliado - Historia Javier",
+      "steps": [
+        {
+          "type": "text",
+          "message": "📍 Javier - Ingeniero, Medellín\n\n\"Resultados en 3 meses:\nMes 1: $480.000 ganancia\nMes 2: $620.000 (efecto red)\nMes 3: $580.000 (estabilizado)\n\nLos números decían la verdad. Recuperé en 3 semanas y gané 24.8x en el ciclo. Ahora hago esto a tiempo parcial y vendo más que mi trabajo full-time.\""
+        },
+        {
+          "type": "delay",
+          "seconds": 3
+        },
+        {
+          "type": "goto",
+          "flow_id": "agente_cta1"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_historia_rosa",
+      "name": "Aliado - Historia Rosa",
+      "steps": [
+        {
+          "type": "text",
+          "message": "📍 Rosa - Maestra de religión, Cali\n\n\"Resultado en 4 meses:\nPrimera venta: $450.000 ganancia\nCapilla del colegio: 20 faroles nuevos\n200+ estudiantes ven la fe en acción\n\nEsperaba dinero, recibí propósito. Cada farol que vendo es una oración encendida. Mis estudiantes ven que la fe se traduce en acciones.\""
+        },
+        {
+          "type": "delay",
+          "seconds": 3
+        },
+        {
+          "type": "goto",
+          "flow_id": "agente_cta1"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_cta1",
+      "name": "Aliado - Primer llamado a acción",
+      "steps": [
+        {
+          "type": "buttons",
+          "buttons": [
+            {
+              "type": "postback",
+              "title": "Sí, voy a compartir mis datos",
+              "payload": "AGENTE_COMPARTIR_DATOS"
+            }
+          ],
+          "message": "¿Ves? No es solo un negocio.\n\nEs una oportunidad de traer luz donde más se necesita. ✨\n\nPara separar tu Kit de Aliado y crear tu registro en nuestro sistema, ¿me regalas tu número de cédula y tu nombre completo? 👇"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_compartir_datos",
+      "name": "Aliado - Captura de cédula",
+      "steps": [
+        {
+          "type": "input",
+          "field": "cedula",
+          "prompt": "Para crear tu registro, ¿me regalas tu número de cédula (sin puntos)?\n\nEjemplo: \"1234567\"",
+          "inputType": "text",
+          "failPayload": "agente_input_nombre",
+          "retryMessage": "Parece que faltan datos. Por favor, envía tu número de cédula.",
+          "successPayload": "agente_input_nombre"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "AGENTE_COMPARTIR_DATOS"
+      ],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "exact",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_input_nombre",
+      "name": "Aliado - Captura de nombre",
+      "steps": [
+        {
+          "type": "input",
+          "field": "nombre",
+          "prompt": "Perfecto. Ahora, ¿me regalas tu nombre completo? 👇",
+          "inputType": "text",
+          "failPayload": "agente_input_ciudad",
+          "retryMessage": "Parece que faltan datos. Por favor, envía tu nombre completo.",
+          "successPayload": "agente_input_ciudad"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_input_ciudad",
+      "name": "Aliado - Captura de ciudad",
+      "steps": [
+        {
+          "type": "input",
+          "field": "ciudad",
+          "prompt": "¿En qué ciudad o municipio está ubicada tu iglesia?",
+          "inputType": "text",
+          "failPayload": "agente_resumen",
+          "retryMessage": "Por favor, dime en qué ciudad o municipio estás.",
+          "successPayload": "agente_resumen"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_resumen",
+      "name": "Aliado - Resumen y confirmación",
+      "steps": [
+        {
+          "type": "buttons",
+          "buttons": [
+            {
+              "type": "postback",
+              "title": "✅ Sí, confirmo",
+              "payload": "AGENTE_CONFIRMO"
+            },
+            {
+              "type": "postback",
+              "title": "🔄 Cambiar algo",
+              "payload": "AGENTE_CAMBIAR"
+            }
+          ],
+          "message": "Perfecto, {{nombre}}.\n\nAquí está tu orden:\n\n📋 KIT DE ALIADO:\n   • 6 Paquetes (48 faroles)\n   • Precio: $108.000\n\n📍 ENVÍO A {{ciudad}}:\n   • Costo: $18.500\n\n💰 TOTAL: $126.500\n\n🔄 MODALIDAD: Pago Contra Entrega\n   (Pagas cuando recibes la caja)\n\n¿Confirmas para proceder?"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_cambiar",
+      "name": "Aliado - Cambiar datos",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¿Qué quieres cambiar? Puedo volver a cédula, ciudad o cantidad."
+        },
+        {
+          "type": "goto",
+          "flow_id": "agente_compartir_datos"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "AGENTE_CAMBIAR"
+      ],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "exact",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_confirmo",
+      "name": "Aliado - Confirmación y escalado",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "estado",
+            "value": "confirmado"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "tag": "cliente_confirmado"
+          },
+          "actionType": "add_tag"
+        },
+        {
+          "type": "action",
+          "params": {
+            "tag": "listo_venta"
+          },
+          "actionType": "add_tag"
+        },
+        {
+          "type": "action",
+          "actionType": "pause_bot"
+        },
+        {
+          "type": "text",
+          "message": "¡Excelente! 🎉\n\nTu pedido está registrado.\n\nUn asesor de Faroles Genius se comunicará contigo en las próximas 2 horas para confirmar detalles y coordinar la entrega.\n\nMientras tanto:\n✅ Ya tienes acceso a la comunidad privada de Aliados (WhatsApp)\n✅ Tu asesor: [NOMBRE DEL ASESOR]\n✅ Teléfono: [TELÉFONO DE CONTACTO]\n\n¡Gracias por ser aliado! 🙏✨"
+        },
+        {
+          "type": "action",
+          "params": {
+            "field": "estado",
+            "value": "escalado"
+          },
+          "actionType": "set_field"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "AGENTE_CONFIRMO"
+      ],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "exact",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_agente_soy_detal",
+      "name": "Detal - Elección de ruta",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "tipo",
+            "value": "detal"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "tag": "cliente_detal"
+          },
+          "actionType": "add_tag"
+        },
+        {
+          "type": "delay",
+          "seconds": 1
+        },
+        {
+          "type": "text",
+          "message": "¡Excelente! Tu hogar se va a ver hermoso. 🏡✨\n\nAhora mismo tenemos una Compra Grupal activa: si te unes con familia, vecinos o tu grupo de iglesia y compran juntos, el precio unitario baja mucho.\n\nRevisa las opciones:"
+        },
+        {
+          "type": "gallery",
+          "images": [
+            {
+              "url": "https://quickchart.io/chart?c=%7B%22type%22:%22table%22,%22data%22:%7B%22headers%22:%5B%22Si%20compras%22,%22Precio%20c/u%22,%22Total%20(6%20paquetes)%22%5D,%22rows%22:%5B%5B%221-2%22,%22%2428.000%22,%22%24168.000%22%5D,%5B%223-5%22,%22%2425.000%22,%22%24150.000%22%5D,%5B%226%2B%22,%22%2424.000%22,%22%24144.000%22%5D%5D%7D%7D"
+            }
+          ],
+          "delay_between_ms": 300
+        },
+        {
+          "type": "text",
+          "message": "📊 Nota: Al ser un producto artesanal hecho a mano, nuestra capacidad de producción es limitada. ¡Asegura tus faroles antes de que se agoten!"
+        },
+        {
+          "type": "delay",
+          "seconds": 1.5
+        },
+        {
+          "type": "input",
+          "field": "cantidad",
+          "prompt": "¿Cuántos paquetes te gustaría llevar?\n\n(Ejemplo: \"6\")",
+          "inputType": "number",
+          "failPayload": "detal_precio_tier1",
+          "retryMessage": "Envía el número, ej: 6",
+          "successPayload": "detal_precio_tier1"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "AGENTE_SOY_DETAL"
+      ],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "exact",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_precio_tier1",
+      "name": "Detal - Cálculo de precio (paso 1)",
+      "steps": [
+        {
+          "type": "condition",
+          "field": "cantidad",
+          "value": "5",
+          "operator": ">",
+          "truePayload": "detal_precio_alto",
+          "falsePayload": "detal_precio_tier2"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_precio_tier2",
+      "name": "Detal - Cálculo de precio (paso 2)",
+      "steps": [
+        {
+          "type": "condition",
+          "field": "cantidad",
+          "value": "2",
+          "operator": ">",
+          "truePayload": "detal_precio_medio",
+          "falsePayload": "detal_precio_bajo"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_precio_alto",
+      "name": "Detal - Precio 6+",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "precio_unitario",
+            "value": "24000"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "field": "total",
+            "operand1": "cantidad",
+            "operand2": "precio_unitario",
+            "operator": "*"
+          },
+          "actionType": "compute"
+        },
+        {
+          "type": "goto",
+          "flow_id": "detal_confirmacion"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_precio_medio",
+      "name": "Detal - Precio 3-5",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "precio_unitario",
+            "value": "25000"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "field": "total",
+            "operand1": "cantidad",
+            "operand2": "precio_unitario",
+            "operator": "*"
+          },
+          "actionType": "compute"
+        },
+        {
+          "type": "goto",
+          "flow_id": "detal_confirmacion"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_precio_bajo",
+      "name": "Detal - Precio 1-2",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "precio_unitario",
+            "value": "28000"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "field": "total",
+            "operand1": "cantidad",
+            "operand2": "precio_unitario",
+            "operator": "*"
+          },
+          "actionType": "compute"
+        },
+        {
+          "type": "goto",
+          "flow_id": "detal_confirmacion"
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_confirmacion",
+      "name": "Detal - Confirmación y checkout",
+      "steps": [
+        {
+          "type": "buttons",
+          "buttons": [
+            {
+              "type": "postback",
+              "title": "Listo, me contacto por WhatsApp",
+              "payload": "DETAL_CONTACTO_WSP"
+            }
+          ],
+          "message": "Perfecto. Tu orden es:\n\n{{cantidad}} paquetes × ${{precio_unitario}} = ${{total}}\n\nEnvío a Bogotá: $18.500\n(Otros municipios: consulta con asesor)\n\nMODALIDADES DE PAGO:\n\n💳 Opción 1: Transferencia bancaria (hoy)\n📱 Opción 2: Tarjeta de crédito (2 horas)\n🚚 Opción 3: Pago Contra Entrega (pagas al recibir)\n\nPara proceder, contáctanos:\n✅ WhatsApp: [LINK DE WHATSAPP]\n✅ IG DM: @farolegenius\n\nNuestro equipo confirma tu orden de inmediato."
+        }
+      ],
+      "enabled": true,
+      "keywords": [],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_detal_contacto_wsp",
+      "name": "Detal - Checkout confirmado",
+      "steps": [
+        {
+          "type": "action",
+          "params": {
+            "field": "estado",
+            "value": "checkout"
+          },
+          "actionType": "set_field"
+        },
+        {
+          "type": "action",
+          "params": {
+            "tag": "cliente_en_checkout"
+          },
+          "actionType": "add_tag"
+        },
+        {
+          "type": "text",
+          "message": "Perfecto, te espera [NOMBRE DEL ASESOR]. ¡Gracias! 🙏✨"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "DETAL_CONTACTO_WSP"
+      ],
+      "createdAt": "2026-08-02T02:32:56.696Z",
+      "matchType": "exact",
+      "updatedAt": "2026-08-02T02:32:56.696Z",
+      "executionCount": 0
+    },
+    {
+      "id": "flow_1",
+      "name": "Flujo Visual 1",
+      "steps": [
+        {
+          "type": "text",
+          "message": "¡Hola! Nuestros faroles rústEl hijo de rana \n"
+        }
+      ],
+      "enabled": true,
+      "keywords": [
+        "precio",
+        "valor"
+      ],
+      "createdAt": "2026-08-04T19:23:22.714Z",
+      "matchType": "contains",
+      "updatedAt": "2026-08-04T19:23:22.714Z",
+      "triggerType": "message"
+    },
+    {
+      "id": "flow_1785874888851",
+      "name": "E2E Test Flow Updated",
+      "keywords": [
+        "e2e",
+        "test"
       ],
       "matchType": "contains",
       "steps": [
         {
           "type": "text",
-          "message": "Hello!"
+          "message": "Hello from E2E test"
         },
         {
-          "type": "text",
-          "message": "Goodbye!"
+          "type": "buttons",
+          "message": "Choose option:",
+          "buttons": [
+            {
+              "type": "postback",
+              "title": "Option 1",
+              "payload": "OPT1"
+            },
+            {
+              "type": "postback",
+              "title": "Option 2",
+              "payload": "OPT2"
+            }
+          ]
+        },
+        {
+          "type": "delay",
+          "seconds": 2
         }
       ],
       "enabled": false,
-      "createdAt": "2026-08-04T20:06:07.071Z",
-      "updatedAt": "2026-08-04T20:06:07.080Z"
+      "createdAt": "2026-08-04T20:21:28.851Z",
+      "updatedAt": "2026-08-04T20:21:29.283Z"
     }
-  ]
-}{
-      "id": "flow_1785873967079",
-      "name": "UseCase Test Flow",
-      "keywords": [
-        "usecase"
-      ],
-      "matchType": "exact",
-      "steps": [
-        {
-          "type": "text",
-          "message": "Test message"
-        }
-      ],
-      "enabled": true,
-      "createdAt": "2026-08-04T20:06:07.079Z",
-      "updatedAt": "2026-08-04T20:06:07.079Z"
-    }
-  ]
+  ],
+  "defaultFlow": {
+    "steps": [
+      {
+        "type": "ai_agent",
+        "system_prompt": "",
+        "ignore_master_context": false
+      }
+    ]
+  },
+  "welcomeFlow": {
+    "steps": [
+      {
+        "type": "text",
+        "message": "¡Qué bendición! Eres esa puerta que necesitamos abrir. 🚪✨\n\nComo viste en el video, nuestra meta en esta primera etapa es que los faroles lleguen a cada parroquia del país a un precio mucho más accesible para la comunidad.\n\nPara hacerlo posible, hemos diseñado una herramienta exclusiva: un Kit de Muestra para Aliados.\n\n¿Cómo te gustaría sumarte a esta iniciativa? 👇"
+      },
+      {
+        "type": "delay",
+        "seconds": 1
+      },
+      {
+        "type": "buttons",
+        "buttons": [
+          {
+            "type": "postback",
+            "title": "🤝 Quiero ser Aliado",
+            "payload": "AGENTE_SOY_ALIADO"
+          },
+          {
+            "type": "postback",
+            "title": "🏡 Busco faroles para mi hogar",
+            "payload": "AGENTE_SOY_DETAL"
+          }
+        ],
+        "message": "¿Cuál es tu camino? 👇"
+      }
+    ]
+  }
 }
