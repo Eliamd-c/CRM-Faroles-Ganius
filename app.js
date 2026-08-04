@@ -812,6 +812,19 @@ app.get('/auth/callback', async (req, res) => {
 
 app.get('/api/auth/status', (req, res) => res.json({ connected: !!state.ACCESS_TOKEN }));
 
+app.post('/api/auth/disconnect', async (req, res) => {
+  try {
+    state.ACCESS_TOKEN = null;
+    state.INSTAGRAM_ACCOUNT_ID = null;
+    if (supabase) {
+      await supabase.from('app_config').delete().in('key', ['INSTAGRAM_ACCESS_TOKEN', 'INSTAGRAM_ACCOUNT_ID']);
+    }
+    res.json({ success: true, message: 'Instagram desconectado exitosamente' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to disconnect Instagram', details: e.message });
+  }
+});
+
 // ═══════════════════════════════════════════════
 // SYNC & INSIGHTS
 // ═══════════════════════════════════════════════

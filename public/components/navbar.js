@@ -38,5 +38,40 @@ document.addEventListener("DOMContentLoaded", () => {
                 link.classList.add('active');
             }
         });
+        
+        // Comprobar estado de conexión y ajustar botón
+        const btnConnect = document.getElementById('global-btn-connect');
+        const badge = document.getElementById('global-status-badge');
+        
+        if (btnConnect) {
+            // Revisa si getAuthHeader está disponible para pasarlo
+            const headers = typeof getAuthHeader === 'function' ? getAuthHeader() : {};
+            
+            fetch('/api/auth/status', { headers })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.connected) {
+                        btnConnect.innerHTML = '<i class="fa-brands fa-instagram"></i> Desconectar';
+                        btnConnect.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                        btnConnect.href = '#';
+                        if (badge) badge.style.display = 'flex';
+                        
+                        btnConnect.onclick = (e) => {
+                            e.preventDefault();
+                            if (confirm('¿Estás seguro de que deseas desconectar Instagram? Las automatizaciones dejarán de funcionar.')) {
+                                fetch('/api/auth/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers } })
+                                    .then(res => res.json())
+                                    .then(() => window.location.reload())
+                                    .catch(err => console.error('Error desconectando:', err));
+                            }
+                        };
+                    } else {
+                        btnConnect.innerHTML = '<i class="fa-brands fa-instagram"></i> Conectar Instagram';
+                        btnConnect.href = '/auth/instagram';
+                        if (badge) badge.style.display = 'none';
+                    }
+                })
+                .catch(err => console.error('Error verificando estado:', err));
+        }
     }
 });
