@@ -123,7 +123,7 @@ function renderFlows(flows) {
   empty.style.display = 'none';
 
   tbody.innerHTML = visible.map(flow => {
-    const status = getFlowStatus(flow);
+    const status = flow.enabled === false ? { label: 'BORRADOR', cls: 'crm-badge-draft' } : { label: 'ACTIVO', cls: 'crm-badge-active' };
     const { total, types } = countStepTypes(flow.steps);
     const checked = flow.enabled !== false ? 'checked' : '';
 
@@ -133,7 +133,7 @@ function renderFlows(flows) {
         <div class="flow-id">${escapeHtml(flow.id)}</div>
       </td>
       <td data-label="Estado">
-        <span class="status-badge ${status.cls}">${status.label}</span>
+        <span class="${status.cls}">${status.label}</span>
       </td>
       <td data-label="Keywords">
         <div class="keywords-cell">${renderKeywordPills(flow.keywords)}</div>

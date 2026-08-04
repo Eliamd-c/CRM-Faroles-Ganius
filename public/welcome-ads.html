@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome Message Ads - Faroles Genius CRM</title>
     <script src="auth.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles/global.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
         :root {
             --bg-color: #0f1115;
             --card-bg: rgba(255, 255, 255, 0.03);
@@ -392,26 +392,16 @@
     </style>
 </head>
 <body>
-    <header>
-        <div class="header-left">
-            <div class="logo">Faroles Genius <span>CRM</span></div>
-            <nav class="nav-bar">
-                <a href="/">Monitor</a>
-                <a href="/automations.html">Automatizaciones</a>
-                <a href="/welcome-ads.html" class="active">Welcome Ads</a>
-                <a href="/builder.html">Builder</a>
-            </nav>
-        </div>
-    </header>
+    <div id="global-navbar"></div>
 
-    <div class="page-content">
-        <div class="page-header">
-            <h1>🎯 Welcome Message Ads <span class="flow-count" id="flow-count"></span></h1>
-            <button class="btn-primary" onclick="openCreateModal()">+ Nuevo Welcome Flow</button>
+    <div class="crm-main-container">
+        <div class="crm-page-header">
+            <h1 class="crm-page-title">🎯 Welcome Message Ads <span class="flow-count" id="flow-count"></span></h1>
+            <button class="crm-btn-primary" onclick="openCreateModal()">+ Nuevo Welcome Flow</button>
         </div>
 
-        <div class="flows-table-wrapper">
-            <table>
+        <div class="crm-table-container">
+            <table class="crm-table">
                 <thead>
                     <tr>
                         <th>Nombre</th>
@@ -515,7 +505,7 @@
                         <div class="flow-id">${escapeHtml(flow.id)}</div>
                     </td>
                     <td>
-                        <span class="status-badge ${flow.is_used_in_ad ? 'status-live' : 'status-draft'}">
+                        <span class="${flow.is_used_in_ad ? 'crm-badge-active' : 'crm-badge-draft'}">
                             ${flow.is_used_in_ad ? 'EN USO' : 'BORRADOR'}
                         </span>
                     </td>
@@ -663,5 +653,6 @@
 
         loadFlows();
     </script>
+    <script src="/components/navbar.js"></script>
 </body>
 </html>

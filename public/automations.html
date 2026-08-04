@@ -6,62 +6,57 @@
     <title>Automatizaciones - Faroles Genius</title>
     <script src="auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="automations.css?v=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="automations.css">
+    <link rel="stylesheet" href="/styles/global.css">
 </head>
 <body>
-    <header>
-        <div class="header-left">
-            <div class="logo">Faroles Genius <span>CRM</span></div>
-            <nav class="nav-bar">
-                <a href="/">Monitor</a>
-                <a href="/automations.html" class="active">Automatizaciones</a>
-                <a href="/welcome-ads.html">Welcome Ads</a>
-                <a href="/builder.html">Builder</a>
-            </nav>
-        </div>
-    </header>
+    <div id="global-navbar"></div>
 
-    <div class="page-content">
-        <div class="page-header">
-            <h1>Mis Automatizaciones <span class="flow-count" id="flow-count"></span></h1>
-            <button class="btn-primary" onclick="window.location='/builder.html?new=1'">+ Nueva Automatizacion</button>
+    <div class="crm-main-container">
+        <div class="crm-page-header">
+            <h1 class="crm-page-title">Mis Automatizaciones <span class="flow-count" id="flow-count"></span></h1>
+            <button class="crm-btn-primary" onclick="window.location='/builder.html?new=1'">+ Nueva Automatizacion</button>
         </div>
 
-        <div class="flows-table-wrapper">
-            <table>
+        <div class="crm-table-container">
+            <table class="crm-table" id="flows-table">
                 <thead>
                     <tr>
                         <th>Nombre</th>
                         <th>Estado</th>
-                        <th>Palabras Clave</th>
+                        <th>Keywords</th>
                         <th>Pasos</th>
                         <th>Ejecutados</th>
                         <th>Modificado</th>
-                        <th style="text-align:right">Acciones</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
-                <tbody id="flows-body">
+                <tbody id="flows-tbody">
+                    <!-- Filas renderizadas desde JS -->
                 </tbody>
             </table>
-            <div class="empty-state" id="empty-state" style="display:none">
-                <div class="icon">⚡</div>
-                <h3>No hay automatizaciones</h3>
-                <p>Crea tu primera automatizacion desde el Builder</p>
-            </div>
+        </div>
+        
+        <div class="empty-state" id="empty-state" style="display:none; text-align:center; padding: 40px;">
+            <p>No tienes flujos creados aún.</p>
+            <button class="crm-btn-primary" style="margin: 16px auto;" onclick="window.location='/builder.html?new=1'">Crear el primero</button>
         </div>
     </div>
 
-    <div class="modal-overlay" id="delete-modal">
+    <!-- Modals (delete flow, duplicate etc) kept from automations.js -->
+    <div class="modal-overlay" id="modal-delete" style="display:none;">
         <div class="modal">
-            <h3>Eliminar automatizacion</h3>
-            <p>Estas seguro de que quieres eliminar <strong id="delete-flow-name"></strong>? Esta accion no se puede deshacer.</p>
+            <h3>Eliminar Flujo</h3>
+            <p>¿Estás seguro que deseas eliminar <strong id="delete-flow-name"></strong>?</p>
             <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
-                <button class="btn-danger" id="btn-confirm-delete">Eliminar</button>
+                <button class="crm-btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+                <button class="crm-btn-primary" style="background:var(--danger);" onclick="confirmDelete()">Eliminar</button>
             </div>
         </div>
     </div>
 
-    <script src="automations.js?v=2"></script>
+    <script src="automations.js"></script>
+    <script src="/components/navbar.js"></script>
 </body>
 </html>
