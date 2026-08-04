@@ -418,7 +418,7 @@
                         <th>Estado</th>
                         <th>Mensaje</th>
                         <th>Botones</th>
-                        <th>Publicado</th>
+                        <th>Ads Manager</th>
                         <th>Creado</th>
                         <th style="text-align:right">Acciones</th>
                     </tr>
@@ -515,17 +515,20 @@
                         <div class="flow-id">${escapeHtml(flow.id)}</div>
                     </td>
                     <td>
-                        <span class="status-badge ${flow.enabled ? 'status-live' : 'status-stopped'}">
-                            ${flow.enabled ? 'ACTIVO' : 'DETENIDO'}
+                        <span class="status-badge ${flow.is_used_in_ad ? 'status-live' : 'status-draft'}">
+                            ${flow.is_used_in_ad ? 'EN USO' : 'BORRADOR'}
                         </span>
                     </td>
                     <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(flow.message_text)}</td>
                     <td>${flow.quick_replies?.length || 0} botones</td>
-                    <td>${flow.meta_flow_id ? '✅ Sí' : '❌ No'}</td>
+                    <td>${flow.is_used_in_ad ? '✅ Conectado' : '❌ Libre'}</td>
                     <td style="color: var(--text-muted); font-size: 0.8rem;">${new Date(flow.created_at).toLocaleDateString()}</td>
                     <td style="text-align: right;">
-                        <button class="btn-icon" title="Editar" onclick="editFlow('${flow.id}')">✏️</button>
-                        <button class="btn-icon" title="Eliminar" onclick="openDeleteModal('${flow.id}', '${escapeHtml(flow.name)}')">🗑️</button>
+                        ${flow.is_used_in_ad ? 
+                          '<span style="font-size:0.75rem; color:var(--text-muted); margin-right:1rem;">Bloqueado por Meta</span>' : 
+                          `<button class="btn-icon" title="Editar" onclick="editFlow('${flow.id}')">✏️</button>
+                           <button class="btn-icon" title="Eliminar" onclick="openDeleteModal('${flow.id}', '${escapeHtml(flow.name)}')">🗑️</button>`
+                        }
                     </td>
                 </tr>
             `).join('');

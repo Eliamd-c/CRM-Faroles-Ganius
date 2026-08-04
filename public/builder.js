@@ -637,7 +637,7 @@ function renderMessageInspector(nodeId) {
     html += `
       <div class="ms-block-wrapper" style="margin-bottom: 24px; position: relative;">
         <!-- Botón para eliminar bloque -->
-        <button onclick="deleteBlock('${nodeId}', ${idx})" style="position: absolute; top: 10px; right: -30px; background: none; border: none; color: #ef4444; font-size: 16px; cursor: pointer;" title="Eliminar bloque">×</button>
+        <button onclick="deleteBlock('${nodeId}', ${idx})" style="position: absolute; top: -10px; right: -10px; background: white; border: 1px solid #ef4444; color: #ef4444; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" title="Eliminar bloque"><i class="fa-solid fa-times"></i></button>
     `;
       
     if (block.type === 'text') {
@@ -653,12 +653,12 @@ function renderMessageInspector(nodeId) {
     } else if (block.type === 'image') {
       html += `
         <div style="background: #f1f2f6; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-          <label style="font-size:11px; color:var(--text-muted); margin-bottom:4px; display:block;">URL de la Imagen o Subir archivo</label>
+          <label class="cfg-label"><i class="fa-solid fa-image"></i> URL de la Imagen o Subir archivo</label>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <input id="img-url-${nodeId}-${idx}" class="cfg-input" type="text" style="flex:1; border: none; background: #ffffff; padding: 8px; border-radius: 6px; font-size: 13px;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
-            <label style="cursor: pointer; background: #ffffff; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0;" title="Subir imagen desde tu PC">
+            <input id="img-url-${nodeId}-${idx}" class="cfg-input" type="text" style="margin-bottom:0;" value="${block.url || ''}" oninput="updateBlockUrl('${nodeId}', ${idx}, this.value)" placeholder="https://..." />
+            <label style="cursor: pointer; background: #ffffff; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex-shrink: 0; border: 1px solid #cbd5e1; color: var(--primary);" title="Subir imagen desde tu PC">
               <input type="file" accept="image/*" style="display: none;" onchange="uploadBlockImage(this, '${nodeId}', ${idx})" />
-              <span style="font-size: 16px; display:inline-block; margin-top:-2px;">📁</span>
+              <i class="fa-solid fa-upload"></i>
             </label>
           </div>
           <div id="upload-progress-${nodeId}-${idx}" style="font-size: 11px; color: var(--color-primary); display: none; margin-top: 4px;">Subiendo imagen...</div>
@@ -680,7 +680,7 @@ function renderMessageInspector(nodeId) {
 
     // Botón "+ Añadir botón" fuera del bloque gris (como respuesta rápida o botón extra)
     if ((block.buttons || []).length < 3) {
-      html += `<div onclick="addButton('${nodeId}', ${idx})" style="border: 1px dashed #b0b8c4; border-radius: 20px; padding: 10px; text-align: center; font-size: 13px; font-weight: 500; color: #b0b8c4; cursor: pointer; margin-top: 10px; transition: color 0.15s, border-color 0.15s;" onmouseover="this.style.color='#0084ff'; this.style.borderColor='#0084ff';" onmouseout="this.style.color='#b0b8c4'; this.style.borderColor='#b0b8c4';">+ Añadir botón</div>`;
+      html += `<div onclick="addButton('${nodeId}', ${idx})" style="border: 1px dashed var(--primary); background: rgba(37,99,235,0.05); border-radius: 20px; padding: 10px; text-align: center; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; margin-top: 10px; transition: all 0.2s;"><i class="fa-solid fa-plus"></i> Añadir botón</div>`;
     }
     
     html += `</div>`; // fin .ms-block-wrapper
@@ -2616,7 +2616,28 @@ function renderTriggerInspector(nodeId) {
     renderTriggerMessageInspector(nodeId, data);
   } else if (triggerType === 'comment') {
     renderTriggerCommentInspector(nodeId, data);
+  } else if (triggerType === 'mention') {
+    renderTriggerMentionInspector(nodeId, data);
   }
+}
+
+function renderTriggerMentionInspector(nodeId, data) {
+  document.getElementById('config-title').innerText = '💬 Disparador: Mención';
+  document.getElementById('config-body').innerHTML = `
+    <div style="margin-bottom:16px;">
+      <button onclick="openTriggerPicker('${nodeId}')" style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:6px 12px; font-size:12px; color:#6b7280; cursor:pointer; display:flex; align-items:center; gap:6px;">
+        ⚡ Cambiar tipo de disparador
+      </button>
+    </div>
+    <div class="config-group" style="background:#f3e8ff; border:1px solid #d8b4fe; border-radius:8px; padding:12px; margin-bottom:12px;">
+      <p style="font-size:13px; color:#6b21a8; font-weight:600; margin-bottom:6px;"><i class="fa-solid fa-info-circle"></i> ¿Cómo funciona?</p>
+      <p style="font-size:12px; color:#7e22ce; line-height:1.4;">Este flujo se activará cada vez que un usuario mencione tu cuenta <strong>@${window.BOT_USERNAME || 'tu_cuenta'}</strong> en los comentarios o descripción de una de <strong>sus</strong> publicaciones.</p>
+    </div>
+    <div class="config-group" style="background:#fff7ed; border:1px solid #fdba74; border-radius:8px; padding:12px;">
+      <p style="font-size:13px; color:#c2410c; font-weight:600; margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Importante</p>
+      <p style="font-size:12px; color:#c2410c; line-height:1.4;">Para responder a la mención, añade un nodo de <strong>Acción &gt; Mensaje</strong>. El texto de ese nodo se publicará como un <strong>comentario público</strong> en respuesta al usuario. No se soportan botones ni imágenes.</p>
+    </div>
+  `;
 }
 
 function renderTriggerMessageInspector(nodeId, data) {
@@ -2837,6 +2858,12 @@ function renderTriggerNode(nodeId) {
       ${kw ? `<div style="background:#f0fdf4; padding:8px; border-radius:6px; font-size:11px; color:#15803d; font-weight:600; margin-bottom:6px;">Palabra clave: "${kw}"</div>` : '<div style="font-size:11px; color:#9ca3af; margin-bottom:6px;">Cualquier comentario</div>'}
       ${pub ? `<div style="font-size:11px; color:#6b7280;">↩ Responde: "${pub.substring(0,40)}${pub.length>40?'...':''}"</div>` : ''}
       ${data.commentPrivateReply !== false ? '<div style="font-size:11px; color:#6b7280;">📩 Envía flujo por DM</div>' : ''}`;
+  } else if (triggerType === 'mention') {
+    container.innerHTML = `
+      <div class="trigger-type-badge mention" style="background:#f3e8ff; color:#7e22ce;">@ Mención</div>
+      <div style="font-size:11px; color:#6b7280; margin-top:6px;">Se activa cuando te etiquetan.</div>
+      <div style="font-size:11px; color:#d97706; margin-top:4px; font-weight:bold;">⚠️ Responde con un comentario.</div>
+    `;
   } else {
     container.innerHTML = `<div style="border:2px dashed #0084ff; border-radius:8px; padding:12px; text-align:center; color:#0084ff; font-weight:600; font-size:14px; cursor:pointer;" onclick="openTriggerPicker('${nodeId}')">+ Elegir disparador</div>`;
   }

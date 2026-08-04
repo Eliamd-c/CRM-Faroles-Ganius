@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insights y Métricas - CRM 2.0</title>
+  <link rel="stylesheet" href="insights.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <nav class="navbar">
+      <div class="nav-logo">
+        <i class="fa-solid fa-robot"></i>
+        <span>CRM 2.0</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="index.html">Dashboard</a></li>
+        <li><a href="builder.html">Flow Builder</a></li>
+        <li><a href="ai-config.html">AI Config</a></li>
+        <li><a href="contacts.html">Contactos</a></li>
+        <li><a href="insights.html" class="active">Insights</a></li>
+      </ul>
+      <div class="nav-user">
+        <button id="logoutBtn" class="btn-secondary"><i class="fa-solid fa-right-from-bracket"></i> Salir</button>
+      </div>
+    </nav>
+
+    <main class="insights-layout">
+      
+      <div class="insights-header">
+        <div class="profile-summary">
+          <img src="https://via.placeholder.com/64" alt="Profile" id="profilePic">
+          <div>
+            <h1 id="profileName">Cargando...</h1>
+            <p>@<span id="profileUsername">...</span></p>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="loadInsights()"><i class="fa-solid fa-rotate"></i> Refrescar</button>
+      </div>
+
+      <!-- KPI Cards -->
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <i class="fa-solid fa-users kpi-icon"></i>
+          <div class="kpi-info">
+            <h3>Seguidores</h3>
+            <h2 id="kpiFollowers">-</h2>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <i class="fa-solid fa-user-plus kpi-icon"></i>
+          <div class="kpi-info">
+            <h3>Seguidos</h3>
+            <h2 id="kpiFollows">-</h2>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <i class="fa-solid fa-images kpi-icon"></i>
+          <div class="kpi-info">
+            <h3>Publicaciones</h3>
+            <h2 id="kpiMedia">-</h2>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts Section -->
+      <section class="charts-section">
+        <div class="chart-container">
+          <h2>Rendimiento Reciente (Likes y Comentarios)</h2>
+          <canvas id="mediaChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Media List -->
+      <section class="media-section">
+        <h2>Últimas Publicaciones</h2>
+        <div class="media-grid" id="mediaGrid">
+          <div style="padding: 20px;">Cargando publicaciones...</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="insights.js"></script>
+</body>
+</html>

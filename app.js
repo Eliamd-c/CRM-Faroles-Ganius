@@ -14,7 +14,7 @@ const supabase = require('./db');
 let flowsConfig = { flows: [], defaultFlow: null };
 
 // Cargar configuración de flujos de bienvenida (Welcome Message Ads)
-let welcomeFlowsConfig = { welcome_flows: [] };
+
 try {
   let filePath = path.join(__dirname, 'flows.json');
   // Si flows.json no existe, intenta flows.json.example (para despliegues)
@@ -45,21 +45,6 @@ try {
 } catch (err) {
   console.error('❌ Error al cargar flows.json:', err.message);
   console.warn('⚠️ Usando configuración de flujos vacía por defecto.');
-}
-
-// Cargar welcome_flows.json (Welcome Message Ads)
-try {
-  const welcomeFlowsPath = path.join(__dirname, 'welcome_flows.json');
-  if (fs.existsSync(welcomeFlowsPath)) {
-    const rawData = fs.readFileSync(welcomeFlowsPath);
-    welcomeFlowsConfig = JSON.parse(rawData);
-    console.log(`✅ ${welcomeFlowsConfig.welcome_flows?.length || 0} Welcome Message Flows cargados.`);
-  } else {
-    console.log('ℹ️ welcome_flows.json no encontrado. Usando configuración vacía.');
-  }
-} catch (err) {
-  console.error('❌ Error al cargar welcome_flows.json:', err.message);
-  console.warn('⚠️ Usando configuración de welcome flows vacía por defecto.');
 }
 
 // Fuente de verdad de los flujos: Supabase (sobrevive a los despliegues).
@@ -346,7 +331,31 @@ const {
 // vencido cuando el otro sigue siendo válido).
 let ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
 
-const GRAPH_API = 'https://graph.facebook.com/v21.0';
+// ─────────────────────────────────────────────
+// Cargar configuraciones de BD al inicio
+// ─────────────────────────────────────────────
+async function loadAppConfig() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('app_config').select('key, value');
+    if (!error && data) {
+      const dbToken = data.find(d => d.key === 'INSTAGRAM_ACCESS_TOKEN');
+      if (dbToken && dbToken.value) {
+        ACCESS_TOKEN = dbToken.value;
+        console.log('✅ INSTAGRAM_ACCESS_TOKEN cargado desde Supabase');
+      }
+      const dbAccountId = data.find(d => d.key === 'INSTAGRAM_ACCOUNT_ID');
+      if (dbAccountId && dbAccountId.value) {
+        INSTAGRAM_ACCOUNT_ID = dbAccountId.value;
+        console.log('✅ INSTAGRAM_ACCOUNT_ID cargado desde Supabase');
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Error cargando app_config:', err.message);
+  }
+}
+
+const GRAPH_API = 'https://graph.instagram.com/v21.0';
 
 // ─────────────────────────────────────────────
 // Inicialización del Bot (Cargar datos propios)
@@ -555,6 +564,10 @@ try {
       else if (event.sponsored_message) {
         await handleSponsoredMessage(event);
       }
+      // Mensaje editado
+      else if (event.message_edit) {
+        await handleMessageEdit(event);
+      }
       // Mensajes regulares o quick replies
       else if (event.message?.text || event.message?.quick_reply) {
         await handleMessage(event);
@@ -567,7 +580,11 @@ try {
       if (change.field === 'comments') {
         await handleComment(change.value);
       }
-      // Menciones en historias
+      // Comentarios en vivos (Live Comments)
+      else if (change.field === 'live_comments') {
+        await handleLiveComment(change.value);
+      }
+      // Menciones (@mentions en comentarios o captions)
       else if (change.field === 'mentions') {
         await handleMention(change.value);
       }
@@ -609,7 +626,7 @@ app.get('/api/instagram/media', async (req, res) => {
     // Usa el token ya validado por initBot (no reintroduce el token muerto).
     const token = ACCESS_TOKEN;
     if (!token) return res.status(503).json({ error: 'No access token configured' });
-    const r = await axios.get('https://graph.facebook.com/v21.0/me/media', {
+    const r = await axios.get('https://graph.instagram.com/v21.0/me/media', {
       params: { fields: 'id,media_type,thumbnail_url,media_url,caption,timestamp,permalink', limit: 12, access_token: token }
     });
     const data = r.data;
@@ -714,132 +731,58 @@ app.post('/api/flows/:id/duplicate', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// Welcome Message Ads (Instagram Click-to-DM)
-// ─────────────────────────────────────────────
-
-// Listar flujos de bienvenida
-app.get('/api/welcome-flows', (req, res) => {
+// LISTAR Welcome Message Flows desde Meta
+app.get('/api/welcome-flows', async (req, res) => {
   try {
-    res.json(welcomeFlowsConfig.welcome_flows || []);
+    if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+    const response = await axios.get(`https://graph.instagram.com/v26.0/me/welcome_message_flows`, {
+      params: { access_token: ACCESS_TOKEN }
+    });
+    
+    const mapped = (response.data.data || []).map(flow => {
+      let wm = flow.welcome_message;
+      if (typeof wm === 'string') {
+          try { wm = JSON.parse(wm); } catch(e){}
+      }
+      
+      // La API devuelve un objeto con .message o un array con {message}
+      const msgObj = Array.isArray(wm) ? wm[0]?.message : (wm?.message || wm);
+
+      return {
+        id: flow.id,
+        name: flow.name,
+        message_text: msgObj?.text || '',
+        quick_replies: msgObj?.quick_replies || [],
+        is_used_in_ad: flow.is_used_in_ad || false,
+        created_at: flow.last_update_time || new Date().toISOString()
+      };
+    });
+
+    res.json(mapped);
   } catch (err) {
-    console.error('Error getting welcome flows:', err);
-    res.status(500).json({ error: 'Failed to get welcome flows' });
+    console.error('Error getting welcome flows:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to get welcome flows from Meta' });
   }
 });
 
-// Crear un flujo de bienvenida
+// CREAR un Welcome Message Flow en Meta
 app.post('/api/welcome-flows', express.json(), async (req, res) => {
   try {
-    const { name, message_text, quick_replies, enabled } = req.body;
+    if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+    const { name, message_text, quick_replies } = req.body;
+    
     if (!name || !message_text) {
       return res.status(400).json({ error: 'name y message_text son requeridos' });
     }
 
-    const flow = {
-      id: 'wf_' + Date.now(),
-      name,
-      message_text,
-      quick_replies: quick_replies || [],
-      enabled: enabled !== false,
-      meta_flow_id: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    if (!welcomeFlowsConfig.welcome_flows) welcomeFlowsConfig.welcome_flows = [];
-    welcomeFlowsConfig.welcome_flows.push(flow);
-
-    // Guardar en archivo local
-    try {
-      await fs.promises.writeFile(
-        path.join(__dirname, 'welcome_flows.json'),
-        JSON.stringify(welcomeFlowsConfig, null, 2)
-      );
-    } catch (e) {
-      console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
-    }
-
-    res.json(flow);
-  } catch (err) {
-    console.error('Error creating welcome flow:', err);
-    res.status(500).json({ error: 'Failed to create welcome flow' });
-  }
-});
-
-// Actualizar un flujo de bienvenida
-app.patch('/api/welcome-flows/:id', express.json(), async (req, res) => {
-  try {
-    const { name, message_text, quick_replies, enabled } = req.body;
-    const flow = welcomeFlowsConfig.welcome_flows?.find(f => f.id === req.params.id);
-
-    if (!flow) return res.status(404).json({ error: 'Welcome flow not found' });
-
-    if (name) flow.name = name;
-    if (message_text) flow.message_text = message_text;
-    if (quick_replies) flow.quick_replies = quick_replies;
-    if (enabled !== undefined) flow.enabled = enabled;
-    flow.updated_at = new Date().toISOString();
-
-    try {
-      await fs.promises.writeFile(
-        path.join(__dirname, 'welcome_flows.json'),
-        JSON.stringify(welcomeFlowsConfig, null, 2)
-      );
-    } catch (e) {
-      console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
-    }
-
-    res.json(flow);
-  } catch (err) {
-    console.error('Error updating welcome flow:', err);
-    res.status(500).json({ error: 'Failed to update welcome flow' });
-  }
-});
-
-// Eliminar un flujo de bienvenida
-app.delete('/api/welcome-flows/:id', async (req, res) => {
-  try {
-    const idx = welcomeFlowsConfig.welcome_flows?.findIndex(f => f.id === req.params.id);
-    if (idx === -1 || idx === undefined) {
-      return res.status(404).json({ error: 'Welcome flow not found' });
-    }
-
-    welcomeFlowsConfig.welcome_flows.splice(idx, 1);
-
-    try {
-      await fs.promises.writeFile(
-        path.join(__dirname, 'welcome_flows.json'),
-        JSON.stringify(welcomeFlowsConfig, null, 2)
-      );
-    } catch (e) {
-      console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error deleting welcome flow:', err);
-    res.status(500).json({ error: 'Failed to delete welcome flow' });
-  }
-});
-
-// Crear flujo en Meta API y vincularlo a un anuncio
-app.post('/api/welcome-flows/:id/publish', express.json(), async (req, res) => {
-  try {
-    const { igUserAccessToken } = req.body;
-    const flow = welcomeFlowsConfig.welcome_flows?.find(f => f.id === req.params.id);
-
-    if (!flow) return res.status(404).json({ error: 'Welcome flow not found' });
-    if (!igUserAccessToken) return res.status(400).json({ error: 'igUserAccessToken requerido' });
-
-    // Construir payload para Meta API
     const metaPayload = {
       eligible_platforms: ['instagram'],
-      name: flow.name,
+      name: name,
       welcome_message_flow: [
         {
           message: {
-            text: flow.message_text,
-            quick_replies: flow.quick_replies.map(qr => ({
+            text: message_text,
+            quick_replies: (quick_replies || []).map(qr => ({
               content_type: 'text',
               title: qr.title,
               payload: qr.payload
@@ -849,40 +792,70 @@ app.post('/api/welcome-flows/:id/publish', express.json(), async (req, res) => {
       ]
     };
 
-    // Llamar a Meta Graph API
-    const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || 'me';
-    const response = await axios.post(
-      `https://graph.instagram.com/v26.0/${igUserId}/welcome_message_flows`,
-      metaPayload,
-      {
-        headers: { Authorization: `Bearer ${igUserAccessToken}` }
-      }
-    );
-
-    if (response.data?.flow_id) {
-      flow.meta_flow_id = response.data.flow_id;
-      flow.updated_at = new Date().toISOString();
-
-      try {
-        await fs.promises.writeFile(
-          path.join(__dirname, 'welcome_flows.json'),
-          JSON.stringify(welcomeFlowsConfig, null, 2)
-        );
-      } catch (e) {
-        console.warn('⚠️ No se guardó welcome_flows.json:', e.message);
-      }
-
-      console.log(`✅ Welcome Message Flow publicado en Meta: ${response.data.flow_id}`);
-      res.json({ success: true, meta_flow_id: response.data.flow_id });
-    } else {
-      res.status(400).json({ error: 'No flow_id recibido de Meta' });
-    }
-  } catch (err) {
-    console.error('Error publishing welcome flow:', err.response?.data || err.message);
-    res.status(500).json({
-      error: 'Failed to publish welcome flow',
-      details: err.response?.data?.error?.message || err.message
+    const response = await axios.post(`https://graph.instagram.com/v26.0/me/welcome_message_flows`, metaPayload, {
+      params: { access_token: ACCESS_TOKEN }
     });
+
+    res.json({ success: true, flow_id: response.data.flow_id });
+  } catch (err) {
+    console.error('Error creating welcome flow:', err?.response?.data || err.message);
+    res.status(500).json({ error: err?.response?.data?.error?.message || 'Failed to create welcome flow in Meta' });
+  }
+});
+
+// ACTUALIZAR un Welcome Message Flow en Meta
+app.patch('/api/welcome-flows/:id', express.json(), async (req, res) => {
+  try {
+    if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+    const { name, message_text, quick_replies } = req.body;
+    const flow_id = req.params.id;
+
+    const params = new URLSearchParams();
+    params.append('access_token', ACCESS_TOKEN);
+    params.append('flow_id', flow_id);
+    if (name) params.append('name', name);
+    
+    if (message_text) {
+        const welcome_message_flow = [
+            {
+                message: {
+                    text: message_text,
+                    quick_replies: (quick_replies || []).map(qr => ({
+                        content_type: 'text',
+                        title: qr.title,
+                        payload: qr.payload
+                    }))
+                }
+            }
+        ];
+        params.append('welcome_message_flow', JSON.stringify(welcome_message_flow));
+    }
+
+    await axios.post(`https://graph.instagram.com/v26.0/me/welcome_message_flows`, params);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating welcome flow:', err?.response?.data || err.message);
+    res.status(500).json({ error: err?.response?.data?.error?.message || 'Failed to update welcome flow in Meta' });
+  }
+});
+
+// ELIMINAR un Welcome Message Flow en Meta
+app.delete('/api/welcome-flows/:id', async (req, res) => {
+  try {
+    if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+    const flow_id = req.params.id;
+    
+    await axios.delete(`https://graph.instagram.com/v26.0/me/welcome_message_flows`, {
+      params: { 
+        access_token: ACCESS_TOKEN,
+        flow_id: flow_id
+      }
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting welcome flow:', err?.response?.data || err.message);
+    res.status(500).json({ error: err?.response?.data?.error?.message || 'Failed to delete welcome flow in Meta' });
   }
 });
 
@@ -1262,6 +1235,23 @@ app.post('/api/contacts/:instagram_id/toggle-bot', express.json(), async (req, r
     const { error } = await supabase.from('customers').update({ bot_paused }).eq('instagram_id', instagram_id);
     if (error) throw error;
     res.json({ success: true, bot_paused });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Marcar mensajes como leídos
+app.post('/api/contacts/:instagram_id/mark-read', express.json(), async (req, res) => {
+  if (!supabase) return res.status(500).json({ error: 'No DB' });
+  try {
+    const { instagram_id } = req.params;
+    const { error } = await supabase.from('messages')
+      .update({ is_read: true })
+      .eq('instagram_id', instagram_id)
+      .eq('direction', 'inbound')
+      .eq('is_read', false);
+    if (error) throw error;
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1815,7 +1805,11 @@ async function handleMessage(event) {
 
   // 2. Manejo de Mensajes Directos regulares (DM)
   broadcastLog('DM', `Recibido de ${senderName}: "${text}"`, profile);
-  logMessageToDB(senderId, 'inbound', 'text', text || (hasAttachments ? '[Adjunto/s]' : ''));
+  const msgExtra = {};
+  if (event.message?.reply_to?.mid) msgExtra.reply_to_mid = event.message.reply_to.mid;
+  if (event.message?.quick_reply) msgExtra.metadata = { quick_reply: event.message.quick_reply.payload };
+  if (event.message?.referral) msgExtra.metadata = { ...msgExtra.metadata, referral: event.message.referral };
+  logMessageToDB(senderId, 'inbound', 'text', text || (hasAttachments ? '[Adjunto/s]' : ''), event.message?.mid, msgExtra);
 
   // 3. Verificar si el bot está pausado o en recolección de datos
   let customer = null;
@@ -1828,6 +1822,14 @@ async function handleMessage(event) {
         .single();
 
       customer = data;
+      if (customer && profile) {
+        const updates = {};
+        if (profile.name && profile.name !== customer.name) updates.name = profile.name;
+        if (profile.profile_pic && profile.profile_pic !== customer.profile_picture_url) updates.profile_picture_url = profile.profile_pic;
+        if (Object.keys(updates).length > 0) {
+          supabase.from('customers').update(updates).eq('instagram_id', senderId).then(() => {});
+        }
+      }
       if (customer && customer.bot_paused) {
         console.log(`[IGNORE] Bot pausado para el usuario ${senderId}`);
         return;
@@ -1842,7 +1844,7 @@ async function handleMessage(event) {
     try {
       const { data: newCustomer, error: insertErr } = await supabase
         .from('customers')
-        .insert([{ instagram_id: senderId, name: senderName, tags: [], fields: {}, bot_paused: false, bot_state: 'active' }])
+        .insert([{ instagram_id: senderId, name: senderName, profile_picture_url: profile?.profile_pic || null, tags: [], fields: {}, bot_paused: false, bot_state: 'active' }])
         .select()
         .single();
 
@@ -2377,14 +2379,51 @@ async function handleComment(value) {
 // DOC: https://developers.facebook.com/docs/instagram-platform/reference/ig-user/tags
 // ─────────────────────────────────────────────
 async function handleMention(value) {
-  const from = value.from?.username;
-  broadcastLog('MENTION', `@${from} te mencionó en una historia.`);
+  // La API puede enviar un comment_id o un media_id dependiendo de dónde fue la mención
+  const mentionId = value.comment_id || value.media_id;
+  if (!mentionId) return;
 
+  broadcastLog('MENTION', `Alguien te mencionó en una publicación o comentario (ID: ${mentionId}).`);
+
+  // Revisar si hay un flujo configurado para Menciones
   if (flowsConfig.mentionFlow?.steps?.length > 0) {
-    const senderId = value.from?.id;
-    if (senderId) {
-      await processFlowSteps(flowsConfig.mentionFlow.steps, senderId, from || senderId);
+    const firstStep = flowsConfig.mentionFlow.steps[0];
+    let replyText = '¡Gracias por mencionarnos! 🙌';
+    
+    // Si el primer nodo es un mensaje, usamos ese texto. No se soportan botones ni carruseles.
+    if (firstStep.type === 'message' && firstStep.message) {
+      replyText = firstStep.message;
     }
+
+    await replyToMention(mentionId, replyText);
+  }
+}
+
+// DOC: https://developers.facebook.com/documentation/instagram-platform/instagram-graph-api/reference/ig-user/mentions
+async function replyToMention(mentionId, text) {
+  if (!ACCESS_TOKEN || !INSTAGRAM_ACCOUNT_ID) return;
+  try {
+    const payload = new URLSearchParams();
+    payload.append('message', text);
+    payload.append('access_token', ACCESS_TOKEN);
+    
+    // El parámetro requerido es comment_id o media_id.
+    // Usaremos comment_id por defecto si es numérico/valido. Instagram lo procesa en su backend.
+    if (mentionId) {
+        payload.append('comment_id', mentionId); // o 'media_id' dependiendo del webhook real, intentamos comment_id
+    }
+
+    const res = await axios.post(
+      `https://graph.instagram.com/v26.0/${INSTAGRAM_ACCOUNT_ID}/mentions`,
+      payload
+    );
+    
+    console.log(`✅ Respuesta a mención enviada a ${mentionId}`);
+    broadcastLog('SYSTEM', `Comentario de respuesta publicado en la mención ${mentionId}`);
+    return res.data;
+  } catch (err) {
+    console.error(`❌ Error enviando respuesta a mención ${mentionId}:`, err.response?.data || err.message);
+    broadcastLog('ERROR', `Falló respuesta a mención: ${err.message}`);
   }
 }
 
@@ -2418,8 +2457,25 @@ async function handleDeliveryConfirmation(event) {
 async function handleReadReceipt(event) {
   const senderId = event.sender?.id;
   const watermark = event.read?.watermark;
+  const mid = event.read?.mid;
   console.log(`👀 Read Receipt - Leído por ${senderId}`);
   broadcastLog('READ', `Mensaje leído por el usuario`);
+  if (supabase && senderId) {
+    try {
+      if (mid) {
+        await supabase.from('messages').update({ is_read: true }).eq('mid', mid);
+      } else if (watermark) {
+        await supabase.from('messages')
+          .update({ is_read: true })
+          .eq('instagram_id', senderId)
+          .eq('direction', 'outbound')
+          .eq('is_read', false)
+          .lte('created_at', new Date(watermark).toISOString());
+      }
+    } catch (e) {
+      console.error('Error actualizando read receipt:', e.message);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -2439,11 +2495,14 @@ async function handleTypingIndicator(event) {
 async function handlePostback(event) {
   const senderId = event.sender?.id;
   const payload = event.postback?.payload;
-  const text = event.postback?.title;
-  console.log(`🔘 Postback - ${text} (${payload}) desde ${senderId}`);
-  broadcastLog('POSTBACK', `Usuario pulsó botón: ${text}`);
+  const title = event.postback?.title;
+  const mid = event.postback?.mid;
+  console.log(`🔘 Postback - ${title} (${payload}) desde ${senderId}`);
+  broadcastLog('POSTBACK', `Usuario pulsó botón: ${title}`);
+  logMessageToDB(senderId, 'inbound', 'postback', title || payload, mid, {
+    metadata: { postback_payload: payload, postback_title: title }
+  });
 
-  // Procesar como si fuera un mensaje de texto
   await handleMessage({ sender: event.sender, message: { text: payload } });
 }
 
@@ -2453,9 +2512,17 @@ async function handlePostback(event) {
 // ─────────────────────────────────────────────
 async function handleMessageReaction(event) {
   const senderId = event.sender?.id;
-  const reaction = event.message?.reaction;
-  console.log(`😊 Message Reaction - ${reaction} desde ${senderId}`);
-  broadcastLog('REACTION', `Usuario reaccionó: ${reaction}`);
+  const reactionData = event.reaction || event.message?.reaction;
+  const emoji = reactionData?.emoji || reactionData;
+  const action = reactionData?.action || 'react';
+  const targetMid = reactionData?.mid;
+  console.log(`😊 Message Reaction - ${emoji} (${action}) desde ${senderId}`);
+  broadcastLog('REACTION', `Usuario reaccionó: ${emoji}`);
+  if (action === 'react') {
+    logMessageToDB(senderId, 'inbound', 'reaction', emoji, null, {
+      metadata: { reaction: emoji, target_mid: targetMid, action }
+    });
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -2489,12 +2556,17 @@ async function handleStoryReaction(value) {
 async function handleAttachments(event) {
   const senderId = event.sender?.id;
   const attachments = event.message?.attachments || [];
+  const mid = event.message?.mid;
 
   for (const attachment of attachments) {
-    const type = attachment.type; // image, video, audio, file
+    const type = attachment.type;
     const url = attachment.payload?.url;
     console.log(`📎 Attachment - ${type} desde ${senderId}: ${url}`);
     broadcastLog('ATTACHMENT', `Usuario compartió ${type}`, { id: senderId });
+    logMessageToDB(senderId, 'inbound', 'attachment', `[${type}]`, mid, {
+      attachment_type: type,
+      attachment_url: url
+    });
   }
 }
 
@@ -2504,8 +2576,12 @@ async function handleAttachments(event) {
 async function handleLocation(event) {
   const senderId = event.sender?.id;
   const coords = event.message?.location?.coordinates;
+  const mid = event.message?.mid;
   console.log(`📍 Location - Lat: ${coords?.lat}, Lng: ${coords?.long} desde ${senderId}`);
   broadcastLog('LOCATION', `Usuario compartió ubicación`);
+  logMessageToDB(senderId, 'inbound', 'location', `📍 ${coords?.lat}, ${coords?.long}`, mid, {
+    metadata: { lat: coords?.lat, lng: coords?.long }
+  });
 
   if (supabase && coords) {
     try {
@@ -2525,8 +2601,17 @@ async function handleLocation(event) {
 async function handleShare(event) {
   const senderId = event.sender?.id;
   const shares = event.message?.shares || [];
+  const mid = event.message?.mid;
   console.log(`🔗 Share - ${shares.length} contenidos compartidos desde ${senderId}`);
   broadcastLog('SHARE', `Usuario compartió contenido`);
+  for (const share of shares) {
+    const url = share.link || share.url || '';
+    logMessageToDB(senderId, 'inbound', 'share', url || '[Contenido compartido]', mid, {
+      attachment_type: 'share',
+      attachment_url: url,
+      metadata: { share }
+    });
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -2745,16 +2830,22 @@ async function handleWelcomeMessageAd(event) {
 // ─────────────────────────────────────────────
 // Log Message to DB (Historial de Contactos)
 // ─────────────────────────────────────────────
-async function logMessageToDB(instagram_id, direction, type, content) {
+async function logMessageToDB(instagram_id, direction, type, content, mid = null, extra = {}) {
   if (!supabase) return;
   try {
     const textContent = typeof content === 'string' ? content : JSON.stringify(content);
-    await supabase.from('messages').insert({
+    const row = {
       instagram_id,
+      mid,
       direction,
       message_type: type,
       content: textContent
-    });
+    };
+    if (extra.attachment_type) row.attachment_type = extra.attachment_type;
+    if (extra.attachment_url) row.attachment_url = extra.attachment_url;
+    if (extra.reply_to_mid) row.reply_to_mid = extra.reply_to_mid;
+    if (extra.metadata && Object.keys(extra.metadata).length > 0) row.metadata = extra.metadata;
+    await supabase.from('messages').insert(row);
   } catch (err) {
     console.error('⚠️ Error guardando mensaje en DB:', err.message);
   }
@@ -3394,6 +3485,72 @@ app.post('/api/comment-triggers', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Instagram OAuth 2.0 (Business Login)
+// ─────────────────────────────────────────────
+const META_REDIRECT_URI = process.env.META_REDIRECT_URI || 'http://localhost:3000/auth/callback';
+
+app.get('/auth/instagram', (req, res) => {
+  const url = `https://www.instagram.com/oauth/authorize?client_id=${process.env.META_APP_ID}&redirect_uri=${META_REDIRECT_URI}&response_type=code&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish`;
+  res.redirect(url);
+});
+
+app.get('/auth/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.send('Error: Código de autorización no proporcionado.');
+  
+  try {
+    // 1. Obtener Token de corta duración
+    const formData = new URLSearchParams();
+    formData.append('client_id', process.env.META_APP_ID);
+    formData.append('client_secret', process.env.META_APP_SECRET);
+    formData.append('grant_type', 'authorization_code');
+    formData.append('redirect_uri', META_REDIRECT_URI);
+    formData.append('code', code.replace('#_', ''));
+
+    const tokenRes = await axios.post('https://api.instagram.com/oauth/access_token', formData);
+    const shortToken = tokenRes.data.access_token;
+    
+    // 2. Intercambiar por Token de larga duración (60 días)
+    const longRes = await axios.get(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${process.env.META_APP_SECRET}&access_token=${shortToken}`);
+    const longToken = longRes.data.access_token;
+    
+    // 3. Obtener el ID de la cuenta de Instagram usando el nuevo token
+    const meRes = await axios.get(`https://graph.instagram.com/v21.0/me?fields=user_id,username&access_token=${longToken}`);
+    const igAccountId = meRes.data.user_id || meRes.data.data?.[0]?.user_id; // Depende de la estructura de la API v21.0
+    
+    // 4. Guardar en Supabase
+    if (supabase) {
+      await supabase.from('app_config').upsert({ key: 'INSTAGRAM_ACCESS_TOKEN', value: longToken, updated_at: new Date() });
+      if (igAccountId) {
+        await supabase.from('app_config').upsert({ key: 'INSTAGRAM_ACCOUNT_ID', value: igAccountId, updated_at: new Date() });
+      }
+    }
+    
+    // 5. Actualizar memoria RAM
+    ACCESS_TOKEN = longToken;
+    if (igAccountId) INSTAGRAM_ACCOUNT_ID = igAccountId;
+    
+    res.send(`
+      <div style="font-family:sans-serif; text-align:center; padding: 50px;">
+        <h1 style="color:#22c55e;">✅ Conexión Exitosa</h1>
+        <p>El CRM ha sido actualizado con el nuevo token OAuth 2.0 de Instagram.</p>
+        <p>Puedes cerrar esta ventana y regresar al dashboard.</p>
+        <script>setTimeout(() => window.close(), 3000);</script>
+      </div>
+    `);
+  } catch (e) {
+    const errMsg = e.response?.data?.error_message || e.message;
+    console.error('Error OAuth:', errMsg, e.response?.data);
+    res.send('<h1 style="color:red;">Error en Autenticación OAuth</h1><p>' + errMsg + '</p>');
+  }
+});
+
+// Endpoint para verificar estado en frontend
+app.get('/api/auth/status', (req, res) => {
+  res.json({ connected: !!ACCESS_TOKEN });
+});
+
+// ─────────────────────────────────────────────
 // Mention Flow API
 // ─────────────────────────────────────────────
 app.get('/api/mention-flow', (req, res) => {
@@ -3407,6 +3564,122 @@ app.post('/api/mention-flow', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Sincronización Histórica de Meta
+// ─────────────────────────────────────────────
+app.post('/api/sync-conversations', express.json(), async (req, res) => {
+  if (!supabase) return res.status(503).json({ error: 'Supabase no conectado' });
+  if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+  if (!INSTAGRAM_ACCOUNT_ID) return res.status(503).json({ error: 'No account ID configured' });
+  
+  try {
+    // 1. Obtener conversaciones
+    const convResponse = await axios.get(`https://graph.instagram.com/v26.0/me/conversations?platform=instagram`, {
+      params: { access_token: ACCESS_TOKEN }
+    });
+    
+    const conversations = convResponse.data.data || [];
+    let messagesSynced = 0;
+    
+    for (const conv of conversations) {
+      try {
+        // 2. Obtener mensajes de la conversación
+        const msgListRes = await axios.get(`https://graph.instagram.com/v26.0/${conv.id}`, {
+          params: { fields: 'messages', access_token: ACCESS_TOKEN }
+        });
+        
+        const messages = msgListRes.data.messages?.data || [];
+        
+        for (const msg of messages) {
+          try {
+            // 3. Obtener detalle del mensaje
+            const detailRes = await axios.get(`https://graph.instagram.com/v26.0/${msg.id}`, {
+              params: { fields: 'id,created_time,from,to,message', access_token: ACCESS_TOKEN }
+            });
+            
+            const detail = detailRes.data;
+            if (!detail || !detail.from) continue;
+            
+            // Determinar quién es el cliente
+            const isBot = String(detail.from.id).trim() === String(INSTAGRAM_ACCOUNT_ID).trim();
+            const customerId = isBot ? detail.to?.data?.[0]?.id : detail.from.id;
+            const customerName = isBot ? detail.to?.data?.[0]?.username : detail.from.username;
+            
+            if (!customerId) continue;
+            
+            // Guardar cliente en Supabase
+            await supabase
+              .from('customers')
+              .upsert({
+                instagram_id: customerId,
+                name: customerName || 'Desconocido',
+                platform: 'instagram'
+              }, { onConflict: 'instagram_id' });
+              
+            // Guardar mensaje en Supabase
+            await supabase
+              .from('messages')
+              .upsert({
+                message_id: detail.id,
+                customer_id: customerId,
+                direction: isBot ? 'outbound' : 'inbound',
+                text: detail.message || '',
+                timestamp: detail.created_time
+              }, { onConflict: 'message_id' });
+              
+            messagesSynced++;
+          } catch (e) {
+            console.error(`Error sync msg ${msg.id}:`, e.message);
+          }
+        }
+      } catch (e) {
+         console.error(`Error sync conv ${conv.id}:`, e.message);
+      }
+    }
+    
+    res.json({ success: true, conversations_checked: conversations.length, messages_synced: messagesSynced });
+  } catch (err) {
+    console.error('Error in sync-conversations:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to sync conversations' });
+  }
+});
+
+// ─────────────────────────────────────────────
+// Insights API — Métricas de Instagram
+// ─────────────────────────────────────────────
+app.get('/api/insights/profile', async (req, res) => {
+  if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+  try {
+    const response = await axios.get(`https://graph.instagram.com/v26.0/me`, {
+      params: { 
+        fields: 'id,username,name,followers_count,follows_count,media_count,profile_picture_url',
+        access_token: ACCESS_TOKEN 
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    console.error('Error in /api/insights/profile:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch profile insights' });
+  }
+});
+
+app.get('/api/insights/media', async (req, res) => {
+  if (!ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });
+  try {
+    const response = await axios.get(`https://graph.instagram.com/v26.0/me/media`, {
+      params: { 
+        fields: 'id,caption,media_type,media_url,thumbnail_url,like_count,comments_count,timestamp,permalink',
+        limit: 12,
+        access_token: ACCESS_TOKEN 
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    console.error('Error in /api/insights/media:', err?.response?.data || err.message);
+    res.status(500).json({ error: 'Failed to fetch media insights' });
   }
 });
 
@@ -3431,6 +3704,28 @@ app.get('/api/contacts', async (req, res) => {
     query = query.order('updated_at', { ascending: false }).range(Number(offset), Number(offset) + Number(limit) - 1);
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
+
+    // Enriquecer con conteo de mensajes y no leídos
+    if (data && data.length > 0) {
+      try {
+        const igIds = data.map(c => c.instagram_id);
+        const { data: msgStats } = await supabase.rpc('get_message_stats', { ig_ids: igIds });
+        if (msgStats) {
+          const statsMap = {};
+          for (const s of msgStats) statsMap[s.instagram_id] = s;
+          for (const contact of data) {
+            const st = statsMap[contact.instagram_id];
+            contact.message_count = st?.total || 0;
+            contact.unread_count = st?.unread || 0;
+            contact.last_message_at = st?.last_message_at || null;
+            contact.last_message_preview = st?.last_content || null;
+          }
+        }
+      } catch (e) {
+        console.warn('Stats de mensajes no disponibles:', e.message);
+      }
+    }
+
     res.json(data || []);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -3533,7 +3828,8 @@ if (!process.env.API_SECRET) {
 // ─────────────────────────────────────────────
 // Arranque del servidor
 // ─────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await loadAppConfig(); // Cargar token desde DB
   console.log(`🚀 CRM 2.0 Webhook escuchando en http://localhost:${PORT}/webhook`);
   console.log(`   Account ID : ${INSTAGRAM_ACCOUNT_ID}`);
   console.log(`   Verify Token: ${VERIFY_TOKEN}`);

@@ -187,6 +187,38 @@
         }
         .nav-bar a:hover { background: rgba(255,255,255,0.08); color: var(--text-main); }
         .nav-bar a.active { background: rgba(138, 43, 226, 0.15); color: #b175ff; }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn-connect {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #4f46e5, #8a2be2);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 99px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+        }
+
+        .btn-connect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(138, 43, 226, 0.4);
+        }
+        .btn-connect.connected {
+            background: rgba(32, 201, 151, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(32, 201, 151, 0.2);
+            box-shadow: none;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -200,11 +232,18 @@
                 <a href="/builder.html">Builder</a>
                 <a href="/ai-config.html">Configuración IA</a>
                 <a href="/contacts.html">Contactos</a>
+                <a href="/insights.html">Insights</a>
             </nav>
         </div>
-        <div class="status-badge">
-            <div class="pulse"></div>
-            Escuchando a Instagram API
+        <div class="header-right" style="display:flex; align-items:center; gap: 1rem;">
+            <a href="/auth/instagram" class="btn-connect" id="btn-connect">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                Conectar Instagram
+            </a>
+            <div class="status-badge" id="status-badge">
+                <div class="pulse"></div>
+                Escuchando a Instagram API
+            </div>
         </div>
     </header>
 
@@ -297,6 +336,22 @@
             // Mantenemos el error solo en la consola para no asustar al usuario visualmente.
             console.warn("La conexión en vivo se interrumpió temporalmente (EventSource). Reconectando de forma silenciosa...");
         };
+
+        // Setup SSE for Logs
+        setupEventSource();
+
+        // Verificamos el estado de autenticación OAuth
+        fetch('/api/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                const btnConnect = document.getElementById('btn-connect');
+                if (data.connected) {
+                    btnConnect.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Instagram Conectado';
+                    btnConnect.classList.add('connected');
+                }
+            })
+            .catch(console.error);
+
     </script>
 </body>
 </html>

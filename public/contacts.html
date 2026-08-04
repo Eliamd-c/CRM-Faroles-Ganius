@@ -5,14 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contactos - CRM 2.0</title>
   <link rel="stylesheet" href="contacts.css">
-  <!-- Google Fonts: Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
   <div class="app-container">
-    <!-- Navbar -->
     <nav class="navbar">
       <div class="nav-logo">
         <i class="fa-solid fa-robot"></i>
@@ -20,29 +17,48 @@
       </div>
       <ul class="nav-links">
         <li><a href="index.html">Dashboard</a></li>
-        <li><a href="flow-builder.html">Flow Builder</a></li>
+        <li><a href="builder.html">Flow Builder</a></li>
         <li><a href="ai-config.html">AI Config</a></li>
         <li><a href="contacts.html" class="active">Contactos</a></li>
+        <li><a href="insights.html">Insights</a></li>
       </ul>
       <div class="nav-user">
         <button id="logoutBtn" class="btn-secondary"><i class="fa-solid fa-right-from-bracket"></i> Salir</button>
       </div>
     </nav>
 
-    <!-- Main Content: Contacts Layout -->
     <main class="contacts-layout">
       <!-- Left Sidebar: Contact List -->
       <section class="contacts-sidebar">
         <div class="sidebar-header">
-          <h2>Suscriptores</h2>
+          <div class="sidebar-title-row">
+            <h2>Contactos</h2>
+            <span class="contact-count" id="contactCount">0</span>
+          </div>
           <div class="search-bar">
             <i class="fa-solid fa-search"></i>
-            <input type="text" id="contactSearch" placeholder="Buscar contacto...">
+            <input type="text" id="contactSearch" placeholder="Buscar por nombre, ID o tag...">
+          </div>
+          <div class="filter-row">
+            <select id="filterStatus" class="filter-select">
+              <option value="">Todos los estados</option>
+              <option value="open">Abierto</option>
+              <option value="closed">Cerrado</option>
+              <option value="pending">Pendiente</option>
+            </select>
+            <select id="filterTag" class="filter-select">
+              <option value="">Todos los tags</option>
+            </select>
+            <button class="btn-icon" id="btnSync" title="Sincronizar Meta">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+            <button class="btn-icon" id="btnExport" title="Exportar CSV">
+              <i class="fa-solid fa-download"></i>
+            </button>
           </div>
         </div>
         <div class="contacts-list" id="contactsList">
-          <!-- Contacts will be rendered here dynamically -->
-          <div class="loading-contacts">Cargando...</div>
+          <div class="loading-contacts"><i class="fa-solid fa-spinner fa-spin"></i> Cargando...</div>
         </div>
       </section>
 
@@ -60,7 +76,6 @@
           </div>
         </div>
         <div class="chat-messages" id="chatMessages">
-          <!-- Messages will appear here -->
           <div class="empty-chat-state">
             <i class="fa-regular fa-comments"></i>
             <p>Selecciona un contacto para ver el historial de mensajes</p>
@@ -76,14 +91,15 @@
 
       <!-- Right Sidebar: Contact Profile -->
       <section class="profile-sidebar" id="profileSidebar">
-        <div class="profile-empty">
+        <div class="profile-empty" id="profileEmpty">
+          <i class="fa-regular fa-user"></i>
           <p>Sin contacto seleccionado</p>
         </div>
         <div class="profile-content hidden" id="profileContent">
-          <div class="profile-avatar">
+          <div class="profile-avatar" id="profileAvatar">
             <i class="fa-solid fa-user-circle"></i>
           </div>
-          <h2 id="profileName">Nombre del Cliente</h2>
+          <h2 id="profileName">Nombre</h2>
           <p class="profile-ig">@<span id="profileIgId">instagram_id</span></p>
 
           <div class="profile-section">
@@ -92,20 +108,44 @@
           </div>
 
           <div class="profile-section">
-            <h3>Etiquetas (Tags)</h3>
-            <div class="tags-container" id="profileTags">
-              <!-- Tags here -->
+            <h3>Estado del Contacto</h3>
+            <select class="profile-status-select" id="profileStatusSelect">
+              <option value="open">Abierto</option>
+              <option value="pending">Pendiente</option>
+              <option value="closed">Cerrado</option>
+            </select>
+          </div>
+
+          <div class="profile-section">
+            <h3>Etiquetas</h3>
+            <div class="tags-container" id="profileTags"></div>
+            <div class="tag-add-row">
+              <input type="text" id="newTagInput" placeholder="Nuevo tag..." class="tag-input">
+              <button class="btn-icon-sm" id="btnAddTag"><i class="fa-solid fa-plus"></i></button>
             </div>
           </div>
 
           <div class="profile-section">
-            <h3>Última Actividad</h3>
-            <p class="text-muted" id="profileLastActive">-</p>
+            <h3>Actividad</h3>
+            <div class="profile-stats">
+              <div class="stat-item">
+                <span class="stat-value" id="profileMsgCount">0</span>
+                <span class="stat-label">Mensajes</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="profileCreatedAt">-</span>
+                <span class="stat-label">Primer contacto</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="profileLastActive">-</span>
+                <span class="stat-label">Ultima actividad</span>
+              </div>
+            </div>
           </div>
-          
-          <div class="profile-section">
-            <h3>Campos Personalizados</h3>
-            <pre class="custom-fields-json" id="profileFields">{}</pre>
+
+          <div class="profile-section" id="profileFieldsSection">
+            <h3>Datos Recopilados</h3>
+            <div class="fields-list" id="profileFields"></div>
           </div>
         </div>
       </section>
