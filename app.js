@@ -844,6 +844,12 @@ app.get('/api/insights/media', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════
+// FLOW BUILDER API (Clean Architecture)
+// ═══════════════════════════════════════════════
+const flowRoutes = require('./src/routes/flowRoutes');
+app.use('/api/flows-builder', flowRoutes(di));
+
+// ═══════════════════════════════════════════════
 // ERROR HANDLER & STARTUP
 // ═══════════════════════════════════════════════
 app.use((err, req, res, next) => {

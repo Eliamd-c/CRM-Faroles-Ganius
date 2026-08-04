@@ -5,12 +5,19 @@ const MetaGateway = require('../adapters/gateways/MetaGateway');
 const OpenAiGateway = require('../adapters/gateways/OpenAiGateway');
 const FlowGateway = require('../adapters/gateways/FlowGateway');
 const SupabaseGateway = require('../adapters/gateways/SupabaseGateway');
+const FlowRepository = require('../adapters/gateways/FlowRepository');
 
 const HandleIncomingMessageUseCase = require('../use-cases/HandleIncomingMessageUseCase');
 const HandleCommentUseCase = require('../use-cases/HandleCommentUseCase');
 const HandlePostbackUseCase = require('../use-cases/HandlePostbackUseCase');
 const HandleMentionUseCase = require('../use-cases/HandleMentionUseCase');
 const HandleAttachmentsUseCase = require('../use-cases/HandleAttachmentsUseCase');
+
+const CreateFlowUseCase = require('../use-cases/CreateFlowUseCase');
+const UpdateFlowUseCase = require('../use-cases/UpdateFlowUseCase');
+const DeleteFlowUseCase = require('../use-cases/DeleteFlowUseCase');
+const TestFlowUseCase = require('../use-cases/TestFlowUseCase');
+const ExportFlowUseCase = require('../use-cases/ExportFlowUseCase');
 
 function bootstrap(dependencies) {
   const { state, flowsConfig, supabaseClient, broadcastLog, recentReplies } = dependencies;
@@ -28,8 +35,9 @@ function bootstrap(dependencies) {
   const openaiGateway = new OpenAiGateway();
   const flowGateway = new FlowGateway();
   const supabaseGateway = new SupabaseGateway(supabaseClient);
+  const flowRepository = new FlowRepository(supabaseClient);
 
-  console.log('[Bootstrap] ✅ Gateways initialized (4/4)');
+  console.log('[Bootstrap] ✅ Gateways initialized (5/5)');
 
   // ============================================
   // 2. INSTANTIATE USE-CASES
@@ -79,7 +87,28 @@ function bootstrap(dependencies) {
     broadcastLog
   });
 
-  console.log('[Bootstrap] ✅ UseCases initialized (5/5)');
+  const createFlowUseCase = new CreateFlowUseCase({
+    flowRepository
+  });
+
+  const updateFlowUseCase = new UpdateFlowUseCase({
+    flowRepository
+  });
+
+  const deleteFlowUseCase = new DeleteFlowUseCase({
+    flowRepository
+  });
+
+  const testFlowUseCase = new TestFlowUseCase({
+    flowRepository,
+    metaGateway
+  });
+
+  const exportFlowUseCase = new ExportFlowUseCase({
+    flowRepository
+  });
+
+  console.log('[Bootstrap] ✅ UseCases initialized (10/10)');
 
   // ============================================
   // 3. RETURN DI CONTAINER
@@ -90,7 +119,8 @@ function bootstrap(dependencies) {
       metaGateway,
       openaiGateway,
       flowGateway,
-      supabaseGateway
+      supabaseGateway,
+      flowRepository
     },
 
     // Use Cases
@@ -99,15 +129,27 @@ function bootstrap(dependencies) {
       handleCommentUseCase,
       handlePostbackUseCase,
       handleMentionUseCase,
-      handleAttachmentsUseCase
+      handleAttachmentsUseCase,
+      createFlowUseCase,
+      updateFlowUseCase,
+      deleteFlowUseCase,
+      testFlowUseCase,
+      exportFlowUseCase
     },
 
-    // Convenience shortcuts
+    // Convenience shortcuts (message handlers)
     handleMessage: handleIncomingMessageUseCase,
     handleComment: handleCommentUseCase,
     handlePostback: handlePostbackUseCase,
     handleMention: handleMentionUseCase,
-    handleAttachments: handleAttachmentsUseCase
+    handleAttachments: handleAttachmentsUseCase,
+
+    // Convenience shortcuts (flow operations)
+    createFlow: createFlowUseCase,
+    updateFlow: updateFlowUseCase,
+    deleteFlow: deleteFlowUseCase,
+    testFlow: testFlowUseCase,
+    exportFlow: exportFlowUseCase
   };
 }
 
