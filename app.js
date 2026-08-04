@@ -17,6 +17,10 @@ const handlers = require('./src/handlers/webhook.handlers');
 // ─── Clean Architecture Bootstrap ───
 const bootstrap = require('./src/infrastructure/bootstrap');
 
+// ─── Status Monitor ───
+const StatusMonitor = require('./src/services/status-monitor');
+const statusMonitor = new StatusMonitor();
+
 // ─── Inicialización de estado ───
 const { PAGE_ACCESS_TOKEN, VERIFY_TOKEN, PORT = 3000, INSTAGRAM_ACCESS_TOKEN } = process.env;
 state.ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
@@ -205,15 +209,30 @@ app.post('/webhook', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════
-// HEALTH CHECK ENDPOINT
+// HEALTH CHECK & STATUS ENDPOINTS
 // ═══════════════════════════════════════════════
+
+// Status Endpoint - Real connection status
+app.get('/api/status', (req, res) => {
+  const status = statusMonitor.getHealthCheck();
+  const statusCode = status.healthy ? 200 : 503;
+  res.status(statusCode).json(status);
+});
+
+// Detailed Status (Admin)
+app.get('/api/status/detailed', (req, res) => {
+  res.json(statusMonitor.getFullStatus());
+});
 
 // Health Check Endpoint
 app.get('/health/builder', (req, res) => {
+  const status = statusMonitor.getHealthCheck();
   res.status(200).json({
     status: 'HEALTHY',
     timestamp: new Date().toISOString(),
-    message: 'Clean architecture running'
+    message: status.message,
+    configured: status.details.configured,
+    connected: status.details.instagramConnected
   });
 });
 

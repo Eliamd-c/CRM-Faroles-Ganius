@@ -72,9 +72,26 @@
             font-weight: 500;
             padding: 0.5rem 1rem;
             border-radius: 99px;
+            transition: all 0.3s ease;
+            cursor: help;
+        }
+
+        .status-badge.connected {
             background: rgba(32, 201, 151, 0.1);
             color: var(--success);
             border: 1px solid rgba(32, 201, 151, 0.2);
+        }
+
+        .status-badge.warning {
+            background: rgba(255, 193, 7, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(255, 193, 7, 0.2);
+        }
+
+        .status-badge.error {
+            background: rgba(250, 82, 82, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(250, 82, 82, 0.2);
         }
 
         .pulse {
@@ -319,17 +336,54 @@
         // Setup SSE for Logs
         setupEventSource();
 
-        // Verificamos el estado de autenticación OAuth
-        fetch('/api/auth/status')
-            .then(res => res.json())
-            .then(data => {
-                const btnConnect = document.getElementById('btn-connect');
-                if (data.connected) {
-                    btnConnect.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Instagram Conectado';
-                    btnConnect.classList.add('connected');
+        // Verificar estado real del sistema
+        async function updateConnectionStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                const badge = document.querySelector('.status-badge');
+                const statusText = document.getElementById('status-text');
+
+                if (!badge || !statusText) return;
+
+                // Limpiar clases previas
+                badge.className = 'status-badge';
+
+                // Aplicar estado basado en diagnóstico real
+                if (!status.details.configured) {
+                    badge.className += ' error';
+                    statusText.textContent = '🔴 No configurado - .env incompleto';
+                    badge.title = 'Faltan variables en .env: PAGE_ACCESS_TOKEN, VERIFY_TOKEN, API_SECRET, INSTAGRAM_ACCOUNT_ID';
+                } else if (!status.details.webhookReady) {
+                    badge.className += ' warning';
+                    statusText.textContent = '🟡 Webhook no configurado';
+                    badge.title = 'Verifica VERIFY_TOKEN y META_APP_SECRET en .env';
+                } else if (!status.details.instagramConnected) {
+                    badge.className += ' warning';
+                    statusText.textContent = '🟡 Instagram desconectado';
+                    badge.title = 'Verifica PAGE_ACCESS_TOKEN en .env';
+                } else if (!status.details.monitorConnected) {
+                    badge.className += ' warning';
+                    statusText.textContent = '🟡 Monitor esperando conexión';
+                    badge.title = 'Abre esta página en el navegador para conectar Monitor';
+                } else {
+                    badge.className += ' connected';
+                    statusText.textContent = '🟢 Conectado y funcionando';
+                    badge.title = 'Listo para recibir mensajes';
                 }
-            })
-            .catch(console.error);
+            } catch (err) {
+                console.error('Error fetching status:', err);
+                const statusText = document.getElementById('status-text');
+                if (statusText) statusText.textContent = '⚠️ Error verificando estado';
+            }
+        }
+
+        // Verificar estado inicial
+        updateConnectionStatus();
+
+        // Verificar estado cada 5 segundos
+        setInterval(updateConnectionStatus, 5000);
 
     </script>
     <script src="/components/navbar.js"></script>

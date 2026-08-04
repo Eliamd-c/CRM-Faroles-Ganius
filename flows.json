@@ -1,4 +1,53 @@
 {
+  "name": "Test Flow",
+  "keywords": [
+    "test"
+  ],
+  "matchType": "contains",
+  "steps": [
+    {
+      "type": "text",
+      "message": "Hello world"
+    }
+  ],
+  "enabled": true,
+  "defaultFlow": {
+    "steps": [
+      {
+        "type": "ai_agent",
+        "system_prompt": "",
+        "ignore_master_context": false
+      }
+    ]
+  },
+  "welcomeFlow": {
+    "steps": [
+      {
+        "type": "text",
+        "message": "¡Qué bendición! Eres esa puerta que necesitamos abrir. 🚪✨\n\nComo viste en el video, nuestra meta en esta primera etapa es que los faroles lleguen a cada parroquia del país a un precio mucho más accesible para la comunidad.\n\nPara hacerlo posible, hemos diseñado una herramienta exclusiva: un Kit de Muestra para Aliados.\n\n¿Cómo te gustaría sumarte a esta iniciativa? 👇"
+      },
+      {
+        "type": "delay",
+        "seconds": 1
+      },
+      {
+        "type": "buttons",
+        "buttons": [
+          {
+            "type": "postback",
+            "title": "🤝 Quiero ser Aliado",
+            "payload": "AGENTE_SOY_ALIADO"
+          },
+          {
+            "type": "postback",
+            "title": "🏡 Busco faroles para mi hogar",
+            "payload": "AGENTE_SOY_DETAL"
+          }
+        ],
+        "message": "¿Cuál es tu camino? 👇"
+      }
+    ]
+  },
   "flows": [
     {
       "id": "flow_price",
@@ -940,42 +989,5 @@
       "createdAt": "2026-08-04T20:21:28.851Z",
       "updatedAt": "2026-08-04T20:21:29.283Z"
     }
-  ],
-  "defaultFlow": {
-    "steps": [
-      {
-        "type": "ai_agent",
-        "system_prompt": "",
-        "ignore_master_context": false
-      }
-    ]
-  },
-  "welcomeFlow": {
-    "steps": [
-      {
-        "type": "text",
-        "message": "¡Qué bendición! Eres esa puerta que necesitamos abrir. 🚪✨\n\nComo viste en el video, nuestra meta en esta primera etapa es que los faroles lleguen a cada parroquia del país a un precio mucho más accesible para la comunidad.\n\nPara hacerlo posible, hemos diseñado una herramienta exclusiva: un Kit de Muestra para Aliados.\n\n¿Cómo te gustaría sumarte a esta iniciativa? 👇"
-      },
-      {
-        "type": "delay",
-        "seconds": 1
-      },
-      {
-        "type": "buttons",
-        "buttons": [
-          {
-            "type": "postback",
-            "title": "🤝 Quiero ser Aliado",
-            "payload": "AGENTE_SOY_ALIADO"
-          },
-          {
-            "type": "postback",
-            "title": "🏡 Busco faroles para mi hogar",
-            "payload": "AGENTE_SOY_DETAL"
-          }
-        ],
-        "message": "¿Cuál es tu camino? 👇"
-      }
-    ]
-  }
+  ]
 }
