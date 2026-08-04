@@ -177,12 +177,12 @@ app.post('/webhook', async (req, res) => {
       else if (event.message?.text || event.message?.quick_reply) {
         // ✅ PHASE 3: Clean Architecture (Direct handler execution)
         try {
-          await di.handleIncomingMessage.execute({
+          await di.handleMessage.execute({
             senderId: event.sender.id,
-            text: event.message?.text || '',
-            quickReply: event.message?.quick_reply,
-            mid: event.message?.mid,
-            timestamp: event.timestamp
+            text: event.message?.text || event.message?.quick_reply?.payload || '',
+            storyMention: false,
+            hasAttachments: !!event.message?.attachments,
+            event: event
           });
         } catch (err) {
           console.error('[Handler Message] Error:', err.message);
