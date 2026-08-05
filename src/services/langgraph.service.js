@@ -7,6 +7,7 @@ const { PostgresSaver } = require('@langchain/langgraph-checkpoint-postgres');
 const { Pool } = require('pg');
 const supabase = require('../../db');
 const { state } = require('../shared');
+const meta = require('./meta.service');
 
 // ==========================================
 // 1. ESTADO DE VENTAS (State Pattern)
@@ -25,7 +26,12 @@ const SALES_STATES = {
 };
 
 // ==========================================
-// 2. CONFIGURACIÓN DEL LLM
+// 2. HERRAMIENTAS DEL AGENTE (Command Pattern)
+// ==========================================
+const commandRegistry = require('../domain/commands/CommandRegistry');
+
+// ==========================================
+// 3. CONFIGURACIÓN DEL LLM
 // ==========================================
 const llm = new ChatOpenAI({
   modelName: 'gpt-4o-mini',
@@ -33,7 +39,7 @@ const llm = new ChatOpenAI({
 });
 
 // ==========================================
-// 3. DEFINICIÓN DEL GRAFO (con funnel_stage)
+// 4. DEFINICIÓN DEL GRAFO (State + Command Pattern)
 // ==========================================
 
 const graphState = {
@@ -56,6 +62,10 @@ const graphState = {
   funnel_stage: {
     value: (x, y) => y || x,
     default: () => 'ONBOARDING'
+  },
+  tool_calls: {
+    value: (x, y) => y || x,
+    default: () => []
   }
 };
 
@@ -157,8 +167,23 @@ async function respondNode(graphData) {
     customer: graphData.customer
   });
 
-  const response = await llm.invoke(prompt);
-  return { messages: [{ role: 'assistant', content: response.content }] };
+  // Obtener las herramientas disponibles del CommandRegistry
+  const tools = commandRegistry.getAllToolSchemas();
+
+  // Invocar al LLM CON herramientas (OpenAI Function Calling)
+  const response = await llm.invoke(prompt, { tools });
+
+  // Si el LLM quiere usar una herramienta, guardar las tool_calls
+  if (response.additional_kwargs?.tool_calls?.length > 0) {
+    const toolCalls = response.additional_kwargs.tool_calls;
+    console.log(`[RespondNode] 🔧 LLM solicita ${toolCalls.length} herramienta(s): ${toolCalls.map(t => t.function.name).join(', ')}`);
+    return {
+      messages: [{ role: 'assistant', content: response.content || '' }],
+      tool_calls: toolCalls
+    };
+  }
+
+  return { messages: [{ role: 'assistant', content: response.content }], tool_calls: [] };
 }
 
 // ─── Router: Decidir si responder o escalar ───
@@ -167,19 +192,58 @@ function routerNode(graphData) {
   return "RESPOND";
 }
 
+// ─── Router post-respuesta: Decidir si ejecutar herramientas o terminar ───
+function postRespondRouter(graphData) {
+  if (graphData.tool_calls && graphData.tool_calls.length > 0) return "TOOLS";
+  return "END_GRAPH";
+}
+
+// ─── Nodo 3: Ejecutar Herramientas (Command Pattern) ───
+async function toolNode(graphData) {
+  const toolCalls = graphData.tool_calls || [];
+  
+  for (const toolCall of toolCalls) {
+    const fnName = toolCall.function?.name;
+    let fnArgs = {};
+    try {
+      fnArgs = JSON.parse(toolCall.function?.arguments || '{}');
+    } catch (e) {
+      console.error(`[ToolNode] Error parseando argumentos de ${fnName}:`, e.message);
+      continue;
+    }
+
+    // Ejecutar el Comando correspondiente (Command Pattern)
+    const context = {
+      senderId: graphData.customer?.instagram_id || 'unknown',
+      customer: graphData.customer,
+      meta,
+      supabase
+    };
+
+    await commandRegistry.execute(fnName, fnArgs, context);
+  }
+
+  return { tool_calls: [] }; // Limpiar tool_calls tras la ejecución
+}
+
 // ─── Compilar el Grafo ───
 const workflow = new StateGraph({ channels: graphState })
   .addNode("analyzeIntent", analyzeIntentNode)
   .addNode("respond", respondNode)
+  .addNode("tools", toolNode)
   .addEdge("__start__", "analyzeIntent")
   .addConditionalEdges("analyzeIntent", routerNode, {
     "END_GRAPH": END,
     "RESPOND": "respond"
   })
-  .addEdge("respond", END);
+  .addConditionalEdges("respond", postRespondRouter, {
+    "TOOLS": "tools",
+    "END_GRAPH": END
+  })
+  .addEdge("tools", END);
 
 // ==========================================
-// 4. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
+// 5. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
 // ==========================================
 class LangGraphService {
   constructor() {
