@@ -1,6 +1,6 @@
 const { StateGraph, END } = require('@langchain/langgraph');
 const { ChatOpenAI } = require('@langchain/openai');
-const { BaseCheckpointSaver } = require('@langchain/langgraph/dist/checkpoints/base');
+const { BaseCheckpointSaver } = require('@langchain/langgraph-checkpoint');
 const supabase = require('../../db');
 
 // ==========================================
@@ -128,7 +128,7 @@ async function respondNode(state) {
     ${context}
 
     Historial reciente de la conversación:
-    ${state.messages.slice(-4).map(m => \`[\${m.role}]: \${m.content}\`).join('\n')}
+    ${state.messages.slice(-4).map(m => `[${m.role}]: ${m.content}`).join('\n')}
 
     Intención detectada: ${state.intent}
     
