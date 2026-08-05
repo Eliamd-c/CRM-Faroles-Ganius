@@ -16,11 +16,14 @@ class CreateFlowUseCase {
 
     this._validateSteps(steps);
 
+    // NUEVO: Si el primer paso es ad_trigger, marcar como flujo de anuncio
+    const isAdFlow = steps[0]?.type === 'ad_trigger';
     const flowData = {
       name: name.trim(),
       keywords: (keywords || []).map(k => k.toLowerCase().trim()).filter(Boolean),
       matchType: matchType || 'contains',
-      steps
+      steps,
+      isAdFlow // NUEVO
     };
 
     const flow = await this.flowRepository.create(flowData);
@@ -28,33 +31,69 @@ class CreateFlowUseCase {
     return {
       status: 'success',
       flow,
-      message: `Flujo "${flow.name}" creado exitosamente`
+      isAdFlow,
+      message: isAdFlow
+        ? `Flujo de anuncio "${flow.name}" creado exitosamente`
+        : `Flujo "${flow.name}" creado exitosamente`
     };
   }
 
   _validateSteps(steps) {
+    // ACTUALIZADO: Agregar 'ad_trigger' a tipos válidos
     const validTypes = [
       'text', 'buttons', 'template', 'card', 'carousel', 'gallery',
       'audio', 'video', 'file', 'delay', 'input', 'condition',
-      'randomizer', 'goto', 'action', 'ai_agent'
+      'randomizer', 'goto', 'action', 'ai_agent',
+      'ad_trigger'  // NUEVO
     ];
 
-    for (const step of steps) {
+    for (const [index, step] of steps.entries()) {
       if (!step.type || !validTypes.includes(step.type)) {
-        throw new Error(`Tipo de paso inválido: ${step.type}`);
+        throw new Error(`Paso ${index}: tipo inválido: ${step.type}`);
       }
 
-      if (step.type === 'text' && !step.message) {
-        throw new Error('Paso de texto debe tener un mensaje');
+      // NUEVO: ad_trigger solo permitido como primer paso
+      if (step.type === 'ad_trigger' && index !== 0) {
+        throw new Error('Ad Trigger debe ser el primer paso del flujo');
       }
 
-      if (step.type === 'buttons' && (!step.message || !Array.isArray(step.buttons))) {
-        throw new Error('Paso de botones debe tener mensaje y botones');
-      }
+      // Validaciones específicas por tipo
+      this._validateStepByType(step, index);
+    }
+  }
 
-      if (step.type === 'condition' && !step.field) {
-        throw new Error('Paso de condición debe especificar un campo');
-      }
+  /**
+   * Validar cada paso según su tipo
+   */
+  _validateStepByType(step, index) {
+    switch (step.type) {
+      case 'text':
+        if (!step.message) throw new Error(`Paso ${index}: text requiere "message"`);
+        break;
+      case 'buttons':
+        if (!step.message || !Array.isArray(step.buttons)) {
+          throw new Error(`Paso ${index}: buttons requiere "message" y "buttons"`);
+        }
+        break;
+      case 'ad_trigger':
+        if (!step.message) throw new Error(`Paso ${index}: ad_trigger requiere "message"`);
+        if (!Array.isArray(step.quick_replies)) {
+          throw new Error(`Paso ${index}: ad_trigger requiere "quick_replies"`);
+        }
+        if (step.quick_replies.length === 0) {
+          throw new Error(`Paso ${index}: ad_trigger requiere al menos 1 botón`);
+        }
+        if (step.quick_replies.length > 13) {
+          throw new Error(`Paso ${index}: ad_trigger máximo 13 botones`);
+        }
+        if (step.message.includes('{{') || step.message.includes('{username}')) {
+          throw new Error(`Paso ${index}: ad_trigger no permite variables en mensaje`);
+        }
+        break;
+      case 'condition':
+        if (!step.field) throw new Error(`Paso ${index}: condition requiere "field"`);
+        break;
+      // ... otros validaciones
     }
   }
 }
