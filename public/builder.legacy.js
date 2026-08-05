@@ -86,7 +86,8 @@ function syncAllNodeStateToDrawflow() {
     _video: nodeVideoState,
     _file: nodeFileState,
     _delay: nodeDelayState,
-    _goto: nodeGotoState
+    _goto: nodeGotoState,
+    _ad: nodeAdTriggerState
   };
   for (const key in stateMap) {
     const store = stateMap[key];
@@ -121,6 +122,7 @@ function rehydrateAllNodeVisuals() {
       else if (node.name === 'delay' && node.data._delay) { nodeDelayState[nodeId] = JSON.parse(node.data._delay); renderDelayNode(nodeId); }
       else if (node.name === 'goto' && node.data._goto) { nodeGotoState[nodeId] = JSON.parse(node.data._goto); renderGotoNode(nodeId); }
       else if (node.name === 'ai_agent' && node.data._ai) { nodeAiAgentState[nodeId] = JSON.parse(node.data._ai); renderAiAgentNode(nodeId); }
+      else if (node.name === 'ad_trigger' && node.data._ad) { nodeAdTriggerState[nodeId] = JSON.parse(node.data._ad); renderAdTriggerNode(nodeId); }
     } catch (e) { console.warn('rehydrate: error en nodo', nodeId, e); }
   }
 }
@@ -630,6 +632,8 @@ function openInspector(nodeId) {
     renderGotoInspector(nodeId);
   } else if (node.name === 'ai_agent') {
     renderAiAgentInspector(nodeId);
+  } else if (node.name === 'ad_trigger') {
+    renderAdTriggerInspector(nodeId);
   } else {
     document.getElementById('config-title').innerText = 'Inspector';
     document.getElementById('config-body').innerHTML = '<p style="color:var(--text-muted); font-size:13px;">No hay configuraciones extra para este nodo.</p>';
@@ -3103,4 +3107,161 @@ window.renderAdTriggerNode = function(nodeId) {
   } else {
     container.innerHTML = `<em style="color:#ef4444; font-size:11px;">⚠️ Sin Configurar</em>`;
   }
+};
+
+window.renderAdTriggerInspector = function(nodeId) {
+  document.getElementById('config-title').innerText = '📢 Disparador de Anuncios Instagram';
+
+  const state = nodeAdTriggerState[nodeId] || { message: '', quick_replies: [], linkedFlowId: '' };
+  const quickReplies = state.quick_replies || [];
+
+  let html = `
+    <div style="background: linear-gradient(135deg, #ec4899 0%, #f97316 100%); padding: 15px; border-radius: 8px; color: white; margin-bottom: 15px;">
+      <h3 style="margin:0 0 5px 0; font-size:14px; display:flex; align-items:center; gap:5px;">📢 Disparador de Anuncios Instagram</h3>
+      <p style="margin:0; font-size:12px; opacity:0.9;">Configura el mensaje de bienvenida y los botones que aparecerán cuando alguien haga clic en tu anuncio de Instagram.</p>
+    </div>
+
+    <!-- Mensaje -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+      <label class="cfg-label">
+        <span>💬 Mensaje de Bienvenida (Requerido)</span>
+        <span style="color:#ef4444; font-size:11px;">Máx 2000 caracteres</span>
+      </label>
+      <textarea id="ad-message" class="cfg-input" maxlength="2000" style="height: 100px; resize:vertical;"
+        placeholder="Escribe el mensaje que verá el usuario...">${state.message}</textarea>
+      <p style="font-size:11px; color:#ef4444;">⚠️ Las variables {{username}} no están permitidas en este campo (limitación de Meta)</p>
+    </div>
+
+    <!-- Botones -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+      <label class="cfg-label">
+        <span>🔘 Botones de Respuesta Rápida (1-13)</span>
+        <span style="color:#8b5cf6; font-size:11px;">Máx 13</span>
+      </label>
+      <div id="ad-quick-replies-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px;">
+  `;
+
+  // Mostrar botones existentes
+  quickReplies.forEach((qr, idx) => {
+    html += `
+      <div style="display: flex; gap: 8px; align-items: flex-end;">
+        <input type="text" class="cfg-input" maxlength="20" placeholder="Título (máx 20)" value="${qr.title}"
+          style="flex: 1;" onchange="window.updateAdQuickReply('${nodeId}', ${idx}, 'title', this.value)">
+        <input type="text" class="cfg-input" maxlength="1000" placeholder="Payload (máx 1000)" value="${qr.payload}"
+          style="flex: 1;" onchange="window.updateAdQuickReply('${nodeId}', ${idx}, 'payload', this.value)">
+        <button onclick="window.removeAdQuickReply('${nodeId}', ${idx})" style="padding: 6px 10px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">×</button>
+      </div>
+    `;
+  });
+
+  html += `
+      </div>
+      ${quickReplies.length < 13 ? `<button onclick="window.addAdQuickReply('${nodeId}')" style="padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; width: 100%;">+ Agregar Botón</button>` : '<p style="font-size:11px; color:#ef4444; margin:0;">Máximo de botones alcanzado (13)</p>'}
+    </div>
+
+    <!-- Flujo Vinculado -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+      <label class="cfg-label">
+        <span>🔗 Flujo Vinculado (Opcional)</span>
+        <span style="color:#8b5cf6; font-size:11px;">Para ejecutar después del anuncio</span>
+      </label>
+      <select id="ad-linked-flow" class="cfg-input" onchange="window.updateAdLinkedFlow('${nodeId}', this.value)">
+        <option value="">Sin flujo vinculado</option>
+      </select>
+    </div>
+
+    <button class="btn-primary" onclick="saveAdTriggerConfig('${nodeId}')" style="width:100%;">💾 Guardar Configuración</button>
+  `;
+
+  document.getElementById('config-body').innerHTML = html;
+
+  // Cargar flujos disponibles
+  const flowsConfig = window.editor?.getFlow?.() || { flows: [] };
+  const select = document.getElementById('ad-linked-flow');
+  if (select) {
+    (state.flows || []).forEach(flow => {
+      const opt = document.createElement('option');
+      opt.value = flow.id;
+      opt.textContent = flow.name;
+      if (flow.id === state.linkedFlowId) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+};
+
+window.addAdQuickReply = function(nodeId) {
+  const state = nodeAdTriggerState[nodeId] || { message: '', quick_replies: [] };
+  if (!state.quick_replies) state.quick_replies = [];
+  if (state.quick_replies.length < 13) {
+    state.quick_replies.push({ title: '', payload: '' });
+    window.renderAdTriggerInspector(nodeId);
+  }
+};
+
+window.removeAdQuickReply = function(nodeId, idx) {
+  const state = nodeAdTriggerState[nodeId];
+  if (state && state.quick_replies) {
+    state.quick_replies.splice(idx, 1);
+    window.renderAdTriggerInspector(nodeId);
+  }
+};
+
+window.updateAdQuickReply = function(nodeId, idx, field, value) {
+  const state = nodeAdTriggerState[nodeId];
+  if (state && state.quick_replies && state.quick_replies[idx]) {
+    state.quick_replies[idx][field] = value;
+  }
+};
+
+window.updateAdLinkedFlow = function(nodeId, flowId) {
+  const state = nodeAdTriggerState[nodeId];
+  if (state) {
+    state.linkedFlowId = flowId;
+  }
+};
+
+window.saveAdTriggerConfig = function(nodeId) {
+  const message = document.getElementById('ad-message')?.value.trim() || '';
+
+  if (!message) {
+    if (typeof Toast !== 'undefined') Toast.error('El mensaje es requerido');
+    return;
+  }
+
+  if (message.length > 2000) {
+    if (typeof Toast !== 'undefined') Toast.error('El mensaje no puede exceder 2000 caracteres');
+    return;
+  }
+
+  const state = nodeAdTriggerState[nodeId];
+  if (!state || !state.quick_replies || state.quick_replies.length === 0) {
+    if (typeof Toast !== 'undefined') Toast.error('Necesitas al menos 1 botón de respuesta rápida');
+    return;
+  }
+
+  if (state.quick_replies.length > 13) {
+    if (typeof Toast !== 'undefined') Toast.error('Máximo 13 botones permitidos');
+    return;
+  }
+
+  // Validar que cada botón tenga título y payload
+  for (let i = 0; i < state.quick_replies.length; i++) {
+    const qr = state.quick_replies[i];
+    if (!qr.title || !qr.payload) {
+      if (typeof Toast !== 'undefined') Toast.error(`Botón ${i + 1}: Necesita título y payload`);
+      return;
+    }
+    if (qr.title.length > 20) {
+      if (typeof Toast !== 'undefined') Toast.error(`Botón ${i + 1}: Título no puede exceder 20 caracteres`);
+      return;
+    }
+  }
+
+  state.message = message;
+  state.linkedFlowId = document.getElementById('ad-linked-flow')?.value || '';
+
+  // Actualizar preview del nodo
+  window.renderAdTriggerNode(nodeId);
+
+  if (typeof Toast !== 'undefined') Toast.success('✅ Configuración guardada');
 };
