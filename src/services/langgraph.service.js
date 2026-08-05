@@ -1,3 +1,6 @@
+if (typeof crypto === 'undefined') {
+  global.crypto = require('crypto');
+}
 const { StateGraph, END } = require('@langchain/langgraph');
 const { ChatOpenAI } = require('@langchain/openai');
 const { PostgresSaver } = require('@langchain/langgraph-checkpoint-postgres');
