@@ -31,7 +31,12 @@ const SALES_STATES = {
 const commandRegistry = require('../domain/commands/CommandRegistry');
 
 // ==========================================
-// 3. CONFIGURACIÓN DEL LLM
+// 3. RESILIENCIA (Circuit Breaker Pattern)
+// ==========================================
+const { openAICircuitBreaker } = require('../utils/CircuitBreaker');
+
+// ==========================================
+// 4. CONFIGURACIÓN DEL LLM
 // ==========================================
 const llm = new ChatOpenAI({
   modelName: 'gpt-4o-mini',
@@ -39,7 +44,7 @@ const llm = new ChatOpenAI({
 });
 
 // ==========================================
-// 4. DEFINICIÓN DEL GRAFO (State + Command Pattern)
+// 5. DEFINICIÓN DEL GRAFO (State + Command Pattern)
 // ==========================================
 
 const graphState = {
@@ -74,8 +79,12 @@ async function analyzeIntentNode(graphData) {
   const lastMessage = graphData.messages[graphData.messages.length - 1];
   const currentStage = graphData.funnel_stage || 'ONBOARDING';
   
-  // Pedir al LLM que clasifique la intención Y sugiera si avanzar de etapa
-  const response = await llm.invoke(`Analiza este mensaje de un cliente: "${lastMessage.content}".
+  let intent = 'GENERAL';
+  let shouldAdvance = false;
+  
+  try {
+    // Usar Circuit Breaker para proteger a OpenAI
+    const response = await openAICircuitBreaker.fire(() => llm.invoke(`Analiza este mensaje de un cliente: "${lastMessage.content}".
 
 Etapa actual del embudo de ventas: ${currentStage}
 
@@ -92,21 +101,18 @@ Reglas:
 - GENERAL: cualquier otra cosa.
 - should_advance: true si la conversación ya maduró lo suficiente para pasar a la siguiente etapa del embudo.
 
-Devuelve SOLO el JSON, sin texto adicional.`);
+Devuelve SOLO el JSON, sin texto adicional.`));
 
-  let intent = 'GENERAL';
-  let shouldAdvance = false;
-  
-  try {
     const parsed = JSON.parse(response.content.trim());
     intent = (parsed.intent || 'GENERAL').toUpperCase();
     shouldAdvance = parsed.should_advance === true;
   } catch (e) {
-    // Fallback si el LLM no devuelve JSON válido
-    const raw = response.content.trim().toUpperCase();
-    if (raw.includes('ESCALATE')) intent = 'ESCALATE';
-    else if (raw.includes('OBJECTION')) intent = 'OBJECTION';
-    else if (raw.includes('PURCHASE_INTENT')) intent = 'PURCHASE_INTENT';
+    if (e.name === 'CircuitOpenError' || e.isCircuitBreakerError) {
+      console.warn('[CircuitBreaker] Circuito Abierto en analyzeIntentNode. Forzando contingencia.');
+      return { intent: 'ESCALATE', human_needed: true, funnel_stage: currentStage };
+    }
+    // Fallback si el LLM no devuelve JSON válido o hay otro error lógico
+    intent = 'GENERAL';
   }
 
   const human_needed = intent === 'ESCALATE';
@@ -155,8 +161,15 @@ async function respondNode(graphData) {
       intent: graphData.intent,
       customer: graphData.customer
     });
-    const response = await llm.invoke(prompt);
-    return { messages: [{ role: 'assistant', content: response.content }] };
+    try {
+      const response = await openAICircuitBreaker.fire(() => llm.invoke(prompt));
+      return { messages: [{ role: 'assistant', content: response.content }] };
+    } catch (e) {
+      if (e.name === 'CircuitOpenError' || e.isCircuitBreakerError) {
+        return { messages: [{ role: 'assistant', content: "Disculpa, estoy experimentando intermitencias en mi sistema. 😔 ¡Pero no te preocupes! Un asesor humano te responderá a la brevedad." }] };
+      }
+      return { messages: [{ role: 'assistant', content: "Hubo un error procesando tu solicitud." }] };
+    }
   }
 
   // Delegar la generación del prompt al objeto de estado (State Pattern)
@@ -170,20 +183,32 @@ async function respondNode(graphData) {
   // Obtener las herramientas disponibles del CommandRegistry
   const tools = commandRegistry.getAllToolSchemas();
 
-  // Invocar al LLM CON herramientas (OpenAI Function Calling)
-  const response = await llm.invoke(prompt, { tools });
+  try {
+    // Invocar al LLM CON herramientas protegiéndolo con el Circuit Breaker
+    const response = await openAICircuitBreaker.fire(() => llm.invoke(prompt, { tools }));
 
-  // Si el LLM quiere usar una herramienta, guardar las tool_calls
-  if (response.additional_kwargs?.tool_calls?.length > 0) {
-    const toolCalls = response.additional_kwargs.tool_calls;
-    console.log(`[RespondNode] 🔧 LLM solicita ${toolCalls.length} herramienta(s): ${toolCalls.map(t => t.function.name).join(', ')}`);
-    return {
-      messages: [{ role: 'assistant', content: response.content || '' }],
-      tool_calls: toolCalls
-    };
+    // Si el LLM quiere usar una herramienta, guardar las tool_calls
+    if (response.additional_kwargs?.tool_calls?.length > 0) {
+      const toolCalls = response.additional_kwargs.tool_calls;
+      console.log(`[RespondNode] 🔧 LLM solicita ${toolCalls.length} herramienta(s): ${toolCalls.map(t => t.function.name).join(', ')}`);
+      return {
+        messages: [{ role: 'assistant', content: response.content || '' }],
+        tool_calls: toolCalls
+      };
+    }
+
+    return { messages: [{ role: 'assistant', content: response.content }], tool_calls: [] };
+
+  } catch (e) {
+    if (e.name === 'CircuitOpenError' || e.isCircuitBreakerError) {
+      console.warn('[CircuitBreaker] Circuito Abierto en respondNode. Retornando fallback.');
+      return { 
+        messages: [{ role: 'assistant', content: "Disculpa, estoy experimentando intermitencias en mi sistema. 😔 ¡Pero no te preocupes! Un asesor humano te responderá a la brevedad." }], 
+        tool_calls: [] 
+      };
+    }
+    return { messages: [{ role: 'assistant', content: "Hubo un error generando mi respuesta." }], tool_calls: [] };
   }
-
-  return { messages: [{ role: 'assistant', content: response.content }], tool_calls: [] };
 }
 
 // ─── Router: Decidir si responder o escalar ───
@@ -262,7 +287,7 @@ const workflow = new StateGraph({ channels: graphState })
   .addEdge("tools", "respond");
 
 // ==========================================
-// 5. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
+// 6. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
 // ==========================================
 class LangGraphService {
   constructor() {
