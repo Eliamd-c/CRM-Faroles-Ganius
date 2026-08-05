@@ -64,6 +64,7 @@ const nodeFileState = {};     // { nodeId: { file_url: '' } }
 const nodeDelayState = {};    // { nodeId: { seconds: 5 } }
 const nodeGotoState = {};     // { nodeId: { flow_id: '' } }
 const nodeAiAgentState = {};  // { nodeId: { system_prompt: '' } }
+const nodeAdTriggerState = {};  // { nodeId: { message: '', quick_replies: [], linkedFlowId: '' } }
 
 // ─────────────────────────────────────────────
 // Helpers: Sync / Rehydrate de estado de nodos
@@ -316,6 +317,20 @@ const htmlTrigger = `
   </div>
 `;
 
+const htmlAdTrigger = `
+  <div class="mc-node mc-trigger" style="background: linear-gradient(135deg, rgba(236,72,153,0.1) 0%, rgba(249,115,22,0.1) 100%); border: 2px solid #ec4899;">
+    <div class="mc-header" style="background: linear-gradient(135deg, #ec4899 0%, #f97316 100%); color: white;">
+      <span>📢</span> Disparador Anuncios Instagram
+    </div>
+    <div class="box ad-trigger-node-preview">
+      <div style="font-size: 12px; color: #666; padding: 8px;">
+        <div style="margin-bottom: 8px;"><strong>Mensaje:</strong> <span class="ad-msg-preview" style="color: #0084ff;">No configurado</span></div>
+        <div><strong>Botones:</strong> <span class="ad-btns-preview" style="color: #0084ff;">0</span></div>
+      </div>
+    </div>
+  </div>
+`;
+
 // Nodo Legacy de Tarjeta (para compatibilidad)
 const htmlCard = `
   <div class="mc-node mc-content">
@@ -447,6 +462,7 @@ editor.registerNode('file', htmlFile);
 editor.registerNode('delay', htmlDelay);
 editor.registerNode('goto', htmlGoto);
 editor.registerNode('ai_agent', htmlAiAgent);
+editor.registerNode('ad_trigger', htmlAdTrigger);
 
 // ─────────────────────────────────────────────
 // Agregar nodo Mensaje (dinámico, soporta hasta 20 botones)
@@ -536,6 +552,10 @@ id.addEventListener('drop', e => {
     const nodeId = editor.addNode('ai_agent', 1, 1, posX, posY, 'ai_agent', { _ai: '{}' }, htmlAiAgent);
     nodeAiAgentState[nodeId] = { system_prompt: 'Eres un asistente útil y amigable. Ayuda al usuario a resolver sus dudas basándote en la información de la tienda.' };
     setTimeout(() => renderAiAgentNode(nodeId), 50);
+  } else if (type === 'ad_trigger') {
+    const nodeId = editor.addNode('ad_trigger', 1, 1, posX, posY, 'ad_trigger', { _ad: '{}' }, htmlAdTrigger);
+    nodeAdTriggerState[nodeId] = { message: '', quick_replies: [], linkedFlowId: '' };
+    setTimeout(() => renderAdTriggerNode(nodeId), 50);
   }
 });
 
@@ -3058,5 +3078,29 @@ window.generateFlowFromAI = async function() {
   } finally {
     btnConfirm.innerHTML = 'Generar Flujo';
     btnConfirm.disabled = false;
+  }
+};
+
+// ─────────────────────────────────────────────
+// Ad Trigger Node Renderer
+// ─────────────────────────────────────────────
+window.renderAdTriggerNode = function(nodeId) {
+  const nodeEl = document.getElementById('node-' + nodeId);
+  if (!nodeEl) return;
+  const container = nodeEl.querySelector('.ad-trigger-node-preview');
+  if (!container) return;
+
+  const state = nodeAdTriggerState[nodeId] || { message: '', quick_replies: [] };
+  if (state.message) {
+    const msgPreview = state.message.substring(0, 30) + (state.message.length > 30 ? '...' : '');
+    const btnsCount = (state.quick_replies || []).length;
+    container.innerHTML = `
+      <div style="font-size: 12px; color: #666; padding: 8px;">
+        <div style="margin-bottom: 8px;"><strong>Mensaje:</strong> <span class="ad-msg-preview" style="color: #0084ff;">${msgPreview}</span></div>
+        <div><strong>Botones:</strong> <span class="ad-btns-preview" style="color: #0084ff;">${btnsCount}</span></div>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `<em style="color:#ef4444; font-size:11px;">⚠️ Sin Configurar</em>`;
   }
 };
