@@ -202,6 +202,79 @@ class SupabaseGateway {
       .eq('bot_paused', true);
     return count || 0;
   }
+
+  // Escalado a humano: actualización directa (sin pasar por Contact)
+  async pauseBot(instagramId, reason = 'requiere_atencion_humana') {
+    if (!this.db) return null;
+    try {
+      // Defecto 2 fix: sellar bot_paused_at solo en la transición false→true (preserva antigüedad en cola)
+      const { data: current, error: fetchErr } = await this.db
+        .from('customers')
+        .select('bot_paused, bot_paused_at')
+        .eq('instagram_id', instagramId)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!current) return null;
+
+      const patch = { bot_paused: true, bot_paused_reason: reason };
+      // Solo sella el timestamp en la transición false -> true
+      if (!current.bot_paused || !current.bot_paused_at) {
+        patch.bot_paused_at = new Date().toISOString();
+      }
+
+      const { data, error } = await this.db
+        .from('customers')
+        .update(patch)
+        .eq('instagram_id', instagramId)
+        .select()
+        .maybeSingle(); // Defecto 3 fix: .maybeSingle() en lugar de .single()
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      if (err.code === 'PGRST116') return null; // Contacto no existe
+      throw err;
+    }
+  }
+
+  async resumeBot(instagramId) {
+    if (!this.db) return null;
+    try {
+      const { data, error } = await this.db
+        .from('customers')
+        .update({
+          bot_paused: false,
+          bot_paused_at: null,
+          bot_paused_reason: null
+        })
+        .eq('instagram_id', instagramId)
+        .select()
+        .maybeSingle(); // Defecto 3 fix
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      if (err.code === 'PGRST116') return null;
+      throw err;
+    }
+  }
+
+  async getPendingHumans(limit = 50) {
+    if (!this.db) return [];
+    try {
+      // Defecto 4 fix: índice ordenado por bot_paused_at, no por bot_paused
+      // Defecto 5 fix: nullsFirst + incluir bot_paused_reason
+      const { data, error } = await this.db
+        .from('customers')
+        .select('id, instagram_id, name, username, bot_paused_at, bot_paused_reason')
+        .eq('bot_paused', true)
+        .order('bot_paused_at', { ascending: true, nullsFirst: true })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error fetching pending humans:', err);
+      return [];
+    }
+  }
 }
 
 module.exports = SupabaseGateway;

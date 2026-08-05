@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS public.customers (
     username TEXT,
     profile_picture_url TEXT,
     bot_paused BOOLEAN DEFAULT FALSE,
+    bot_paused_at TIMESTAMP WITH TIME ZONE,
+    bot_paused_reason TEXT,
     bot_state TEXT DEFAULT 'active',
     awaiting_input_type TEXT,
     awaiting_input_field TEXT,
@@ -40,6 +42,11 @@ CREATE TABLE IF NOT EXISTS public.messages (
 
 CREATE INDEX IF NOT EXISTS idx_messages_instagram_id ON public.messages(instagram_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at DESC);
+
+-- Índice para escalado a humano: ordena por antigüedad dentro de los pausados
+CREATE INDEX IF NOT EXISTS idx_customers_bot_paused
+  ON public.customers (bot_paused_at ASC NULLS FIRST)
+  WHERE bot_paused = true;
 
 -- Crear tabla app_config para configuraciones del sistema y tokens OAuth
 CREATE TABLE IF NOT EXISTS public.app_config (
