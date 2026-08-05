@@ -170,7 +170,8 @@ class LangGraphService {
   // HERRAMIENTAS DE INSPECCIÓN Y TIME TRAVEL
   // ==========================================
   
-  getGraphDiagram() {
+  async getGraphDiagram() {
+    await this.initialize();
     if (!this.appGraph) return null;
     return this.appGraph.getGraph().drawMermaid();
   }

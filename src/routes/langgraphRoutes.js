@@ -35,9 +35,9 @@ module.exports = function(di) {
   );
 
   // GET /api/langgraph/diagram - Obtener diagrama Mermaid
-  router.get('/diagram', (req, res) => {
+  router.get('/diagram', async (req, res) => {
     try {
-      const diagram = langGraphService.getGraphDiagram();
+      const diagram = await langGraphService.getGraphDiagram();
       res.json({ success: true, diagram });
     } catch (error) {
       res.status(500).json({ status: 'error', message: error.message });
