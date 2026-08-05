@@ -240,22 +240,30 @@ function postRespondRouter(graphData) {
 // CRITICAL FIX (578a021): Este nodo se ejecuta DESPUÉS de toolNode
 // Solo marca el estado si toolNode ya ejecutó send_quick_replies
 // Patrón: Ejecución de herramienta (toolNode) → Pausa conversacional (pauseForInputNode)
+//
+// ARQUITECTURA (Corrección de Alucinaciones):
+// Este nodo OMITE la clave 'messages' en su retorno.
+// Si omites una clave en graphState.value, el reductor NO es invocado
+// y el estado anterior se preserva en el checkpoint de PostgreSQL.
+// Esto previene que un graphData.messages vacío sobrescriba el historial.
 async function pauseForInputNode(graphData) {
   // Verificar si toolNode seteó el flag de pausa
   // (toolNode lo setea cuando ejecuta send_quick_replies)
   if (graphData.awaiting_quick_reply === true) {
-    console.log('[PauseForInputNode] ⏸️ Pausa conversacional activada: esperando click en quick_replies');
-    // El estado ya fue marcado por toolNode, solo retornamos para terminar el flujo
+    console.log('[PauseForInputNode] ⏸️ Pausa activada - preservando checkpoint');
+    // Retornar SOLO el flag de estado, omitir messages
+    // → el reductor messages no es invocado
+    // → checkpoint preserva historial anterior
     return {
-      awaiting_quick_reply: true,
-      messages: graphData.messages
+      awaiting_quick_reply: true
+      // Omitir messages intentionalmente
     };
   }
 
-  // Fallback: Si no hay pausa pendiente, continuar
+  // Fallback: Si no hay pausa pendiente, solo retornar flag
   return {
-    awaiting_quick_reply: false,
-    messages: graphData.messages
+    awaiting_quick_reply: false
+    // Omitir messages intentionalmente
   };
 }
 
