@@ -219,8 +219,10 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
             if (result.action === 'pause_bot') {
               await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', senderId);
               await meta.sendMessage(senderId, result.reply);
+              broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName} (Requiere humano)`);
             } else if (result.action === 'send_message' && result.reply) {
               await meta.sendMessage(senderId, result.reply);
+              broadcastLog('SYSTEM', `LangGraph respondió a ${senderName}: ${result.reply.substring(0, 50)}...`);
             }
           }).catch(err => console.error('[LangGraph Flow Trigger] Error:', err));
         }

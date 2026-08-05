@@ -168,6 +168,7 @@ async function handleMessage(event) {
         broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName} (Requiere humano)`);
       } else if (result.action === 'send_message' && result.reply) {
         await sendInChunks(senderId, result.reply);
+        broadcastLog('SYSTEM', `LangGraph respondió a ${senderName}: ${result.reply.substring(0, 50)}...`);
       }
     }).catch(err => {
       console.error('[LangGraph] Error en ejecución de fondo:', err);
