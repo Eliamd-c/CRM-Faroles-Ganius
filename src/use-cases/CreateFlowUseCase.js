@@ -76,19 +76,8 @@ class CreateFlowUseCase {
         }
         break;
       case 'ad_trigger':
-        if (!step.message) throw new Error(`Paso ${index}: ad_trigger requiere "message"`);
-        if (!Array.isArray(step.quick_replies)) {
-          throw new Error(`Paso ${index}: ad_trigger requiere "quick_replies"`);
-        }
-        if (step.quick_replies.length === 0) {
-          throw new Error(`Paso ${index}: ad_trigger requiere al menos 1 botón`);
-        }
-        if (step.quick_replies.length > 13) {
-          throw new Error(`Paso ${index}: ad_trigger máximo 13 botones`);
-        }
-        if (step.message.includes('{{') || step.message.includes('{username}')) {
-          throw new Error(`Paso ${index}: ad_trigger no permite variables en mensaje`);
-        }
+        // Ad Trigger es solo un disparador, sin validación de contenido
+        // El contenido del anuncio se configura en Meta Ads Manager
         break;
       case 'condition':
         if (!step.field) throw new Error(`Paso ${index}: condition requiere "field"`);

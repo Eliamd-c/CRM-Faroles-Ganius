@@ -47,3 +47,11 @@ CREATE TABLE IF NOT EXISTS public.app_config (
     value TEXT NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Crear tabla langgraph_checkpoints para memoria de agentes LangGraph
+CREATE TABLE IF NOT EXISTS public.langgraph_checkpoints (
+    thread_id TEXT PRIMARY KEY,
+    checkpoint JSONB NOT NULL,
+    metadata JSONB,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

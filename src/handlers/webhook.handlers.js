@@ -168,23 +168,31 @@ async function handleMessage(event) {
     flow.saveFlowsConfig().catch(err => console.warn('⚠️ Error guardando flujos (no-bloqueante):', err.message));
     await flow.processFlowSteps(matchedFlow.steps, senderId, senderName, new Set(), text);
   } else {
-    console.log(`[Smart Trigger] Buscando intención con IA para: "${text}"`);
-    const smartFlowId = await openai.detectIntentWithAI(text, state.flowsConfig.flows, senderId);
-    if (smartFlowId) {
-      console.log(`[Smart Trigger] Intención detectada. Ejecutando flujo: ${smartFlowId}`);
-      const smartFlow = state.flowsConfig.flows.find(f => f.id === smartFlowId);
-      if (smartFlow && smartFlow.steps) {
-        smartFlow.executionCount = (smartFlow.executionCount || 0) + 1;
-        smartFlow.lastExecutedAt = new Date().toISOString();
-        flow.saveFlowsConfig().catch(err => console.warn('⚠️ Error guardando smart trigger (no-bloqueante):', err.message));
-        await flow.processFlowSteps(smartFlow.steps, senderId, senderName, new Set(), text);
-        return;
+    console.log(`[LangGraph] Delegando mensaje de "${senderName}" a LangGraph (Fallback inteligente)`);
+    const langGraph = require('../services/langgraph.service');
+    // Función para enviar mensajes largos en partes (Límite Instagram: 1000)
+    const sendInChunks = async (targetId, text) => {
+      const chunks = text.match(/[\s\S]{1,950}/g) || [];
+      for (const chunk of chunks) {
+        await meta.sendMessage(targetId, chunk);
+        await new Promise(r => setTimeout(r, 500)); // Pequeña pausa entre mensajes
       }
-    }
-    if (state.flowsConfig.defaultFlow?.steps) {
-      console.log(`[Router] No hubo coincidencia. Ejecutando Default Flow.`);
-      await flow.processFlowSteps(state.flowsConfig.defaultFlow.steps, senderId, senderName, new Set(), text);
-    }
+    };
+
+    // Ejecución asíncrona para no bloquear el Event Loop ni causar Timeout en Meta
+    langGraph.processConversation(senderId, text, customer).then(async (result) => {
+      if (result.action === 'pause_bot') {
+        if (supabase) {
+          await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', senderId);
+        }
+        await sendInChunks(senderId, result.reply);
+        broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName} (Requiere humano)`);
+      } else if (result.action === 'send_message' && result.reply) {
+        await sendInChunks(senderId, result.reply);
+      }
+    }).catch(err => {
+      console.error('[LangGraph] Error en ejecución de fondo:', err);
+    });
   }
 }
 
