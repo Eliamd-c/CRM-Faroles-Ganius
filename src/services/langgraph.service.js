@@ -224,44 +224,35 @@ function routerNode(graphData) {
 }
 
 // ─── Router post-respuesta: Decidir si ejecutar herramientas o terminar ───
-// Arquitectura: Detecta si hay send_quick_replies para pausar la conversación
+// CRITICAL FIX (578a021): SIEMPRE ejecutar herramientas si existen
+// El router NO debe retornar "PAUSE_FOR_INPUT" aquí: eso rompe el flujo
+// La pausa se detecta DESPUÉS de toolNode (ver flujo del grafo)
 function postRespondRouter(graphData) {
   const toolCalls = graphData.tool_calls || [];
 
-  // Detectar si hay invocación de send_quick_replies
-  const hasSendQuickReplies = toolCalls.some(tc => tc.function?.name === 'send_quick_replies');
-
-  if (hasSendQuickReplies) {
-    return "PAUSE_FOR_INPUT"; // → Nuevo nodo de pausa
-  }
-
-  // Si hay otras tool_calls, procesarlas
+  // SIEMPRE ejecutar si hay herramientas (incluyendo send_quick_replies)
   if (toolCalls.length > 0) return "TOOLS";
 
   return "END_GRAPH";
 }
 
 // ─── Nodo 2.5: Pausa Conversacional (Arquitectura de Quick Replies) ───
-// Detecta cuando se invoca send_quick_replies y marca el estado de espera
-// Sin este nodo, el grafo continuaría sin dar al usuario la oportunidad de hacer click
-// Patrón: Middleware -> State -> Router (detecta pausa -> ejecuta tools -> pauseForInputNode marca estado)
+// CRITICAL FIX (578a021): Este nodo se ejecuta DESPUÉS de toolNode
+// Solo marca el estado si toolNode ya ejecutó send_quick_replies
+// Patrón: Ejecución de herramienta (toolNode) → Pausa conversacional (pauseForInputNode)
 async function pauseForInputNode(graphData) {
-  const toolCalls = graphData.tool_calls || [];
-
-  // Verificar si el último envío fue send_quick_replies
-  const hasSendQuickReplies = toolCalls.some(tc => tc.function?.name === 'send_quick_replies');
-
-  if (hasSendQuickReplies) {
+  // Verificar si toolNode seteó el flag de pausa
+  // (toolNode lo setea cuando ejecuta send_quick_replies)
+  if (graphData.awaiting_quick_reply === true) {
     console.log('[PauseForInputNode] ⏸️ Pausa conversacional activada: esperando click en quick_replies');
-    // Marcar que estamos en estado de espera
+    // El estado ya fue marcado por toolNode, solo retornamos para terminar el flujo
     return {
       awaiting_quick_reply: true,
-      // NO generar más mensajes: permitir que el usuario haga su elección
       messages: graphData.messages
     };
   }
 
-  // Si no hay send_quick_replies, pasar directamente (fallback, no debería ocurrir)
+  // Fallback: Si no hay pausa pendiente, continuar
   return {
     awaiting_quick_reply: false,
     messages: graphData.messages
@@ -272,7 +263,8 @@ async function pauseForInputNode(graphData) {
 async function toolNode(graphData) {
   const toolCalls = graphData.tool_calls || [];
   const toolResults = [];
-  
+  let wasQuickReplyExecuted = false;  // CRITICAL FIX: Flag para detectar send_quick_replies
+
   for (const toolCall of toolCalls) {
     const fnName = toolCall.function?.name;
     let fnArgs = {};
@@ -289,6 +281,12 @@ async function toolNode(graphData) {
         content: JSON.stringify({ success: false, message: 'Error parseando argumentos' })
       });
       continue;
+    }
+
+    // CRITICAL FIX: Detectar si esta herramienta es send_quick_replies
+    if (fnName === 'send_quick_replies') {
+      wasQuickReplyExecuted = true;
+      console.log('[ToolNode] 🔔 Detectado send_quick_replies - se activará pausa conversacional después');
     }
 
     // Ejecutar el Comando correspondiente (Command Pattern)
@@ -308,9 +306,9 @@ async function toolNode(graphData) {
     } catch (err) {
       console.error(`[ToolNode] 🚨 Falló ${fnName}:`, err.message);
       // 🚨 CLAVE: Informar al LLM del fallo en lugar de romper el grafo
-      resultContent = JSON.stringify({ 
-        error: "La ejecución de la herramienta falló. Informa al usuario de forma natural y ofrécele una disculpa o alternativa.", 
-        details: err.message 
+      resultContent = JSON.stringify({
+        error: "La ejecución de la herramienta falló. Informa al usuario de forma natural y ofrécele una disculpa o alternativa.",
+        details: err.message
       });
     }
 
@@ -323,11 +321,17 @@ async function toolNode(graphData) {
     });
   }
 
+  // CRITICAL FIX: Retornar awaiting_quick_reply para pausar después si fue send_quick_replies
   // Devolver los resultados como mensajes y limpiar tool_calls
-  return { messages: toolResults, tool_calls: [] };
+  return {
+    messages: toolResults,
+    tool_calls: [],
+    awaiting_quick_reply: wasQuickReplyExecuted  // ← Flag para pausar en siguiente condicional
+  };
 }
 
 // ─── Compilar el Grafo (con ReAct Loop para herramientas) ───
+// CRITICAL FIX (578a021): Flujo correcto para pausas conversacionales
 const workflow = new StateGraph({ channels: graphState })
   .addNode("analyzeIntent", analyzeIntentNode)
   .addNode("respond", respondNode)
@@ -340,14 +344,22 @@ const workflow = new StateGraph({ channels: graphState })
   })
   .addConditionalEdges("respond", postRespondRouter, {
     "TOOLS": "tools",
-    "PAUSE_FOR_INPUT": "pauseForInput",
     "END_GRAPH": END
+    // ← Removido "PAUSE_FOR_INPUT" (no debe ir aquí)
   })
-  // Corrección del Arquitecto: después de ejecutar herramientas,
-  // volver a 'respond' para que el LLM genere respuesta natural
-  // basada en los resultados (ReAct Feedback Loop).
-  .addEdge("tools", "respond")
-  // Nueva arquitectura: pauseForInput siempre termina el flujo
+  // CRITICAL FIX: Después de ejecutar herramientas, decidir si pausar o continuar
+  // Si toolNode seteó awaiting_quick_reply=true (send_quick_replies fue ejecutado),
+  // pausar. Sino, continuar con ReAct Loop (volver a respond).
+  .addConditionalEdges("tools", (graphData) => {
+    if (graphData.awaiting_quick_reply === true) {
+      return "pauseForInput"; // Pausar conversación
+    }
+    return "respond"; // ReAct Loop: generar respuesta basada en resultados
+  }, {
+    "pauseForInput": "pauseForInput",
+    "respond": "respond"
+  })
+  // Después de pausar, terminar el flujo
   // El usuario debe hacer click en un botón para continuar
   .addEdge("pauseForInput", END);
 

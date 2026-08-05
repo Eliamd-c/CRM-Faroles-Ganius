@@ -60,15 +60,19 @@ class SendQuickRepliesCommand extends Command {
 
       await meta.sendQuickReplies(senderId, message, quickReplies);
 
-      // Arquitectura: Marcar estado de espera en BD después de enviar quick_replies
-      // Esto permite que webhook.handlers valide y respete la pausa conversacional
+      // CRITICAL FIX: Marcar estado de espera EN BD con validación correcta
+      // Esto permite que webhook.handlers valide contra las opciones correctas
       if (supabaseGateway && senderId) {
         try {
+          // Extraer payloads válidos para validación posterior
+          const validChoices = quickReplies.map(qr => qr.payload.toLowerCase()).join(',');
+
           await supabaseGateway.db
             .from('customers')
             .update({
-              bot_state: 'awaiting_input',  // Estado transitorio: esperando click
-              awaiting_input_type: 'choice' // Tipo: respuesta múltiple
+              bot_state: 'awaiting_input',              // Estado transitorio: esperando click
+              awaiting_input_type: 'choice',             // Tipo: respuesta múltiple
+              awaiting_input_choices: validChoices      // CRITICAL FIX: Setear opciones válidas
             })
             .eq('instagram_id', String(senderId))
             .catch(err => console.warn('⚠️ Error marcando awaiting_input:', err.message));
