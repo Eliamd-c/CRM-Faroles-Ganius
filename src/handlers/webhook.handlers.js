@@ -169,9 +169,12 @@ async function handleMessage(event) {
       } else if (result.action === 'send_message' && result.reply) {
         await sendInChunks(senderId, result.reply);
         broadcastLog('SYSTEM', `LangGraph respondió a ${senderName}: ${result.reply.substring(0, 50)}...`);
+      } else if (result.action === 'error') {
+        broadcastLog('SYSTEM', `❌ Error interno en LangGraph: ${result.reply}`);
       }
     }).catch(err => {
       console.error('[LangGraph] Error en ejecución de fondo:', err);
+      broadcastLog('SYSTEM', `❌ Excepción en LangGraph: ${err.message}`);
     });
   }
 }
