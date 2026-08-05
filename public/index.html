@@ -335,6 +335,9 @@
             };
         }
 
+        // Setup SSE for Logs
+        setupEventSource();
+
         // Verificar estado real del sistema
         async function updateConnectionStatus() {
             try {
