@@ -3,6 +3,7 @@ const router = express.Router();
 const GetGraphStateUseCase = require('../use-cases/langgraph/getGraphState');
 const InjectHumanMessageUseCase = require('../use-cases/langgraph/injectHumanMessage');
 const langGraphService = require('../services/langgraph.service');
+const commandRegistry = require('../domain/commands/CommandRegistry');
 
 module.exports = function(di) {
   if (!di) {
@@ -39,6 +40,16 @@ module.exports = function(di) {
     try {
       const diagram = await langGraphService.getGraphDiagram();
       res.json({ success: true, diagram });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  // GET /api/langgraph/tools - Obtener herramientas registradas
+  router.get('/tools', (req, res) => {
+    try {
+      const tools = commandRegistry.getAllToolSchemas();
+      res.json({ success: true, tools });
     } catch (error) {
       res.status(500).json({ status: 'error', message: error.message });
     }

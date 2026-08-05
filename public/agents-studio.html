@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <!-- Estilos base compartidos y Font Awesome -->
+  <script src="auth.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
@@ -134,45 +135,27 @@
 
           <!-- Pestaña: Conocimiento -->
           <div id="tab-knowledge" class="tab-pane">
-            <div class="empty-state">
-              <i class="fas fa-cogs"></i>
-              <h3>Próximamente</h3>
-              <p>Aquí podrás conectar bases de datos vectoriales (RAG) para que el agente responda preguntas técnicas basadas en PDFs o FAQs.</p>
+            <div class="inspector-header">
+              <h3>Bases de Conocimiento (RAG)</h3>
+              <button class="btn btn-outline btn-sm" onclick="agentsStudio.openAddKnowledgeModal()">
+                <i class="fas fa-plus"></i> Añadir
+              </button>
+            </div>
+            <p>Secciones de conocimiento en la base de datos vectorial de la IA.</p>
+            <div id="knowledge-list" class="glass-panel" style="flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 1rem; gap: 1rem;">
+              <div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando conocimientos...</div>
             </div>
           </div>
 
           <!-- Pestaña: Habilidades -->
           <div id="tab-skills" class="tab-pane">
-            <h3>Habilidades Activadas (Command Pattern)</h3>
+            <div class="inspector-header">
+              <h3>Habilidades Activadas (Command Pattern)</h3>
+            </div>
             <p>Estas son las herramientas a las que este agente tiene acceso actualmente.</p>
             
-            <div class="skills-list">
-              <div class="skill-item">
-                <i class="fas fa-images text-primary"></i>
-                <div class="skill-info">
-                  <h4>Enviar Catálogo de Productos</h4>
-                  <p><code>send_product_catalog</code></p>
-                </div>
-                <div class="toggle active"><i class="fas fa-check"></i></div>
-              </div>
-              
-              <div class="skill-item">
-                <i class="fas fa-save text-success"></i>
-                <div class="skill-info">
-                  <h4>Guardar Datos del Cliente</h4>
-                  <p><code>save_customer_data</code></p>
-                </div>
-                <div class="toggle active"><i class="fas fa-check"></i></div>
-              </div>
-
-              <div class="skill-item">
-                <i class="fas fa-reply-all text-warning"></i>
-                <div class="skill-info">
-                  <h4>Enviar Respuestas Rápidas</h4>
-                  <p><code>send_quick_replies</code></p>
-                </div>
-                <div class="toggle active"><i class="fas fa-check"></i></div>
-              </div>
+            <div id="skills-list" class="skills-list">
+              <div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando habilidades...</div>
             </div>
           </div>
 
@@ -190,6 +173,35 @@
             </div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Añadir Conocimiento -->
+  <div id="knowledge-modal" class="modal-overlay hidden" style="z-index: 1010;">
+    <div class="glass-modal" style="max-width: 600px;">
+      <header class="modal-header">
+        <div class="modal-title">
+          <i class="fas fa-file-alt text-primary"></i> 
+          <h2>Añadir Conocimiento</h2>
+        </div>
+        <button class="btn-close" onclick="agentsStudio.closeAddKnowledgeModal()"><i class="fas fa-times"></i></button>
+      </header>
+      <div style="padding: 2rem;">
+        <div style="margin-bottom: 1rem;">
+          <label style="display:block; margin-bottom: 0.5rem;">Título o Sección</label>
+          <input type="text" id="kn-title" class="glass-input" placeholder="Ej. Garantías de Faroles">
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <label style="display:block; margin-bottom: 0.5rem;">Contenido del Conocimiento</label>
+          <textarea id="kn-content" class="glass-input" rows="8" placeholder="Texto informativo..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="agentsStudio.closeAddKnowledgeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="agentsStudio.saveKnowledge()">
+            <i class="fas fa-save"></i> Guardar
+          </button>
         </div>
       </div>
     </div>

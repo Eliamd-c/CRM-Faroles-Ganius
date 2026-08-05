@@ -18,7 +18,12 @@ const AgentsStudio = (() => {
     contextInput: document.getElementById('ai-context'),
     saveStatus: document.getElementById('save-status'),
     mermaidGraph: document.getElementById('mermaid-graph'),
-    graphLoader: document.getElementById('graph-loader')
+    graphLoader: document.getElementById('graph-loader'),
+    skillsList: document.getElementById('skills-list'),
+    knowledgeList: document.getElementById('knowledge-list'),
+    knowledgeModal: document.getElementById('knowledge-modal'),
+    knTitle: document.getElementById('kn-title'),
+    knContent: document.getElementById('kn-content')
   };
 
   /**
@@ -39,6 +44,10 @@ const AgentsStudio = (() => {
         // Renderizado perezoso del grafo
         if (targetId === 'tab-inspector' && !state.isGraphLoaded) {
           loadGraph();
+        } else if (targetId === 'tab-skills' && !state.skillsLoaded) {
+          loadSkills();
+        } else if (targetId === 'tab-knowledge' && !state.knowledgeLoaded) {
+          loadKnowledge();
         }
       });
     });
@@ -55,6 +64,8 @@ const AgentsStudio = (() => {
     // Resetear pestañas a la primera
     dom.tabBtns[0].click();
     state.isGraphLoaded = false;
+    state.skillsLoaded = false;
+    state.knowledgeLoaded = false;
     dom.mermaidGraph.innerHTML = '';
     dom.graphLoader.style.display = 'flex';
 
@@ -153,6 +164,108 @@ const AgentsStudio = (() => {
     }
   };
 
+  /**
+   * Carga las habilidades (tools) dinámicamente
+   */
+  const loadSkills = async () => {
+    try {
+      const res = await fetch('/api/langgraph/tools');
+      if (!res.ok) throw new Error('Error al cargar habilidades');
+      const data = await res.json();
+      
+      dom.skillsList.innerHTML = '';
+      if (data.tools && data.tools.length > 0) {
+        data.tools.forEach(tool => {
+          dom.skillsList.innerHTML += `
+            <div class="skill-item">
+              <i class="fas fa-tools text-primary"></i>
+              <div class="skill-info">
+                <h4>${tool.function.name.replace(/_/g, ' ')}</h4>
+                <p><code>${tool.function.name}</code>: ${tool.function.description}</p>
+              </div>
+              <div class="toggle active"><i class="fas fa-check"></i></div>
+            </div>
+          `;
+        });
+        state.skillsLoaded = true;
+      } else {
+        dom.skillsList.innerHTML = '<p>No hay habilidades configuradas.</p>';
+      }
+    } catch (e) {
+      console.error(e);
+      dom.skillsList.innerHTML = '<p class="text-warning">Error al cargar habilidades.</p>';
+    }
+  };
+
+  /**
+   * Carga los conocimientos (RAG)
+   */
+  const loadKnowledge = async () => {
+    try {
+      const res = await fetch('/api/ai/knowledge');
+      if (!res.ok) throw new Error('Error al cargar conocimiento');
+      const data = await res.json();
+      
+      dom.knowledgeList.innerHTML = '';
+      if (data && data.length > 0) {
+        data.forEach(kn => {
+          dom.knowledgeList.innerHTML += `
+            <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+              <h4 style="margin: 0 0 0.5rem 0; color: #fff;">${kn.section_title}</h4>
+              <p style="margin: 0; font-size: 0.9rem; color: #aaa;">${kn.content.substring(0, 100)}...</p>
+            </div>
+          `;
+        });
+        state.knowledgeLoaded = true;
+      } else {
+        dom.knowledgeList.innerHTML = '<p style="color: #9ba1a6;">Aún no hay bases de conocimiento agregadas.</p>';
+      }
+    } catch (e) {
+      console.error(e);
+      dom.knowledgeList.innerHTML = '<p class="text-warning">Error al cargar conocimiento.</p>';
+    }
+  };
+
+  const openAddKnowledgeModal = () => {
+    dom.knowledgeModal.classList.remove('hidden');
+    dom.knTitle.value = '';
+    dom.knContent.value = '';
+  };
+
+  const closeAddKnowledgeModal = () => {
+    dom.knowledgeModal.classList.add('hidden');
+  };
+
+  const saveKnowledge = async () => {
+    const title = dom.knTitle.value.trim();
+    const content = dom.knContent.value.trim();
+    
+    if (!title || !content) {
+      alert("Por favor completa ambos campos.");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/ai/knowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section_title: title, content })
+      });
+      
+      if (res.ok) {
+        closeAddKnowledgeModal();
+        state.knowledgeLoaded = false;
+        loadKnowledge(); // Refrescar lista
+        showStatus('Conocimiento agregado exitosamente.');
+      } else {
+        alert("Error al guardar conocimiento. Asegúrate de tener OPENAI_API_KEY configurada para los embeddings.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error de conexión.");
+    }
+  };
+
   // Inicialización global
   document.addEventListener('DOMContentLoaded', () => {
     initTabs();
@@ -166,7 +279,10 @@ const AgentsStudio = (() => {
     openConfigModal,
     closeConfigModal,
     saveContext,
-    loadGraph
+    loadGraph,
+    openAddKnowledgeModal,
+    closeAddKnowledgeModal,
+    saveKnowledge
   };
 })();
 
