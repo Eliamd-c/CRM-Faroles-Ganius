@@ -252,14 +252,25 @@ async function toolNode(graphData) {
       supabase
     };
 
-    const result = await commandRegistry.execute(fnName, fnArgs, context);
+    let resultContent;
+    try {
+      const result = await commandRegistry.execute(fnName, fnArgs, context);
+      resultContent = JSON.stringify(result);
+    } catch (err) {
+      console.error(`[ToolNode] 🚨 Falló ${fnName}:`, err.message);
+      // 🚨 CLAVE: Informar al LLM del fallo en lugar de romper el grafo
+      resultContent = JSON.stringify({ 
+        error: "La ejecución de la herramienta falló. Informa al usuario de forma natural y ofrécele una disculpa o alternativa.", 
+        details: err.message 
+      });
+    }
 
     // Crítico: Devolver el resultado como mensaje tipo 'tool' (OpenAI ReAct)
     toolResults.push({
       role: 'tool',
       tool_call_id: toolCall.id,
       name: fnName,
-      content: JSON.stringify(result)
+      content: resultContent
     });
   }
 

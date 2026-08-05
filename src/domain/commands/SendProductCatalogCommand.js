@@ -78,7 +78,7 @@ class SendProductCatalogCommand extends Command {
 
     } catch (err) {
       console.error('[SendProductCatalog] Error:', err.message);
-      return { success: false, message: err.message };
+      throw err;
     }
   }
 }

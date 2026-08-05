@@ -58,6 +58,7 @@ async function sendMessage(recipientId, text, quickReplies = null) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando DM:', errorMsg);
     broadcastLog('ERROR', `Error al responder: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 }
 
@@ -135,6 +136,7 @@ async function sendQuickReplies(recipientId, text, options = []) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Quick Replies:', errorMsg);
     broadcastLog('ERROR', `Error al enviar Quick Replies: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 }
 
@@ -194,6 +196,7 @@ async function sendCard(recipientId, cardData) {
     const errorMsg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando Tarjeta:', errorMsg);
     broadcastLog('ERROR', `Error al enviar tarjeta: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 }
 
@@ -223,6 +226,7 @@ async function sendCarousel(recipientId, elements) {
     const msg = err.response?.data?.error?.message || err.message;
     console.error('❌ Error enviando carrusel:', msg);
     broadcastLog('ERROR', `Error al enviar carrusel: ${msg}`);
+    throw new Error(msg);
   }
 }
 

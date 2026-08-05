@@ -109,8 +109,19 @@ class HandleIncomingMessageUseCase {
       
       return { status: 'handled', contact };
     } catch (err) {
-      console.error('[LangGraph] Error en ejecución principal:', err);
-      this.broadcastLog('SYSTEM', `❌ Excepción en LangGraph: ${err.message}`);
+      console.error('[LangGraph] Error en ejecución principal (SPOF):', err);
+      this.broadcastLog('SYSTEM', `❌ Excepción grave en el orquestador: ${err.message}`);
+      
+      // Contingencia Absoluta (SPOF 1): Enviar mensaje directo vía Meta sin usar IA ni flujos
+      try {
+        await this.meta.sendMessage(senderId, "Nuestro sistema inteligente se encuentra en mantenimiento momentáneo. 🛠️ Un asesor humano te contactará muy pronto para continuar tu atención.");
+        contact.switchToPaused();
+        await this.db.updateContact(contact);
+        this.broadcastLog('SYSTEM', `Bot pausado por contingencia para el usuario ${senderName}`);
+      } catch (metaErr) {
+        console.error('[LangGraph] Falló también la contingencia hacia Meta:', metaErr.message);
+      }
+      
       return { status: 'error', contact, error: err.message };
     }
   }
