@@ -5,47 +5,48 @@ const SalesState = require('./SalesState');
 // ==========================================
 // El bot guía al cliente hacia la compra final: confirma producto,
 // detalla precio, garantía, métodos de pago y pasos a seguir.
+//
+// ARQUITECTURA: Implementa getSystemInstruction() (SoC).
+// respondNode llama a getSystemInstruction() + getHistoryContext()
+// y construye el prompt sin duplicación de historial.
 
 class CheckoutState extends SalesState {
   constructor() {
     super('CHECKOUT');
   }
 
-  getPrompt({ context, messages, intent, customer }) {
-    const lastMessages = messages.slice(-6).map(m => `[${m.role}]: ${m.content}`).join('\n');
-    
-    return `
-Contexto Maestro:
+  /**
+   * Retorna SOLO la instrucción del sistema para CHECKOUT.
+   * NO incluir historial aquí.
+   */
+  getSystemInstruction({ context, intent, customer }) {
+    return `Contexto Maestro:
 ${context}
 
-ETAPA ACTUAL DEL EMBUDO: 🛒 CHECKOUT (Cierre de Venta)
+ETAPA ACTUAL DEL EMBUDO: 🟢 CHECKOUT (Cierre de Venta)
 
 TU OBJETIVO EN ESTA ETAPA:
-1. Confirmar el producto que el cliente desea.
-2. Detallar claramente: Precio final, garantía, tiempo de entrega y métodos de pago.
-3. Transmite seguridad y ofrece asistencia paso a paso para el pago.
-4. Si el cliente tiene dudas finales, resolverlas con confianza y calidez.
-5. Si el cliente confirma la compra, felicitarlo y darle los pasos a seguir (link de pago, datos de transferencia, etc.).
-6. Si el cliente NO quiere comprar ahora, no presionar. Ofrecer seguimiento amable.
+1. Facilitar el proceso de compra.
+2. Responder dudas finales sobre envío, garantía, etc.
+3. Proporcionar instrucciones claras para completar compra.
+4. Escalar a humano si hay dudas complejas.
 
-Historial:
-${lastMessages}
+Cliente: ${customer?.name || 'Desconocido'}
+Intención: ${intent || 'GENERAL'}
 
-Intención detectada: ${intent}
-${customer ? `Datos del cliente: ${JSON.stringify(customer)}` : ''}
-
-REGLAS:
-- CRÍTICO: Usa 'query_knowledge_base' para consultar los métodos de pago exactos, cuentas bancarias y tiempos de envío. NO inventes esta información.
-- Sé claro y directo con los números (precio, garantía).
-- Transmite seguridad y profesionalismo.
-- Si el cliente pide hablar con un humano, respétalo inmediatamente.
-- Máximo 800 caracteres.
-`;
+REGLAS CRÍTICAS:
+- Sé claro y conciso.
+- Proporciona info sobre formas de pago, envío, garantía.
+- Si cliente tiene duda que NO puedas resolver → escala a humano.
+- Usa 'query_knowledge_base' para preguntas sobre políticas.
+- Si cliente dice "no quiero" → pregunta por qué y regresa a DISCOVERY.
+- Máximo 1000 caracteres.`;
   }
 
   evaluateTransition({ messages, intent, customer, llmShouldAdvance }) {
-    if (intent === 'OBJECTION' || (intent === 'GENERAL' && llmShouldAdvance)) {
-      return 'RECOMMENDATION'; // Permite volver atrás si el usuario duda
+    // En CHECKOUT, solo permaneces o escalas a humano
+    if (intent === 'ESCALATE') {
+      return null; // El controlador superior manejar human_needed
     }
     return null;
   }

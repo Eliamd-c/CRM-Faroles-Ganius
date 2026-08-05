@@ -5,17 +5,22 @@ const SalesState = require('./SalesState');
 // ==========================================
 // El bot se presenta, establece su identidad espiritual/humana
 // y hace la primera pregunta para perfilar al cliente.
+//
+// ARQUITECTURA: Implementa getSystemInstruction() (SoC).
+// respondNode llama a getSystemInstruction() + getHistoryContext()
+// y construye el prompt sin duplicación de historial.
 
 class OnboardingState extends SalesState {
   constructor() {
     super('ONBOARDING');
   }
 
-  getPrompt({ context, messages, intent, customer }) {
-    const lastMessages = messages.slice(-4).map(m => `[${m.role}]: ${m.content}`).join('\n');
-    
-    return `
-Contexto Maestro:
+  /**
+   * Retorna SOLO la instrucción del sistema para ONBOARDING.
+   * NO incluir historial aquí.
+   */
+  getSystemInstruction({ context, intent, customer }) {
+    return `Contexto Maestro:
 ${context}
 
 ETAPA ACTUAL DEL EMBUDO: 🟢 ONBOARDING (Primera Impresión)
@@ -26,17 +31,15 @@ TU OBJETIVO EN ESTA ETAPA:
 3. Hacer UNA pregunta abierta para descubrir qué necesita el cliente (ej. "¿Qué espacio te gustaría iluminar?").
 4. NO intentes vender todavía. Solo conoce al cliente.
 
-Historial:
-${lastMessages}
+Intención detectada: ${intent || 'GENERAL'}
+${customer?.name ? `Cliente: ${customer.name}` : ''}
 
-Intención detectada: ${intent}
-
-REGLAS:
-- Sé breve, cálido y curioso.
-- Máximo 800 caracteres.
-- Si el cliente ya mostró interés claro en un producto, sugiere avanzar a Discovery.
-- CRÍTICO (RAG): Si el cliente pregunta detalles técnicos, precios, especificaciones o políticas desde el inicio, DEBES usar la herramienta "query_knowledge_base" para buscar la respuesta exacta en los manuales antes de contestar. No inventes datos.
-`;
+REGLAS CRÍTICAS:
+- Sé breve, máximo 800 caracteres.
+- Si preguntan detalles técnicos → usa 'query_knowledge_base' obligatoriamente.
+- Si muestran interés claro → sugiere avanzar a DISCOVERY.
+- NUNCA incluyas precios aquí - usarás tools para eso.
+- Sé cálido, curioso, NO vendedor.`;
   }
 
   evaluateTransition({ messages, intent, customer, llmShouldAdvance }) {

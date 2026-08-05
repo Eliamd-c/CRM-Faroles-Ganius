@@ -5,41 +5,41 @@ const SalesState = require('./SalesState');
 // ==========================================
 // El bot hace preguntas inteligentes para entender las necesidades
 // del cliente: presupuesto, espacio a iluminar, uso deseado.
+//
+// ARQUITECTURA: Implementa getSystemInstruction() (SoC).
+// respondNode llama a getSystemInstruction() + getHistoryContext()
+// y construye el prompt sin duplicación de historial.
 
 class DiscoveryState extends SalesState {
   constructor() {
     super('DISCOVERY');
   }
 
-  getPrompt({ context, messages, intent, customer }) {
-    const lastMessages = messages.slice(-6).map(m => `[${m.role}]: ${m.content}`).join('\n');
-    
-    return `
-Contexto Maestro:
+  /**
+   * Retorna SOLO la instrucción del sistema para DISCOVERY.
+   * NO incluir historial aquí.
+   */
+  getSystemInstruction({ context, intent, customer }) {
+    return `Contexto Maestro:
 ${context}
 
-ETAPA ACTUAL DEL EMBUDO: 🔍 DISCOVERY (Descubrimiento de Necesidades)
+ETAPA ACTUAL DEL EMBUDO: 🔵 DISCOVERY (Descubrimiento de Necesidades)
 
 TU OBJETIVO EN ESTA ETAPA:
-1. Calificar al cliente haciendo preguntas sobre sus necesidades específicas.
-2. Descubrir: ¿Qué espacio quiere iluminar? ¿Cuántos faroles necesita? ¿Tiene presupuesto definido?
-3. Escuchar activamente y mostrar empatía (Máxima de Relevancia de Grice).
-4. Si el cliente menciona un problema concreto (oscuridad, inseguridad, falta de energía), valídalo emocionalmente.
-5. Cuando tengas suficiente información, prepárate para recomendar el producto ideal.
+1. Entender profundamente qué necesita el cliente.
+2. Hacer preguntas sobre espacio, presupuesto, durabilidad.
+3. Acumular información técnica sobre preferencias.
+4. Preparar la recomendación personalizada.
 
-Historial:
-${lastMessages}
+Intención: ${intent || 'GENERAL'}
+Cliente: ${customer?.name || 'Desconocido'}
 
-Intención detectada: ${intent}
-${customer ? `Datos del cliente: ${JSON.stringify(customer)}` : ''}
-
-REGLAS:
-- Haz máximo 1-2 preguntas por mensaje. No interrogues.
-- Usa lenguaje natural y cálido.
-- Máximo 800 caracteres.
-- CRÍTICO: Si el cliente pregunta detalles técnicos, precios o políticas, DEBES usar "query_knowledge_base".
-- CRÍTICO: Cada vez que el cliente te dé un dato valioso (presupuesto, ubicación, espacio), usa la herramienta 'save_customer_data' inmediatamente para registrarlo.
-`;
+REGLAS CRÍTICAS:
+- Formula 1-2 preguntas específicas por mensaje.
+- Si preguntan precios o especificaciones → usa 'query_knowledge_base' o 'send_product_catalog'.
+- Mantén conversación natural y curiosa.
+- NO hagas recomendaciones aún - solo descubre.
+- Máximo 1000 caracteres por respuesta.`;
   }
 
   evaluateTransition({ messages, intent, customer, llmShouldAdvance }) {
