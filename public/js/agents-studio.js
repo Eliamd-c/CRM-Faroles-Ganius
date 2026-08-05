@@ -369,15 +369,369 @@ const AgentsStudio = (() => {
     }
   };
 
+  /**
+   * Escalados: Carga contactos en escalación desde /api/pending-humans
+   */
+  const loadEscalados = async () => {
+    const container = document.getElementById('escalados-container');
+    try {
+      container.innerHTML = '<div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando escalados...</div>';
+
+      const res = await fetch('/api/pending-humans');
+      if (!res.ok) throw new Error('Error fetching escalados');
+      const data = await res.json();
+
+      if (data && Array.isArray(data) && data.length > 0) {
+        renderEscaladosTable(data);
+      } else {
+        renderEscaladosEmpty();
+      }
+    } catch (error) {
+      console.error('Error cargando escalados:', error);
+      container.innerHTML = '<p class="text-warning" style="padding: 2rem; text-align: center;">Error al cargar escalados. Verifica la conexión.</p>';
+    }
+  };
+
+  /**
+   * Escalados: Renderiza la tabla de escalados
+   */
+  const renderEscaladosTable = (escalados) => {
+    const container = document.getElementById('escalados-container');
+    let html = `
+      <table class="escalados-table">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Pausado hace</th>
+            <th class="escalados-razon">Razón</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    escalados.forEach(escalado => {
+      const username = escapeHtml(escalado.username || 'Desconocido');
+      const timeDiff = formatTimeDiff(escalado.paused_at);
+      const reasonBadge = formatReasonBadge(escalado.pause_reason);
+
+      html += `
+        <tr>
+          <td>${username}</td>
+          <td>${timeDiff}</td>
+          <td class="escalados-razon">${reasonBadge}</td>
+          <td>
+            <button class="btn-view-escalado" data-escalado-id="${escapeHtml(String(escalado.instagram_id))}">
+              <i class="fas fa-eye"></i> Ver
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+      <div style="padding: 1rem; text-align: center; font-size: 0.85rem; color: #9ba1a6;">
+        Total: ${escalados.length} contacto(s) en escalación
+      </div>
+    `;
+
+    container.innerHTML = html;
+    initEscaladosEventDelegation();
+  };
+
+  /**
+   * Escalados: Renderiza estado vacío
+   */
+  const renderEscaladosEmpty = () => {
+    const container = document.getElementById('escalados-container');
+    container.innerHTML = `
+      <div class="escalados-empty">
+        <i class="fas fa-check-circle"></i>
+        <h3>Sin contactos en escalación</h3>
+        <p>El sistema está en orden.</p>
+      </div>
+    `;
+  };
+
+  /**
+   * Escalados: Formatea diferencia de tiempo en formato humanizado
+   * Ej: "5 min", "2h 30m", "1d 3h"
+   */
+  const formatTimeDiff = (isoString) => {
+    if (!isoString) return 'N/A';
+
+    try {
+      const now = new Date();
+      const paused = new Date(isoString);
+
+      // Validar que la fecha sea válida (no NaN)
+      if (isNaN(paused.getTime())) return 'N/A';
+
+      const diffMs = now - paused;
+
+      if (diffMs < 0) return 'Futuro'; // Error: fecha en el futuro
+
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHour / 24);
+
+      if (diffSec < 60) return '0 min';
+      if (diffMin < 60) return `${diffMin}m`;
+      if (diffHour < 24) {
+        const mins = diffMin % 60;
+        return mins > 0 ? `${diffHour}h ${mins}m` : `${diffHour}h`;
+      }
+
+      const hours = diffHour % 24;
+      return hours > 0 ? `${diffDay}d ${hours}h` : `${diffDay}d`;
+    } catch (error) {
+      console.error('Error en formatTimeDiff:', error);
+      return 'N/A';
+    }
+  };
+
+  /**
+   * Escalados: Formatea badge de razón
+   */
+  const formatReasonBadge = (reason) => {
+    const reasonMap = {
+      'escalacion': 'Escalación',
+      'operador_manual': 'Operador',
+      'requiere_ia': 'Requiere IA'
+    };
+
+    const label = reasonMap[reason] || reason || 'Desconocida';
+    const badgeClass = reason === 'escalacion' ? 'escalacion' :
+                       reason === 'operador_manual' ? 'operador' :
+                       reason === 'requiere_ia' ? 'requiere_ia' : 'operador';
+
+    return `<span class="escalados-badge ${badgeClass}">${escapeHtml(label)}</span>`;
+  };
+
+  /**
+   * Escalados: Delegación de eventos para "Ver detalles"
+   */
+  const initEscaladosEventDelegation = () => {
+    const container = document.getElementById('escalados-container');
+    if (!container) return;
+
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-view-escalado');
+      if (!btn) return;
+
+      const instagramId = btn.getAttribute('data-escalado-id');
+      if (!instagramId) return;
+
+      openEscaladoModal(instagramId);
+    });
+  };
+
+  /**
+   * Escalados: Abre el modal con detalles del escalado
+   */
+  const openEscaladoModal = async (instagramId) => {
+    const modal = document.getElementById('escalado-modal');
+    if (!modal) return;
+
+    try {
+      // Buscar en escalados cargados
+      const container = document.getElementById('escalados-container');
+      const table = container.querySelector('table');
+      if (!table) return;
+
+      const rows = table.querySelectorAll('tbody tr');
+      let escaladoData = null;
+
+      rows.forEach(row => {
+        const btn = row.querySelector('.btn-view-escalado');
+        if (btn && btn.getAttribute('data-escalado-id') === instagramId) {
+          // Extraer data de la fila actual
+          const cells = row.querySelectorAll('td');
+          escaladoData = {
+            instagram_id: instagramId,
+            username: cells[0].textContent.trim(),
+            paused_at: 'N/A', // Necesitaríamos fetch para el timestamp exacto
+            pause_reason: 'unknown'
+          };
+        }
+      });
+
+      // Si no lo encontramos en la tabla actual, hacer fetch completo
+      if (!escaladoData) {
+        const res = await fetch('/api/pending-humans');
+        if (!res.ok) throw new Error('Error fetching escalados');
+        const escalados = await res.json();
+        escaladoData = escalados.find(e => String(e.instagram_id) === String(instagramId));
+        if (!escaladoData) throw new Error('Escalado no encontrado');
+      }
+
+      // Llenar modal con datos
+      document.getElementById('escalado-modal-title').textContent =
+        `👤 ${escapeHtml(escaladoData.username)} - Escalado`;
+      document.getElementById('escalado-instagram-id').textContent = escapeHtml(String(escaladoData.instagram_id));
+      document.getElementById('escalado-name').textContent = escapeHtml(escaladoData.name || 'N/A');
+      document.getElementById('escalado-username').textContent = '@' + escapeHtml(escaladoData.username || 'N/A');
+      document.getElementById('escalado-paused-at').textContent =
+        new Date(escaladoData.paused_at).toLocaleString('es-ES', { timeZone: 'UTC' }) + ' UTC';
+
+      const reasonLabel = {
+        'escalacion': 'Escalación Automática',
+        'operador_manual': 'Pausado por Operador',
+        'requiere_ia': 'Requiere Intervención IA'
+      }[escaladoData.pause_reason] || 'Desconocida';
+      document.getElementById('escalado-reason').innerHTML = formatReasonBadge(escaladoData.pause_reason);
+
+      // Limpiar formulario
+      document.getElementById('escalado-message').value = '';
+      document.getElementById('escalado-char-count').textContent = '0';
+      document.getElementById('escalado-modal-status').textContent = '';
+      document.getElementById('btn-send-escalado').disabled = false;
+
+      // Guardar referencia del escalado actual
+      state.currentEscalado = escaladoData;
+
+      // Mostrar modal
+      modal.classList.remove('hidden');
+    } catch (error) {
+      console.error('Error abriendo modal de escalado:', error);
+      alert('Error al cargar detalles del escalado.');
+    }
+  };
+
+  /**
+   * Escalados: Cierra el modal
+   */
+  const closeEscaladoModal = () => {
+    const modal = document.getElementById('escalado-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    state.currentEscalado = null;
+  };
+
+  /**
+   * Escalados: Envía mensaje manual al contacto escalado
+   */
+  const sendHumanMessage = async () => {
+    const message = document.getElementById('escalado-message').value.trim();
+    const statusDiv = document.getElementById('escalado-modal-status');
+    const sendBtn = document.getElementById('btn-send-escalado');
+
+    // Validaciones
+    if (!message || message.length === 0) {
+      statusDiv.textContent = '❌ El mensaje no puede estar vacío.';
+      statusDiv.style.color = '#ff4d4d';
+      return;
+    }
+
+    if (message.length > 950) {
+      statusDiv.textContent = '❌ El mensaje excede 950 caracteres.';
+      statusDiv.style.color = '#ff4d4d';
+      return;
+    }
+
+    if (!state.currentEscalado || !state.currentEscalado.instagram_id) {
+      statusDiv.textContent = '❌ Error: escalado no identificado.';
+      statusDiv.style.color = '#ff4d4d';
+      return;
+    }
+
+    try {
+      sendBtn.disabled = true;
+      statusDiv.textContent = 'Enviando...';
+      statusDiv.style.color = '#9ba1a6';
+
+      const payload = {
+        instagram_id: state.currentEscalado.instagram_id,
+        message: message
+      };
+
+      const res = await fetch('/api/langgraph/inject-human-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error al enviar mensaje');
+      }
+
+      statusDiv.textContent = '✅ Mensaje enviado correctamente.';
+      statusDiv.style.color = '#00d26a';
+
+      // Limpiar y cerrar después de 2 segundos
+      setTimeout(() => {
+        closeEscaladoModal();
+        loadEscalados(); // Refrescar tabla
+      }, 2000);
+    } catch (error) {
+      console.error('Error enviando mensaje:', error);
+      statusDiv.textContent = `❌ ${error.message}`;
+      statusDiv.style.color = '#ff4d4d';
+      sendBtn.disabled = false;
+    }
+  };
+
+  /**
+   * Escalados: Character counter para el textarea
+   */
+  const initEscaladoCharCounter = () => {
+    const messageInput = document.getElementById('escalado-message');
+    const charCount = document.getElementById('escalado-char-count');
+
+    if (messageInput && charCount) {
+      messageInput.addEventListener('input', () => {
+        charCount.textContent = messageInput.value.length;
+      });
+    }
+  };
+
+  /**
+   * Escalados: Auto-refresh cada 10 segundos (solo si tab activo)
+   */
+  const startEscaladosAutoRefresh = () => {
+    if (state.escaladosRefreshInterval) clearInterval(state.escaladosRefreshInterval);
+
+    state.escaladosRefreshInterval = setInterval(() => {
+      const tabPane = document.getElementById('tab-escalados');
+      if (tabPane && tabPane.classList.contains('active')) {
+        loadEscalados();
+      }
+    }, 10000);
+  };
+
+  /**
+   * Parar auto-refresh
+   */
+  const stopEscaladosAutoRefresh = () => {
+    if (state.escaladosRefreshInterval) {
+      clearInterval(state.escaladosRefreshInterval);
+      state.escaladosRefreshInterval = null;
+    }
+  };
+
   // Inicialización global
   document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initKnowledgeDelegation();
+    initEscaladoCharCounter();
     loadAgentStats();
     if (window.mermaid) {
       // Tema oscuro: el Studio usa fondo dark; 'default' era ilegible.
       mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
     }
+
+    // Iniciar auto-refresh de escalados
+    startEscaladosAutoRefresh();
+  });
+
+  // Cleanup
+  window.addEventListener('beforeunload', () => {
+    stopEscaladosAutoRefresh();
   });
 
   // API Pública
@@ -389,7 +743,12 @@ const AgentsStudio = (() => {
     openAddKnowledgeModal,
     closeAddKnowledgeModal,
     saveKnowledge,
-    loadAgentStats
+    loadAgentStats,
+    // Escalados
+    loadEscalados,
+    openEscaladoModal,
+    closeEscaladoModal,
+    sendHumanMessage
   };
 })();
 

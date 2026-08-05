@@ -110,6 +110,9 @@
           <button class="tab-btn" data-target="tab-inspector">
             <i class="fas fa-project-diagram"></i> Grafo (LangGraph)
           </button>
+          <button class="tab-btn" data-target="tab-escalados">
+            <i class="fas fa-exclamation-circle"></i> Escalados Pendientes
+          </button>
         </div>
 
         <!-- Contenido de las pestañas -->
@@ -170,6 +173,19 @@
             </div>
           </div>
 
+          <!-- Pestaña: Escalados Pendientes -->
+          <div id="tab-escalados" class="tab-pane">
+            <div class="inspector-header">
+              <h3>🚨 Escalados Pendientes</h3>
+              <button class="btn btn-outline btn-sm" onclick="agentsStudio.loadEscalados()">
+                <i class="fas fa-sync-alt"></i> Refrescar
+              </button>
+            </div>
+            <div id="escalados-container" class="glass-panel" style="flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0;">
+              <div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando escalados...</div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -180,7 +196,7 @@
     <div class="glass-modal" style="max-width: 600px;">
       <header class="modal-header">
         <div class="modal-title">
-          <i class="fas fa-file-alt text-primary"></i> 
+          <i class="fas fa-file-alt text-primary"></i>
           <h2>Añadir Conocimiento</h2>
         </div>
         <button class="btn-close" onclick="agentsStudio.closeAddKnowledgeModal()"><i class="fas fa-times"></i></button>
@@ -200,6 +216,77 @@
             <i class="fas fa-save"></i> Guardar
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Detalles de Escalado -->
+  <div id="escalado-modal" class="modal-overlay hidden" style="z-index: 1020;">
+    <div class="glass-modal" style="max-width: 700px;">
+      <header class="modal-header">
+        <div class="modal-title">
+          <i class="fas fa-user-circle text-primary"></i>
+          <h2 id="escalado-modal-title">Detalles de Escalado</h2>
+        </div>
+        <button class="btn-close" onclick="agentsStudio.closeEscaladoModal()"><i class="fas fa-times"></i></button>
+      </header>
+      <div style="padding: 2rem;">
+        <!-- Información del contacto -->
+        <div class="escalado-info">
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Instagram ID</label>
+            <p id="escalado-instagram-id" style="margin: 0; font-family: monospace; color: #fff;"></p>
+          </div>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Nombre</label>
+            <p id="escalado-name" style="margin: 0; color: #fff;"></p>
+          </div>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Usuario</label>
+            <p id="escalado-username" style="margin: 0; color: #fff;"></p>
+          </div>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Pausado a</label>
+            <p id="escalado-paused-at" style="margin: 0; color: #fff; font-size: 0.9rem;"></p>
+          </div>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Razón</label>
+            <p id="escalado-reason" style="margin: 0;"></p>
+          </div>
+        </div>
+
+        <!-- Separador -->
+        <div style="border-top: 1px solid var(--glass-border); margin: 2rem 0; opacity: 0.5;"></div>
+
+        <!-- Responder manualmente -->
+        <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); border-radius: 8px; padding: 1.5rem;">
+          <h4 style="margin: 0 0 1rem 0; color: #fff;">Responder manualmente</h4>
+          <div style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem; font-size: 0.9rem;">Mensaje (máximo 950 caracteres):</label>
+            <textarea
+              id="escalado-message"
+              class="glass-input"
+              rows="5"
+              maxlength="950"
+              placeholder="Escribe tu respuesta aquí..."
+              style="margin-bottom: 0.5rem;">
+            </textarea>
+            <div style="text-align: right; font-size: 0.85rem; color: #9ba1a6;">
+              <span id="escalado-char-count">0</span>/950
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="form-actions" style="margin-top: 2rem;">
+          <button class="btn btn-outline" onclick="agentsStudio.closeEscaladoModal()">Cerrar</button>
+          <button id="btn-send-escalado" class="btn btn-primary" onclick="agentsStudio.sendHumanMessage()">
+            <i class="fas fa-paper-plane"></i> Enviar
+          </button>
+        </div>
+
+        <!-- Mensaje de estado en el modal -->
+        <div id="escalado-modal-status" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; min-height: 1.2rem;"></div>
       </div>
     </div>
   </div>

@@ -512,3 +512,159 @@ h1, h2, h3, h4 {
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow-x: auto;
 }
+
+/* ===== Escalados Tab Styles ===== */
+
+/* Tabla de escalados */
+.escalados-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+
+.escalados-table thead {
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.escalados-table th {
+  padding: 1rem;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #9ba1a6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.escalados-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+.escalados-table tbody tr:hover {
+  background: rgba(77, 163, 255, 0.05);
+}
+
+.escalados-table td {
+  padding: 1rem;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.escalados-table td:first-child {
+  font-weight: 500;
+  color: #4da3ff;
+}
+
+/* Badges de razón */
+.escalados-badge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: fit-content;
+}
+
+.escalados-badge.escalacion {
+  background: rgba(255, 77, 77, 0.15);
+  color: #ff4d4d;
+  border: 1px solid rgba(255, 77, 77, 0.3);
+}
+
+.escalados-badge.operador {
+  background: rgba(255, 184, 34, 0.15);
+  color: #ffb822;
+  border: 1px solid rgba(255, 184, 34, 0.3);
+}
+
+.escalados-badge.requiere_ia {
+  background: rgba(77, 163, 255, 0.15);
+  color: #4da3ff;
+  border: 1px solid rgba(77, 163, 255, 0.3);
+}
+
+/* Botón de ver detalles */
+.btn-view-escalado {
+  background: transparent;
+  border: 1px solid rgba(77, 163, 255, 0.3);
+  color: #4da3ff;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-view-escalado:hover {
+  background: rgba(77, 163, 255, 0.1);
+  border-color: #4da3ff;
+}
+
+/* Estado vacío */
+.escalados-empty {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #9ba1a6;
+}
+
+.escalados-empty i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+  color: #00d26a;
+}
+
+.escalados-empty h3 {
+  color: #00d26a;
+  margin-bottom: 0.5rem;
+  font-size: 1.2rem;
+}
+
+.escalados-empty p {
+  color: #9ba1a6;
+  margin: 0;
+}
+
+/* Información del escalado en modal */
+.escalado-info {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.escalado-info label {
+  color: #9ba1a6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .escalados-table {
+    font-size: 0.85rem;
+  }
+
+  .escalados-table th,
+  .escalados-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  /* En mobile, ocultar razón y mostrar solo lo esencial */
+  .escalados-table .escalados-razon {
+    display: none;
+  }
+
+  .escalados-table th:nth-child(3),
+  .escalados-table td:nth-child(3) {
+    display: none;
+  }
+}
