@@ -19,6 +19,7 @@ const UpdateFlowUseCase = require('../use-cases/UpdateFlowUseCase');
 const DeleteFlowUseCase = require('../use-cases/DeleteFlowUseCase');
 const TestFlowUseCase = require('../use-cases/TestFlowUseCase');
 const ExportFlowUseCase = require('../use-cases/ExportFlowUseCase');
+const GetPendingHumansUseCase = require('../use-cases/GetPendingHumansUseCase');
 
 function bootstrap(dependencies) {
   const { state, flowsConfig, supabaseClient, broadcastLog, recentReplies } = dependencies;
@@ -110,7 +111,9 @@ function bootstrap(dependencies) {
     flowRepository
   });
 
-  console.log('[Bootstrap] ✅ UseCases initialized (10/10)');
+  const getPendingHumansUseCase = new GetPendingHumansUseCase(supabaseGateway);
+
+  console.log('[Bootstrap] ✅ UseCases initialized (11/11)');
 
   // ============================================
   // 3. RETURN DI CONTAINER
@@ -136,7 +139,8 @@ function bootstrap(dependencies) {
       updateFlowUseCase,
       deleteFlowUseCase,
       testFlowUseCase,
-      exportFlowUseCase
+      exportFlowUseCase,
+      getPendingHumansUseCase
     },
 
     // Convenience shortcuts (message handlers)
@@ -151,7 +155,10 @@ function bootstrap(dependencies) {
     updateFlow: updateFlowUseCase,
     deleteFlow: deleteFlowUseCase,
     testFlow: testFlowUseCase,
-    exportFlow: exportFlowUseCase
+    exportFlow: exportFlowUseCase,
+
+    // Convenience shortcuts (escalation operations)
+    getPendingHumans: getPendingHumansUseCase
   };
 }
 

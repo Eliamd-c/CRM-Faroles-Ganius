@@ -27,6 +27,10 @@ module.exports = function(di) {
     meta
   );
 
+  // Instanciar use-case de escalado a humano
+  const GetPendingHumansUseCase = require('../use-cases/GetPendingHumansUseCase');
+  const getPendingHumansUseCase = new GetPendingHumansUseCase(supabaseGateway);
+
   // GET /api/langgraph/diagram - Obtener diagrama Mermaid
   router.get('/diagram', async (req, res) => {
     try {
@@ -79,7 +83,7 @@ module.exports = function(di) {
     try {
       const { thread_id } = req.params;
       const { message, checkpoint_id } = req.body;
-      
+
       if (!message) {
         return res.status(400).json({ status: 'error', message: 'Message is required' });
       }
@@ -89,10 +93,43 @@ module.exports = function(di) {
         message,
         checkpointId: checkpoint_id
       });
-      
+
       res.json(result);
     } catch (error) {
       res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
+  // GET /api/langgraph/pending-humans - Obtener clientes con bot pausado (escalados a humano)
+  router.get('/pending-humans', async (req, res) => {
+    try {
+      const { limit = 50 } = req.query;
+
+      // Validar limit en el controlador (defensa en profundidad)
+      const parsedLimit = Number(limit);
+      if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid limit: must be integer between 1 and 1000'
+        });
+      }
+
+      // Ejecutar use-case
+      const data = await getPendingHumansUseCase.execute(parsedLimit);
+
+      // Respuesta estructurada
+      res.json({
+        success: true,
+        data,
+        count: data.length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('[GetPendingHumans] Error:', error.message);
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      });
     }
   });
 
