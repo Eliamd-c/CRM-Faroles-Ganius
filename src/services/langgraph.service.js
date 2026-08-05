@@ -9,7 +9,23 @@ const supabase = require('../../db');
 const { state } = require('../shared');
 
 // ==========================================
-// 1. CONFIGURACIÓN DEL LLM
+// 1. ESTADO DE VENTAS (State Pattern)
+// ==========================================
+const OnboardingState = require('../domain/states/OnboardingState');
+const DiscoveryState = require('../domain/states/DiscoveryState');
+const RecommendationState = require('../domain/states/RecommendationState');
+const CheckoutState = require('../domain/states/CheckoutState');
+
+// Registro de estados (evita switch/case gigante)
+const SALES_STATES = {
+  ONBOARDING: new OnboardingState(),
+  DISCOVERY: new DiscoveryState(),
+  RECOMMENDATION: new RecommendationState(),
+  CHECKOUT: new CheckoutState()
+};
+
+// ==========================================
+// 2. CONFIGURACIÓN DEL LLM
 // ==========================================
 const llm = new ChatOpenAI({
   modelName: 'gpt-4o-mini',
@@ -17,7 +33,7 @@ const llm = new ChatOpenAI({
 });
 
 // ==========================================
-// 2. DEFINICIÓN DEL GRAFO
+// 3. DEFINICIÓN DEL GRAFO (con funnel_stage)
 // ==========================================
 
 const graphState = {
@@ -36,51 +52,122 @@ const graphState = {
   human_needed: {
     value: (x, y) => y,
     default: () => false
+  },
+  funnel_stage: {
+    value: (x, y) => y || x,
+    default: () => 'ONBOARDING'
   }
 };
 
-async function analyzeIntentNode(state) {
-  const lastMessage = state.messages[state.messages.length - 1];
+// ─── Nodo 1: Analizar Intención + Evaluar Transición de Etapa ───
+async function analyzeIntentNode(graphData) {
+  const lastMessage = graphData.messages[graphData.messages.length - 1];
+  const currentStage = graphData.funnel_stage || 'ONBOARDING';
   
-  const response = await llm.invoke(`Analiza este mensaje de un cliente: "${lastMessage.content}". 
-  Responde únicamente con una de estas categorías: 
-  - ESCALATE (si pide explícitamente hablar con un humano o asesor)
-  - OBJECTION (si es una objeción de precio, garantía, duda sobre durabilidad o proceso)
-  - GENERAL (cualquier otra cosa)`);
+  // Pedir al LLM que clasifique la intención Y sugiera si avanzar de etapa
+  const response = await llm.invoke(`Analiza este mensaje de un cliente: "${lastMessage.content}".
 
-  const category = response.content.trim().toUpperCase();
-  let human_needed = category.includes('ESCALATE');
-  
-  return { intent: category, human_needed };
+Etapa actual del embudo de ventas: ${currentStage}
+
+Responde en formato JSON estricto con estas dos claves:
+{
+  "intent": "ESCALATE | OBJECTION | PURCHASE_INTENT | GENERAL",
+  "should_advance": true | false
 }
 
-async function respondNode(stateGraph) {
-  // Cargar contexto maestro desde la variable inyectada por app.js
-  const context = state.AI_MASTER_CONTEXT || "Eres Faroles Genius, vendes faroles solares apoyando comunidades.";
+Reglas:
+- ESCALATE: si pide explícitamente hablar con un humano o asesor.
+- OBJECTION: si es una objeción de precio, garantía, duda sobre durabilidad.
+- PURCHASE_INTENT: si muestra interés claro en comprar, pide precio, o dice "quiero comprar".
+- GENERAL: cualquier otra cosa.
+- should_advance: true si la conversación ya maduró lo suficiente para pasar a la siguiente etapa del embudo.
+
+Devuelve SOLO el JSON, sin texto adicional.`);
+
+  let intent = 'GENERAL';
+  let shouldAdvance = false;
   
-  const response = await llm.invoke(`
-    Contexto Maestro (Reglas, Cialdini, Grice):
-    ${context}
+  try {
+    const parsed = JSON.parse(response.content.trim());
+    intent = (parsed.intent || 'GENERAL').toUpperCase();
+    shouldAdvance = parsed.should_advance === true;
+  } catch (e) {
+    // Fallback si el LLM no devuelve JSON válido
+    const raw = response.content.trim().toUpperCase();
+    if (raw.includes('ESCALATE')) intent = 'ESCALATE';
+    else if (raw.includes('OBJECTION')) intent = 'OBJECTION';
+    else if (raw.includes('PURCHASE_INTENT')) intent = 'PURCHASE_INTENT';
+  }
 
-    Historial reciente de la conversación:
-    ${stateGraph.messages.slice(-4).map(m => `[${m.role}]: ${m.content}`).join('\n')}
+  const human_needed = intent === 'ESCALATE';
+  
+  // Sanitizar estado inválido (Corrección #3 del Arquitecto)
+  if (!SALES_STATES[currentStage]) {
+    console.warn(`[StateMachine] ⚠️ Estado inválido "${currentStage}", reiniciando a ONBOARDING`);
+    return { intent, human_needed, funnel_stage: 'ONBOARDING' };
+  }
 
-    Intención detectada: ${stateGraph.intent}
-    
-    Genera una respuesta apropiada, cálida y persuasiva basándote en las directrices del Contexto Maestro.
-    Si es una objeción (OBJECTION), usa la técnica correspondiente (Autoridad, Prueba Social, etc.).
-    
-    REGLA CRÍTICA DE INSTAGRAM: Tu respuesta DEBE ser concisa y NUNCA superar los 800 caracteres en total. Si superas este límite, el mensaje fallará. Sé breve y directo.
-  `);
+  // Evaluar transición de etapa usando el State Pattern
+  // Corrección #1 del Arquitecto: El objeto de estado es la MÁXIMA AUTORIDAD.
+  // Siempre llamamos a evaluateTransition, pasándole la opinión del LLM.
+  let newStage = currentStage;
+  const currentStateObj = SALES_STATES[currentStage];
+  
+  const nextStage = currentStateObj.evaluateTransition({
+    messages: graphData.messages,
+    intent,
+    customer: graphData.customer,
+    llmShouldAdvance: shouldAdvance
+  });
+  
+  if (nextStage && SALES_STATES[nextStage]) {
+    newStage = nextStage;
+    console.log(`[StateMachine] 🔄 Transición: ${currentStage} → ${newStage}`);
+  }
 
+  return { intent, human_needed, funnel_stage: newStage };
+}
+
+// ─── Nodo 2: Generar Respuesta (Delegada al State Pattern) ───
+async function respondNode(graphData) {
+  const context = state.AI_MASTER_CONTEXT || "Eres Faroles Genius, vendes faroles solares apoyando comunidades.";
+  const currentStage = graphData.funnel_stage || 'ONBOARDING';
+  
+  // Obtener la clase de estado correspondiente
+  const stateObj = SALES_STATES[currentStage];
+  
+  if (!stateObj) {
+    console.error(`[StateMachine] Estado desconocido: ${currentStage}, usando ONBOARDING`);
+    const fallback = SALES_STATES['ONBOARDING'];
+    const prompt = fallback.getPrompt({
+      context,
+      messages: graphData.messages,
+      intent: graphData.intent,
+      customer: graphData.customer
+    });
+    const response = await llm.invoke(prompt);
+    return { messages: [{ role: 'assistant', content: response.content }] };
+  }
+
+  // Delegar la generación del prompt al objeto de estado (State Pattern)
+  const prompt = stateObj.getPrompt({
+    context,
+    messages: graphData.messages,
+    intent: graphData.intent,
+    customer: graphData.customer
+  });
+
+  const response = await llm.invoke(prompt);
   return { messages: [{ role: 'assistant', content: response.content }] };
 }
 
-function routerNode(state) {
-  if (state.human_needed) return "END_GRAPH";
+// ─── Router: Decidir si responder o escalar ───
+function routerNode(graphData) {
+  if (graphData.human_needed) return "END_GRAPH";
   return "RESPOND";
 }
 
+// ─── Compilar el Grafo ───
 const workflow = new StateGraph({ channels: graphState })
   .addNode("analyzeIntent", analyzeIntentNode)
   .addNode("respond", respondNode)
@@ -92,7 +179,7 @@ const workflow = new StateGraph({ channels: graphState })
   .addEdge("respond", END);
 
 // ==========================================
-// 3. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
+// 4. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
 // ==========================================
 class LangGraphService {
   constructor() {
@@ -102,7 +189,6 @@ class LangGraphService {
   }
 
   // Patrón "Local Initialization Check" (Node.js Design Patterns - Cap. 11)
-  // Garantiza que la BD y LangGraph se preparen de forma segura antes de usarse.
   async initialize() {
     if (this.isInitialized) return;
     
@@ -113,24 +199,20 @@ class LangGraphService {
             throw new Error('Falta la variable de entorno SUPABASE_DB_URL (PostgreSQL Connection String)');
           }
 
-          // Usar la cadena de conexión nativa de Postgres
           const pool = new Pool({
             connectionString: process.env.SUPABASE_DB_URL,
-            // Importante para conexiones remotas y SSL con Supabase
             ssl: { rejectUnauthorized: false } 
           });
 
           const checkpointer = new PostgresSaver(pool);
-          
-          // Ejecuta las migraciones internas (crea checkpoints, checkpoint_blobs, etc.)
           await checkpointer.setup(); 
 
           this.appGraph = workflow.compile({ checkpointer });
           this.isInitialized = true;
-          console.log('[LangGraphService] PostgresSaver inicializado exitosamente en Supabase.');
+          console.log('[LangGraphService] ✅ PostgresSaver + State Machine inicializados.');
         } catch (error) {
-          console.error('[LangGraphService] Error inicializando checkpointer:', error.message);
-          this.initializationPromise = null; // Permite reintento en caso de fallo
+          console.error('[LangGraphService] Error inicializando:', error.message);
+          this.initializationPromise = null;
           throw error;
         }
       })();
@@ -141,10 +223,8 @@ class LangGraphService {
 
   async processConversation(senderId, text, customerProfile) {
     try {
-      // 1. Garantizamos de manera asíncrona que la infraestructura esté lista.
       await this.initialize();
 
-      // 2. Invocación del grafo compilado
       const threadConfig = { configurable: { thread_id: senderId } };
       
       const inputs = {
@@ -155,11 +235,19 @@ class LangGraphService {
       const result = await this.appGraph.invoke(inputs, threadConfig);
       
       if (result.human_needed) {
-        return { action: 'pause_bot', reply: '¡Entendido! Un asesor humano (como María o uno de nuestros expertos) se pondrá en contacto contigo en breve para ayudarte personalmente.' };
+        return { 
+          action: 'pause_bot', 
+          reply: '¡Entendido! Un asesor humano se pondrá en contacto contigo en breve para ayudarte personalmente. 🙌',
+          funnel_stage: result.funnel_stage
+        };
       }
 
       const lastMsg = result.messages[result.messages.length - 1];
-      return { action: 'send_message', reply: lastMsg.content };
+      return { 
+        action: 'send_message', 
+        reply: lastMsg.content,
+        funnel_stage: result.funnel_stage 
+      };
       
     } catch (err) {
       console.error('[LangGraphService] Error procesando conversacion:', err);
@@ -210,7 +298,6 @@ class LangGraphService {
     }
     
     try {
-      // Inyectar el mensaje y forzar actualización del estado
       await this.appGraph.updateState(config, payload);
       return { success: true };
     } catch (err) {
