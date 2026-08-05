@@ -80,55 +80,53 @@ class HandleIncomingMessageUseCase {
     }
 
     // ============================================
-    // STATE-SPECIFIC HANDLERS (NO GUARD CONDITION)
+    // LANGGRAPH ORCHESTRATION (Brain)
     // ============================================
-
-    // Handle awaiting input state
-    if (contact.isAwaitingInput()) {
-      return await this._handleAwaitingInput(senderId, senderName, text, contact);
-    }
-
-    // ============================================
-    // FLOW MATCHING (Active state)
-    // ============================================
-
-    const matchedFlow = this._findMatchingFlow(text);
-    if (matchedFlow && matchedFlow.steps) {
-      matchedFlow.executionCount = (matchedFlow.executionCount || 0) + 1;
-      matchedFlow.lastExecutedAt = new Date().toISOString();
-      this.flow.saveFlowsConfig().catch(err => console.warn('⚠️ Error guardando flujos:', err.message));
-      await this.flow.processFlowSteps(matchedFlow.steps, senderId, senderName, new Set(), text);
-      return { status: 'flow_matched', contact, flow: matchedFlow };
-    }
-
-    // Try smart trigger with AI
-    console.log(`[Smart Trigger] Buscando intención con IA para: "${text}"`);
-    const smartFlowId = await this.openai.detectIntentWithAI(text, this.flowsConfig.flows, senderId);
-    if (smartFlowId) {
-      console.log(`[Smart Trigger] Intención detectada. Ejecutando flujo: ${smartFlowId}`);
-      const smartFlow = this.flowsConfig.flows.find(f => f.id === smartFlowId);
-      if (smartFlow && smartFlow.steps) {
-        smartFlow.executionCount = (smartFlow.executionCount || 0) + 1;
-        smartFlow.lastExecutedAt = new Date().toISOString();
-        this.flow.saveFlowsConfig().catch(err => console.warn('⚠️ Error guardando smart trigger:', err.message));
-        await this.flow.processFlowSteps(smartFlow.steps, senderId, senderName, new Set(), text);
-        return { status: 'smart_trigger_matched', contact, flow: smartFlow };
+    console.log(`[Router] Delegando mensaje de "${senderName}" a LangGraph`);
+    
+    try {
+      // Lazy load to avoid circular dependencies if any
+      const langGraphService = require('../services/langgraph.service');
+      
+      const result = await langGraphService.processConversation(senderId, text, contact);
+      
+      if (result.action === 'pause_bot') {
+        contact.switchToPaused();
+        await this.db.updateContact(contact);
+        if (result.reply) {
+          await this._sendInChunks(senderId, result.reply);
+        }
+        this.broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName}`);
+        return { status: 'bot_paused_by_ai', contact };
+      } else if (result.action === 'send_message' && result.reply) {
+        await this._sendInChunks(senderId, result.reply);
+        this.broadcastLog('SYSTEM', `LangGraph respondió a ${senderName}`);
+        return { status: 'ai_handled', contact };
+      } else if (result.action === 'error') {
+        this.broadcastLog('SYSTEM', `❌ Error interno en LangGraph: ${result.reply}`);
+        return { status: 'error', contact };
       }
+      
+      return { status: 'handled', contact };
+    } catch (err) {
+      console.error('[LangGraph] Error en ejecución principal:', err);
+      this.broadcastLog('SYSTEM', `❌ Excepción en LangGraph: ${err.message}`);
+      return { status: 'error', contact, error: err.message };
     }
-
-    // Fallback to default flow
-    if (this.flowsConfig.defaultFlow?.steps) {
-      console.log(`[Router] No hubo coincidencia. Ejecutando Default Flow.`);
-      await this.flow.processFlowSteps(this.flowsConfig.defaultFlow.steps, senderId, senderName, new Set(), text);
-      return { status: 'default_flow_executed', contact };
-    }
-
-    return { status: 'no_match', contact };
   }
 
   // ============================================
   // HELPER METHODS
   // ============================================
+  
+  async _sendInChunks(targetId, text) {
+    if (!text) return;
+    const chunks = text.match(/[\s\S]{1,950}/g) || [];
+    for (const chunk of chunks) {
+      await this.meta.sendMessage(targetId, chunk);
+      await new Promise(r => setTimeout(r, 500)); // Pequeña pausa entre mensajes
+    }
+  }
 
   _checkExitPattern(text) {
     const lowerTxt = text.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -136,98 +134,7 @@ class HandleIncomingMessageUseCase {
     return patterns.some(p => p.test(lowerTxt));
   }
 
-  _validateInput(text, inputType) {
-    const lowerTxt = text.trim();
-    if (inputType === 'email') return /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(lowerTxt);
-    if (inputType === 'phone') return /^\+?[\d\s-]{7,15}$/.test(lowerTxt);
-    if (inputType === 'number') return /^-?\d+(\.\d+)?$/.test(lowerTxt);
-    if (inputType === 'url') return /^https?:\/\/.+\..+/.test(lowerTxt);
-    if (inputType === 'date') return !isNaN(Date.parse(lowerTxt));
-    if (inputType === 'choice') {
-      // This will be handled separately
-      return true;
-    }
-    return lowerTxt.length > 0;
-  }
 
-  async _handleAwaitingInput(senderId, senderName, text, contact) {
-    const inputType = contact.awaitingInputType;
-    const lowerTxt = text.trim();
-
-    let isValid = false;
-    if (inputType === 'email') {
-      isValid = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(lowerTxt);
-    } else if (inputType === 'phone') {
-      isValid = /^\+?[\d\s-]{7,15}$/.test(lowerTxt);
-    } else if (inputType === 'number') {
-      isValid = /^-?\d+(\.\d+)?$/.test(lowerTxt);
-    } else if (inputType === 'url') {
-      isValid = /^https?:\/\/.+\..+/.test(lowerTxt);
-    } else if (inputType === 'date') {
-      isValid = !isNaN(Date.parse(lowerTxt));
-    } else if (inputType === 'choice') {
-      const choices = (contact.awaitingInputChoices || '').split(',').map(c => c.trim().toLowerCase());
-      isValid = choices.includes(lowerTxt.toLowerCase());
-    } else {
-      isValid = lowerTxt.length > 0;
-    }
-
-    if (isValid) {
-      contact.switchToActive();
-      if (contact.awaitingInputField) contact.setField(contact.awaitingInputField, lowerTxt);
-      await this.db.updateContact(contact);
-      this.broadcastLog('SYSTEM', `Dato capturado: ${lowerTxt} guardado`);
-      if (contact.currentFlowId) {
-        const successFlow = this.flowsConfig.flows.find(f => f.id === `flow_${contact.currentFlowId}`);
-        if (successFlow && successFlow.steps) await this.flow.processFlowSteps(successFlow.steps, senderId, senderName);
-      }
-      return { status: 'input_captured', contact };
-    } else {
-      contact.incrementRetries();
-      const retries = contact.awaitingInputRetries;
-      if (retries >= 3) {
-        contact.switchToActive();
-        contact.awaitingInputRetries = 0;
-        await this.db.updateContact(contact);
-        return { status: 'max_retries_reached', contact };
-      } else {
-        await this.db.updateContact(contact);
-        await this.meta.sendMessage(senderId, contact.awaitingInputPrompt || "Formato inválido. Intenta de nuevo:");
-        return { status: 'input_invalid', contact, retries };
-      }
-    }
-  }
-
-  _findMatchingFlow(text) {
-    const normalizedText = this.openai.removeAccents(text);
-    const lowerText = normalizedText.toLowerCase();
-    for (const f of this.flowsConfig.flows) {
-      if (f.enabled === false) continue;
-      if (!f.keywords || f.keywords.length === 0) continue;
-      const matchType = f.matchType || 'contains';
-      if (matchType === 'contains') {
-        const match = f.keywords.find(kw => {
-          const cleanKw = kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-          return lowerText.includes(cleanKw);
-        });
-        if (match) return f;
-      } else if (matchType === 'exact') {
-        const match = f.keywords.find(kw => lowerText === kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""));
-        if (match) return f;
-      } else if (matchType === 'starts_with') {
-        const match = f.keywords.find(kw => lowerText.startsWith(kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")));
-        if (match) return f;
-      } else if (matchType === 'regex') {
-        const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const match = f.keywords.some(kw => {
-          try { return new RegExp('\\b' + escapeRegExp(kw.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")) + '\\b', 'i').test(lowerText); }
-          catch (e) { return false; }
-        });
-        if (match) return f;
-      }
-    }
-    return null;
-  }
 }
 
 module.exports = HandleIncomingMessageUseCase;
