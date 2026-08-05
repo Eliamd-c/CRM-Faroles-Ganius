@@ -4,80 +4,6 @@ const { BaseCheckpointSaver } = require('@langchain/langgraph-checkpoint');
 const supabase = require('../../db');
 
 // ==========================================
-// 1. CHECKPOINTER CUSTOM PARA SUPABASE JS
-// ==========================================
-class SupabaseSaver extends BaseCheckpointSaver {
-  constructor(client) {
-    super();
-    this.client = client;
-    this.tableName = 'langgraph_checkpoints';
-  }
-
-  async put(config, checkpoint, metadata, newVersions) {
-    const threadId = config.configurable.thread_id;
-    if (!threadId) throw new Error('thread_id is required');
-    
-    // Convertir el checkpoint a JSON seguro
-    // NOTA ARQUITECTÓNICA: En el futuro, implementar truncado de 'messages' en el estado
-    // para evitar cuellos de botella al parsear/stringificar en el Event Loop.
-    const cp = JSON.stringify(checkpoint);
-    
-    // Upsert a Supabase
-    const { error } = await this.client
-      .from(this.tableName)
-      .upsert({
-        thread_id: threadId,
-        checkpoint: cp,
-        metadata: metadata ? JSON.stringify(metadata) : null,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'thread_id' });
-      
-    if (error) {
-      console.error('[SupabaseSaver] Error saving checkpoint:', error);
-      // Principio "Fail Fast": Lanzar el error para no dejar la app en estado inconsistente
-      throw error;
-    }
-
-    return {
-      configurable: {
-        thread_id: threadId,
-        checkpoint_ns: config.configurable.checkpoint_ns,
-        checkpoint_id: checkpoint.id,
-      },
-    };
-  }
-
-  async getTuple(config) {
-    const threadId = config.configurable.thread_id;
-    const { data, error } = await this.client
-      .from(this.tableName)
-      .select('checkpoint, metadata')
-      .eq('thread_id', threadId)
-      .single();
-
-    if (error || !data) return undefined;
-    
-    try {
-      const checkpoint = typeof data.checkpoint === 'string' ? JSON.parse(data.checkpoint) : data.checkpoint;
-      const metadata = data.metadata ? (typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata) : {};
-      
-      return {
-        checkpoint,
-        metadata,
-        config,
-      };
-    } catch(err) {
-      console.error('[SupabaseSaver] Error parsing checkpoint:', err);
-      return undefined;
-    }
-  }
-
-  async *list(config, options) {
-      yield* [];
-  }
-}
-
-// ==========================================
 // 2. DEFINICIÓN DEL GRAFO
 // ==========================================
 const llm = new ChatOpenAI({
@@ -157,7 +83,8 @@ const workflow = new StateGraph({ channels: graphState })
   .addEdge("respond", END);
 
 // Compilar con checkpointer
-const checkpointer = new SupabaseSaver(supabase);
+const { MemorySaver } = require('@langchain/langgraph-checkpoint');
+const checkpointer = new MemorySaver();
 // Removemos interruptBefore porque ruteamos directamente a END cuando requiere humano
 const appGraph = workflow.compile({ checkpointer });
 
