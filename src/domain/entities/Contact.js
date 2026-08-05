@@ -112,6 +112,11 @@ class Contact {
     this.botPaused = true;
   }
 
+  // Alias usado por HandleIncomingMessageUseCase
+  switchToPaused() {
+    this.botPaused = true;
+  }
+
   resume() {
     this.botPaused = false;
   }

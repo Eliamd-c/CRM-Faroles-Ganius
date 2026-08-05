@@ -6,6 +6,7 @@ const OpenAiGateway = require('../adapters/gateways/OpenAiGateway');
 const FlowGateway = require('../adapters/gateways/FlowGateway');
 const SupabaseGateway = require('../adapters/gateways/SupabaseGateway');
 const FlowRepository = require('../adapters/gateways/FlowRepository');
+const langGraphService = require('../services/langgraph.service');
 
 const HandleIncomingMessageUseCase = require('../use-cases/HandleIncomingMessageUseCase');
 const HandleCommentUseCase = require('../use-cases/HandleCommentUseCase');
@@ -47,6 +48,7 @@ function bootstrap(dependencies) {
     openaiGateway,
     flowGateway,
     supabaseGateway,
+    langGraphService,
     state,
     flowsConfig,
     broadcastLog
