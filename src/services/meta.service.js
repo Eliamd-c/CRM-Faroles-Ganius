@@ -250,7 +250,7 @@ async function sendGallery(recipientId, images, delayBetweenMs = 300) {
   for (const img of images) {
     try {
       await axios.post(graphUrl('/me/messages'), {
-        recipient: { id: recipientId },
+        recipient: { id: normalizeId(recipientId) },
         message: { attachment: { type: 'image', payload: { url: img.url, is_reusable: true } } }
       }, { params: { access_token: state.ACCESS_TOKEN } });
     } catch (err) {

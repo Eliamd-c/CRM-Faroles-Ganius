@@ -31,7 +31,7 @@ class TriggerStaticFlowCommand extends Command {
   async execute(args, context) {
     try {
       const { flow_id } = args;
-      const { instagramId, customer } = context;
+      const { senderId, customer } = context;
       
       const flowService = require('../../services/flow.service');
       const { state } = require('../../shared');
@@ -46,8 +46,8 @@ class TriggerStaticFlowCommand extends Command {
         return { status: 'error', message: `Flujo ${flow_id} no encontrado o vacío` };
       }
 
-      const senderName = customer?.name || instagramId;
-      await flowService.processFlowSteps(flow.steps, instagramId, senderName, new Set(), "");
+      const senderName = customer?.name || senderId;
+      await flowService.processFlowSteps(flow.steps, senderId, senderName, new Set(), "");
       return { status: 'success', message: `Flujo ${flow.name || flow_id} ejecutado correctamente.` };
 
     } catch (error) {

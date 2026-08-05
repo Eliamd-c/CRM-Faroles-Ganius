@@ -250,7 +250,7 @@ async function toolNode(graphData) {
 
     // Ejecutar el Comando correspondiente (Command Pattern)
     const context = {
-      senderId: graphData.customer?.instagram_id || 'unknown',
+      senderId: graphData.customer?.instagramId || 'unknown',
       customer: graphData.customer,
       meta,
       supabase
