@@ -21,6 +21,11 @@ function graphUrl(path) {
   return `${state.GRAPH_API}${path}`;
 }
 
+// Normalizar recipientId a string (Meta API exige string, no número)
+function normalizeId(id) {
+  return String(id).trim();
+}
+
 async function getUserProfile(senderId) {
   try {
     const response = await axios.get(graphUrl(`/${senderId}`), {
@@ -48,7 +53,7 @@ async function sendMessage(recipientId, text, quickReplies = null) {
       }));
     }
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: messagePayload,
     }, { params: { access_token: state.ACCESS_TOKEN } });
     console.log(`✅ DM enviado a ${recipientId}`);
@@ -81,7 +86,7 @@ async function sendTemplate(recipientId, text, buttons) {
         : { type: 'postback', title: b.title, payload: b.payload }
     );
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: {
         attachment: {
           type: 'template',
@@ -111,7 +116,7 @@ async function sendIceBreaker(recipientId, question, suggestions = []) {
       }));
     }
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: messagePayload,
     }, { params: { access_token: state.ACCESS_TOKEN } });
     console.log(`❄️ Ice Breaker enviado a ${recipientId}`);
@@ -137,11 +142,11 @@ async function sendQuickReplies(recipientId, text, options = []) {
       }))
     };
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: messagePayload,
     }, { params: { access_token: state.ACCESS_TOKEN } });
-    console.log(`⚡ Quick Replies enviado a ${recipientId}`);
-    broadcastLog('SYSTEM', `Quick Replies enviado a ${recipientId}`);
+    console.log(`⚡ Quick Replies enviado a ${normalizeId(recipientId)}`);
+    broadcastLog('SYSTEM', `Quick Replies enviado a ${normalizeId(recipientId)}`);
     logMessageToDB(recipientId, 'outbound', 'text', text);
   } catch (err) {
     const errorMsg = err.response?.data?.error?.message || err.message;
@@ -154,7 +159,7 @@ async function sendQuickReplies(recipientId, text, options = []) {
 async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPDATE') {
   try {
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { text },
       messaging_type: 'MESSAGE_TAG',
       tag: messagingTag
@@ -172,7 +177,7 @@ async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPD
 async function sendMediaMessage(recipientId, type, url) {
   try {
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type, payload: { url, is_reusable: true } } }
     }, { params: { access_token: state.ACCESS_TOKEN }, timeout: 15000 });
     console.log(`✅ Media (${type}) enviado a ${recipientId}`);
@@ -197,7 +202,7 @@ async function sendCard(recipientId, cardData) {
       buttons: [button]
     };
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'template', payload: { template_type: 'generic', elements: [element] } } },
     }, { params: { access_token: state.ACCESS_TOKEN } });
     console.log(`✅ Tarjeta enviada a ${recipientId}`);
@@ -228,7 +233,7 @@ async function sendCarousel(recipientId, elements) {
   });
   try {
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'template', payload: { template_type: 'generic', elements: formattedElements } } }
     }, { params: { access_token: state.ACCESS_TOKEN } });
     broadcastLog('SYSTEM', `Carrusel (${formattedElements.length} tarjetas) enviado a ${recipientId}`);
@@ -260,7 +265,7 @@ async function sendGallery(recipientId, images, delayBetweenMs = 300) {
 async function sendAudio(recipientId, audioUrl) {
   try {
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: true } } }
     }, { params: { access_token: state.ACCESS_TOKEN } });
     broadcastLog('SYSTEM', `Audio enviado a ${recipientId}`);
@@ -275,7 +280,7 @@ async function sendAudio(recipientId, audioUrl) {
 async function sendVideo(recipientId, videoUrl) {
   try {
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'video', payload: { url: videoUrl, is_reusable: true } } }
     }, { params: { access_token: state.ACCESS_TOKEN } });
     broadcastLog('SYSTEM', `Video enviado a ${recipientId}`);
@@ -290,7 +295,7 @@ async function sendVideo(recipientId, videoUrl) {
 async function sendFile(recipientId, fileUrl) {
   try {
     await axios.post(graphUrl('/me/messages'), {
-      recipient: { id: recipientId },
+      recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'file', payload: { url: fileUrl, is_reusable: true } } }
     }, { params: { access_token: state.ACCESS_TOKEN } });
     broadcastLog('SYSTEM', `Archivo enviado a ${recipientId}`);
