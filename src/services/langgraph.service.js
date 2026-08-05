@@ -6,6 +6,7 @@ const { ChatOpenAI } = require('@langchain/openai');
 const { PostgresSaver } = require('@langchain/langgraph-checkpoint-postgres');
 const { Pool } = require('pg');
 const supabase = require('../../db');
+const { state } = require('../shared');
 
 // ==========================================
 // 1. CONFIGURACIÓN DEL LLM
@@ -53,18 +54,18 @@ async function analyzeIntentNode(state) {
   return { intent: category, human_needed };
 }
 
-async function respondNode(state) {
-  // Cargar contexto maestro desde la variable global inyectada por app.js
-  const context = global.AI_MASTER_CONTEXT || "Eres Faroles Genius, vendes faroles solares apoyando comunidades.";
+async function respondNode(stateGraph) {
+  // Cargar contexto maestro desde la variable inyectada por app.js
+  const context = state.AI_MASTER_CONTEXT || "Eres Faroles Genius, vendes faroles solares apoyando comunidades.";
   
   const response = await llm.invoke(`
     Contexto Maestro (Reglas, Cialdini, Grice):
     ${context}
 
     Historial reciente de la conversación:
-    ${state.messages.slice(-4).map(m => `[${m.role}]: ${m.content}`).join('\n')}
+    ${stateGraph.messages.slice(-4).map(m => `[${m.role}]: ${m.content}`).join('\n')}
 
-    Intención detectada: ${state.intent}
+    Intención detectada: ${stateGraph.intent}
     
     Genera una respuesta apropiada, cálida y persuasiva basándote en las directrices del Contexto Maestro.
     Si es una objeción (OBJECTION), usa la técnica correspondiente (Autoridad, Prueba Social, etc.).
