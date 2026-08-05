@@ -258,6 +258,13 @@ app.get('/health/builder', (req, res) => {
 // ═══════════════════════════════════════════════
 app.get('/api/flows', (req, res) => res.json(state.flowsConfig));
 
+// ═══════════════════════════════════════════════
+// LANGGRAPH API
+// ═══════════════════════════════════════════════
+const langgraphRoutes = require('./src/routes/langgraphRoutes')(di);
+app.use('/api/langgraph', requireAuth, langgraphRoutes);
+
+
 app.get('/api/instagram/media', async (req, res) => {
   try {
     if (!state.ACCESS_TOKEN) return res.status(503).json({ error: 'No access token configured' });

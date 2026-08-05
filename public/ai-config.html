@@ -25,6 +25,9 @@
                 <button class="tab-btn" data-target="knowledge-tab">
                     <span class="icon">📚</span> Base de Conocimiento
                 </button>
+                <button class="tab-btn" data-target="langgraph-tab">
+                    <span class="icon">🧠</span> LangGraph Studio
+                </button>
             </nav>
         </aside>
 
@@ -122,12 +125,28 @@
                     </table>
                 </div>
             </div>
+
+            <!-- TAB 4: LangGraph Studio -->
+            <div id="langgraph-tab" class="tab-content">
+                <div class="tab-header">
+                    <h2>LangGraph Studio (Inspector de Arquitectura)</h2>
+                    <p>Visualiza el flujo cognitivo del cerebro de la IA. El esquema del grafo se renderiza en vivo usando Mermaid.js.</p>
+                    <button id="refresh-graph-btn" class="btn secondary">Actualizar Diagrama</button>
+                </div>
+                
+                <div class="editor-container" style="background: white; padding: 20px; border-radius: 8px; text-align: center; overflow-x: auto;">
+                    <div id="mermaid-container">
+                        <p style="color: #666; font-style: italic;">Haz clic en "LangGraph Studio" para cargar el diagrama...</p>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 
     <div id="toast" class="toast">Notificación</div>
 
     <script src="ai-config.js"></script>
+    <script src="/js/langgraph-inspector.js"></script>
     <script src="/components/navbar.js"></script>
 </body>
 </html>

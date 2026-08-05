@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatHeaderInfoEl = document.getElementById('chatHeaderInfo');
   const messageInputEl = document.getElementById('messageInput');
   const btnSendMessageEl = document.getElementById('btnSendMessage');
+  const btnInjectResumeEl = document.getElementById('btnInjectResume');
   const btnToggleBotEl = document.getElementById('btnToggleBot');
   const botStatusTextEl = document.getElementById('botStatusText');
 
@@ -76,8 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderContactsList(filtered);
   }
 
-  // ─── Send message ───
   btnSendMessageEl.addEventListener('click', sendMessage);
+  btnInjectResumeEl.addEventListener('click', injectAndResume);
   messageInputEl.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -221,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     messageInputEl.disabled = false;
     btnSendMessageEl.disabled = false;
+    btnInjectResumeEl.disabled = !contact.bot_paused; // Only enable inject if bot is paused
     btnToggleBotEl.disabled = false;
     updateBotToggleButton(contact.bot_paused);
 
@@ -361,9 +363,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isPaused) {
       btnToggleBotEl.className = 'btn-toggle-bot bot-off';
       botStatusTextEl.textContent = 'Bot Pausado';
+      btnInjectResumeEl.disabled = false;
     } else {
       btnToggleBotEl.className = 'btn-toggle-bot bot-on';
       botStatusTextEl.textContent = 'Bot Activo';
+      btnInjectResumeEl.disabled = true;
     }
   }
 
@@ -508,6 +512,46 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       messageInputEl.disabled = false;
       btnSendMessageEl.disabled = false;
+      if (currentContact) btnInjectResumeEl.disabled = !currentContact.bot_paused;
+      messageInputEl.focus();
+    }
+  }
+
+  async function injectAndResume() {
+    const text = messageInputEl.value.trim();
+    if (!text || !currentContact) return;
+
+    messageInputEl.value = '';
+    messageInputEl.disabled = true;
+    btnSendMessageEl.disabled = true;
+    btnInjectResumeEl.disabled = true;
+
+    const div = document.createElement('div');
+    div.className = 'message outbound';
+    const now = new Date();
+    div.innerHTML = `${esc(text)}<div class="msg-time">${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} <i class="fa-solid fa-clock" style="opacity:0.4"></i></div>`;
+    chatMessagesEl.appendChild(div);
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+
+    try {
+      const res = await apiFetch(`/api/langgraph/resume/${currentContact.instagram_id}`, {
+        method: 'POST',
+        body: JSON.stringify({ message: text })
+      });
+
+      if (res && res.success) {
+        currentContact.bot_paused = false;
+        updateBotToggleButton(false);
+        profileBotStatusEl.textContent = 'Activo';
+        profileBotStatusEl.className = 'status-badge';
+        setTimeout(() => fetchMessages(currentContact.instagram_id), 1000);
+      }
+    } catch (err) {
+      alert('Error inyectando mensaje en LangGraph: ' + err.message);
+    } finally {
+      messageInputEl.disabled = false;
+      btnSendMessageEl.disabled = false;
+      if (currentContact) btnInjectResumeEl.disabled = !currentContact.bot_paused;
       messageInputEl.focus();
     }
   }

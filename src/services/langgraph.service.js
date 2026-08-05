@@ -165,6 +165,57 @@ class LangGraphService {
       return { action: 'error', reply: err.message || err.toString() };
     }
   }
+
+  // ==========================================
+  // HERRAMIENTAS DE INSPECCIÓN Y TIME TRAVEL
+  // ==========================================
+  
+  getGraphDiagram() {
+    if (!this.appGraph) return null;
+    return this.appGraph.getGraph().drawMermaid();
+  }
+
+  async getStateHistory(threadId, limit = 10) {
+    await this.initialize();
+    const config = { configurable: { thread_id: threadId } };
+    const stateHistory = [];
+    
+    try {
+      const historyGenerator = await this.appGraph.getStateHistory(config);
+      let count = 0;
+      for await (const stateSnapshot of historyGenerator) {
+        if (count >= limit) break;
+        stateHistory.push({
+          checkpoint_id: stateSnapshot.config.configurable.checkpoint_id,
+          created_at: stateSnapshot.createdAt,
+          values: stateSnapshot.values,
+          next: stateSnapshot.next
+        });
+        count++;
+      }
+      return stateHistory;
+    } catch (err) {
+      console.error('[LangGraphService] Error obteniendo historial:', err);
+      throw err;
+    }
+  }
+
+  async updateState(threadId, payload, checkpointId = null) {
+    await this.initialize();
+    const config = { configurable: { thread_id: threadId } };
+    if (checkpointId) {
+      config.configurable.checkpoint_id = checkpointId;
+    }
+    
+    try {
+      // Inyectar el mensaje y forzar actualización del estado
+      await this.appGraph.updateState(config, payload);
+      return { success: true };
+    } catch (err) {
+      console.error('[LangGraphService] Error inyectando estado:', err);
+      throw err;
+    }
+  }
 }
 
 module.exports = new LangGraphService();
