@@ -469,17 +469,34 @@ class LangGraphService {
         };
       }
 
-      const lastMsg = result.messages[result.messages.length - 1];
+      // CRITICAL FIX: Filtrar tool messages - solo tomar assistant messages para reply
+      // Los tool messages contienen JSON de resultados internos que NO deben verse al usuario
+      const assistantMsgs = result.messages.filter(m => m.role === 'assistant');
+      const lastAssistantMsg = assistantMsgs.length > 0
+        ? assistantMsgs[assistantMsgs.length - 1]
+        : null;
+
+      // Si estamos pausando para quick_reply y no hay mensaje assistant, no enviar nada
+      if (!lastAssistantMsg && result.awaiting_quick_reply) {
+        console.log(`[LangGraphService] ⏸️ Pausa de conversación (quick_reply) - sin reply adicional`);
+        return {
+          action: 'pause_for_input',
+          reply: '',
+          funnel_stage: result.funnel_stage,
+          awaiting_quick_reply: true
+        };
+      }
 
       // 🔍 LOGGING DE RESULTADO
       console.log(`[LangGraphService] ✅ Respuesta generada:`);
       console.log(`   Etapa: ${result.funnel_stage}`);
       console.log(`   Intención: ${result.intent}`);
-      console.log(`   Respuesta: "${lastMsg.content.substring(0, 50)}..."`);
+      console.log(`   Respuesta: "${lastAssistantMsg?.content?.substring(0, 50)}..."`);
+      console.log(`   Awaiting quick_reply: ${result.awaiting_quick_reply || false}`);
 
       return {
-        action: 'send_message',
-        reply: lastMsg.content,
+        action: lastAssistantMsg ? 'send_message' : 'pause_for_input',
+        reply: lastAssistantMsg?.content || '',
         funnel_stage: result.funnel_stage,
         awaiting_quick_reply: result.awaiting_quick_reply || false
       };

@@ -87,7 +87,15 @@ class HandleIncomingMessageUseCase {
     
     try {
       const result = await this.langGraphService.processConversation(senderId, text, contact);
-      
+
+      // CRITICAL FIX: Verificar awaiting_quick_reply PRIMERO
+      // Si el agente envió quick_replies, pausar conversación sin enviar mensaje adicional
+      if (result.awaiting_quick_reply) {
+        console.log(`[HandleMessage] ⏸️ Quick replies enviados - awaiting_quick_reply=true, pausando conversación`);
+        this.broadcastLog('SYSTEM', `Esperando respuesta del usuario en botones...`);
+        return { status: 'awaiting_quick_reply', contact };
+      }
+
       if (result.action === 'pause_bot') {
         contact.switchToPaused(); // estado en memoria
         await this.db.pauseBot(senderId, 'escalado_langgraph'); // persistencia + timestamp
@@ -96,6 +104,11 @@ class HandleIncomingMessageUseCase {
         }
         this.broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName}`);
         return { status: 'bot_paused_by_ai', contact };
+      } else if (result.action === 'pause_for_input') {
+        // Pausa para input sin escalado a humano (ej. await_quick_reply)
+        console.log(`[HandleMessage] ⏸️ Pausa para input detectada`);
+        this.broadcastLog('SYSTEM', `Sistema pausado esperando entrada del usuario`);
+        return { status: 'awaiting_input', contact };
       } else if (result.action === 'send_message' && result.reply) {
         await this._sendInChunks(senderId, result.reply);
         this.broadcastLog('SYSTEM', `LangGraph respondió a ${senderName}`);
@@ -104,7 +117,7 @@ class HandleIncomingMessageUseCase {
         this.broadcastLog('SYSTEM', `❌ Error interno en LangGraph: ${result.reply}`);
         return { status: 'error', contact };
       }
-      
+
       return { status: 'handled', contact };
     } catch (err) {
       console.error('[LangGraph] Error en ejecución principal (SPOF):', err);

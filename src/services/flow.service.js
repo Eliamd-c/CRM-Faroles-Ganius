@@ -217,10 +217,21 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
           
           // Ejecución asíncrona ("Fire and forget")
           langGraph.processConversation(senderId, triggerText, customer).then(async (result) => {
+            // CRITICAL FIX: Verificar awaiting_quick_reply primero
+            if (result.awaiting_quick_reply) {
+              console.log(`[LangGraph Flow Trigger] ⏸️ Quick replies enviados - awaiting_quick_reply=true`);
+              broadcastLog('SYSTEM', `Esperando respuesta del usuario en botones...`);
+              return;
+            }
+
             if (result.action === 'pause_bot') {
               await supabaseGateway.pauseBot(senderId, 'escalado_langgraph');
               await meta.sendMessageInChunks(senderId, result.reply);
               broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName} (Requiere humano)`);
+            } else if (result.action === 'pause_for_input') {
+              // Pausa para input sin escalado a humano
+              console.log(`[LangGraph Flow Trigger] ⏸️ Pausa para input detectada`);
+              broadcastLog('SYSTEM', `Sistema pausado esperando entrada del usuario`);
             } else if (result.action === 'send_message' && result.reply) {
               await meta.sendMessage(senderId, result.reply);
               broadcastLog('SYSTEM', `LangGraph respondió a ${senderName}: ${result.reply.substring(0, 50)}...`);
