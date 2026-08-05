@@ -26,7 +26,8 @@ class SaveCustomerDataCommand extends Command {
           properties: {
             field_name: {
               type: 'string',
-              description: 'Nombre del campo a guardar (ej. "presupuesto", "ubicacion", "cantidad_faroles", "espacio_a_iluminar")'
+              description: 'Nombre del campo a guardar',
+              enum: ['presupuesto', 'ubicacion', 'cantidad_faroles', 'espacio_a_iluminar', 'modelo_interes']
             },
             field_value: {
               type: 'string',
@@ -65,7 +66,7 @@ class SaveCustomerDataCommand extends Command {
 
     } catch (err) {
       console.error('[SaveCustomerData] Error:', err.message);
-      return { success: false, message: err.message };
+      throw err;
     }
   }
 }

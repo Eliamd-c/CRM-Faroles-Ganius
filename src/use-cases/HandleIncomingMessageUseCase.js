@@ -4,7 +4,7 @@
 const Contact = require('../domain/entities/Contact');
 
 class HandleIncomingMessageUseCase {
-  constructor({ metaGateway, openaiGateway, flowGateway, supabaseGateway, state, flowsConfig, broadcastLog }) {
+  constructor({ metaGateway, openaiGateway, flowGateway, supabaseGateway, langGraphService, state, flowsConfig, broadcastLog }) {
     this.meta = metaGateway;
     this.openai = openaiGateway;
     this.flow = flowGateway;
@@ -12,6 +12,7 @@ class HandleIncomingMessageUseCase {
     this.state = state;
     this.flowsConfig = flowsConfig;
     this.broadcastLog = broadcastLog;
+    this.langGraphService = langGraphService;
   }
 
   async execute(inputData) {
@@ -85,10 +86,7 @@ class HandleIncomingMessageUseCase {
     console.log(`[Router] Delegando mensaje de "${senderName}" a LangGraph`);
     
     try {
-      // Lazy load to avoid circular dependencies if any
-      const langGraphService = require('../services/langgraph.service');
-      
-      const result = await langGraphService.processConversation(senderId, text, contact);
+      const result = await this.langGraphService.processConversation(senderId, text, contact);
       
       if (result.action === 'pause_bot') {
         contact.switchToPaused();
@@ -132,9 +130,11 @@ class HandleIncomingMessageUseCase {
   
   async _sendInChunks(targetId, text) {
     if (!text) return;
-    const chunks = text.match(/[\s\S]{1,950}/g) || [];
-    for (const chunk of chunks) {
+    let index = 0;
+    while (index < text.length) {
+      const chunk = text.slice(index, index + 950);
       await this.meta.sendMessage(targetId, chunk);
+      index += 950;
       await new Promise(r => setTimeout(r, 500)); // Pequeña pausa entre mensajes
     }
   }

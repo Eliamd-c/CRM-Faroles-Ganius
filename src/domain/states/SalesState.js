@@ -28,8 +28,11 @@ class SalesState {
    * @returns {string|null} El nombre de la siguiente etapa, o null si permanece.
    */
   evaluateTransition({ messages, intent, customer, llmShouldAdvance }) {
-    // Regla global: saltar a CHECKOUT si hay intención de compra explícita
-    if (intent === 'PURCHASE_INTENT') return 'CHECKOUT';
+    // Si hay intención de compra, verificar si ya sabemos qué quiere
+    if (intent === 'PURCHASE_INTENT') {
+      const hasProductInterest = customer?.fields?.modelo_interes || customer?.fields?.espacio_a_iluminar;
+      return hasProductInterest ? 'CHECKOUT' : 'DISCOVERY';
+    }
     return null;
   }
 }

@@ -103,7 +103,9 @@ Reglas:
 
 Devuelve SOLO el JSON, sin texto adicional.`));
 
-    const parsed = JSON.parse(response.content.trim());
+    const raw = response.content.trim();
+    if (raw.length > 50000) throw new Error('Payload to large for Event Loop');
+    const parsed = JSON.parse(raw);
     intent = (parsed.intent || 'GENERAL').toUpperCase();
     shouldAdvance = parsed.should_advance === true;
   } catch (e) {
@@ -232,7 +234,9 @@ async function toolNode(graphData) {
     const fnName = toolCall.function?.name;
     let fnArgs = {};
     try {
-      fnArgs = JSON.parse(toolCall.function?.arguments || '{}');
+      const rawArgs = toolCall.function?.arguments || '{}';
+      if (rawArgs.length > 50000) throw new Error('Tool args too large');
+      fnArgs = JSON.parse(rawArgs);
     } catch (e) {
       console.error(`[ToolNode] Error parseando argumentos de ${fnName}:`, e.message);
       toolResults.push({
@@ -305,6 +309,7 @@ class LangGraphService {
     this.appGraph = null;
     this.isInitialized = false;
     this.initializationPromise = null;
+    this.pool = null;
   }
 
   // Patrón "Local Initialization Check" (Node.js Design Patterns - Cap. 11)
@@ -318,12 +323,12 @@ class LangGraphService {
             throw new Error('Falta la variable de entorno SUPABASE_DB_URL (PostgreSQL Connection String)');
           }
 
-          const pool = new Pool({
+          this.pool = new Pool({
             connectionString: process.env.SUPABASE_DB_URL,
             ssl: { rejectUnauthorized: false } 
           });
 
-          const checkpointer = new PostgresSaver(pool);
+          const checkpointer = new PostgresSaver(this.pool);
           await checkpointer.setup(); 
 
           this.appGraph = workflow.compile({ checkpointer });
@@ -336,8 +341,17 @@ class LangGraphService {
         }
       })();
     }
-    
     await this.initializationPromise;
+  }
+
+  async destroy() {
+    if (this.pool) {
+      await this.pool.end();
+      this.pool = null;
+      console.log('[LangGraphService] 🛑 PostgresSaver (Pool) cerrado.');
+    }
+    this.isInitialized = false;
+    this.initializationPromise = null;
   }
 
   async processConversation(senderId, text, customerProfile) {

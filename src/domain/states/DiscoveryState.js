@@ -37,7 +37,8 @@ REGLAS:
 - Haz máximo 1-2 preguntas por mensaje. No interrogues.
 - Usa lenguaje natural y cálido.
 - Máximo 800 caracteres.
-- CRÍTICO (RAG): Si el cliente pregunta detalles técnicos, precios, especificaciones o políticas, DEBES usar la herramienta "query_knowledge_base" para buscar la respuesta exacta en los manuales antes de contestar. No inventes datos.
+- CRÍTICO: Si el cliente pregunta detalles técnicos, precios o políticas, DEBES usar "query_knowledge_base".
+- CRÍTICO: Cada vez que el cliente te dé un dato valioso (presupuesto, ubicación, espacio), usa la herramienta 'save_customer_data' inmediatamente para registrarlo.
 `;
   }
 
@@ -46,7 +47,7 @@ REGLAS:
     if (baseTransition) return baseTransition;
 
     // Reglas específicas de Discovery
-    if (messages.length >= 8 || llmShouldAdvance) return 'RECOMMENDATION';
+    if (llmShouldAdvance) return 'RECOMMENDATION';
     if (intent && intent.includes('OBJECTION')) return 'RECOMMENDATION';
     return null;
   }

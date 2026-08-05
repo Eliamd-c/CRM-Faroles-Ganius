@@ -38,6 +38,7 @@ Intención detectada: ${intent}
 ${customer ? `Datos del cliente: ${JSON.stringify(customer)}` : ''}
 
 REGLAS:
+- CRÍTICO: Usa SIEMPRE la herramienta 'send_product_catalog' para mostrar las opciones. NUNCA inventes nombres de productos ni precios.
 - Sé persuasivo pero NUNCA agresivo.
 - Si es una OBJECTION, responde con la técnica de Cialdini más apropiada.
 - Máximo 800 caracteres.
@@ -49,7 +50,7 @@ REGLAS:
     if (baseTransition) return baseTransition;
 
     // Reglas específicas de Recommendation
-    if (messages.length >= 12 || llmShouldAdvance) return 'CHECKOUT';
+    if (llmShouldAdvance) return 'CHECKOUT';
     return null;
   }
 }
