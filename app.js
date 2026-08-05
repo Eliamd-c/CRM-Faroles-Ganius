@@ -7,6 +7,9 @@ const axios = require('axios');
 const multer = require('multer');
 const supabase = require('./db');
 
+// ─── Constantes de configuración ───
+const MASTER_CONTEXT_PATH = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro_Oficial.md');
+
 // ─── Módulos extraídos ───
 const { state, broadcastLog } = require('./src/shared');
 const meta = require('./src/services/meta.service');
@@ -46,8 +49,7 @@ state.INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
 // Cargar contexto maestro IA
 try {
-  const contextPath = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro.md');
-  state.AI_MASTER_CONTEXT = fs.readFileSync(contextPath, 'utf8');
+  state.AI_MASTER_CONTEXT = fs.readFileSync(MASTER_CONTEXT_PATH, 'utf8');
   console.log(`🧠 Contexto maestro cargado (${state.AI_MASTER_CONTEXT.length} caracteres / ~${Math.round(state.AI_MASTER_CONTEXT.length / 4)} tokens)`);
   const splitIdx = state.AI_MASTER_CONTEXT.indexOf('## 5. HISTORIAS DE ÉXITO');
   state.AI_BASE_PERSONA = splitIdx !== -1 ? state.AI_MASTER_CONTEXT.substring(0, splitIdx) : state.AI_MASTER_CONTEXT;
@@ -504,7 +506,7 @@ app.post('/api/ai/master-context', express.json(), async (req, res) => {
   const { context } = req.body;
   if (!context) return res.status(400).json({ error: 'Contexto vacío' });
   try {
-    await fs.promises.writeFile(path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro.md'), context, 'utf8');
+    await fs.promises.writeFile(MASTER_CONTEXT_PATH, context, 'utf8');
     state.AI_MASTER_CONTEXT = context;
     const splitIdx = state.AI_MASTER_CONTEXT.indexOf('## 5. HISTORIAS DE ÉXITO');
     state.AI_BASE_PERSONA = splitIdx !== -1 ? state.AI_MASTER_CONTEXT.substring(0, splitIdx) : state.AI_MASTER_CONTEXT;

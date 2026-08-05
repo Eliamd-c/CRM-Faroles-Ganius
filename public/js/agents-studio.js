@@ -4,6 +4,14 @@
  */
 
 const AgentsStudio = (() => {
+  // Función helper para escapar HTML y prevenir XSS
+  const escapeHtml = (text) => {
+    if (!text || typeof text !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  };
+
   // Estado local
   const state = {
     activeAgent: null,
@@ -16,6 +24,7 @@ const AgentsStudio = (() => {
     tabBtns: document.querySelectorAll('.tab-btn'),
     tabPanes: document.querySelectorAll('.tab-pane'),
     contextInput: document.getElementById('ai-context'),
+    saveContextBtn: document.getElementById('btn-save-context'),
     saveStatus: document.getElementById('save-status'),
     mermaidGraph: document.getElementById('mermaid-graph'),
     graphLoader: document.getElementById('graph-loader'),
@@ -86,18 +95,25 @@ const AgentsStudio = (() => {
   const loadContext = async () => {
     try {
       dom.contextInput.value = 'Cargando contexto maestro...';
-      const res = await fetch('/api/config');
+      const res = await fetch('/api/ai/master-context');
       const data = await res.json();
-      
-      const masterPrompt = data.find(c => c.key === 'AI_MASTER_CONTEXT');
-      if (masterPrompt) {
-        dom.contextInput.value = masterPrompt.value;
+
+      if (data.context && data.context.trim().length > 0) {
+        dom.contextInput.value = data.context;
+        dom.contextInput.disabled = false;
+        dom.saveContextBtn.disabled = false;
       } else {
-        dom.contextInput.value = 'Eres Faroles Genius...'; // Default
+        dom.contextInput.value = '';
+        dom.contextInput.disabled = true;
+        dom.saveContextBtn.disabled = true;
+        showStatus('⚠️ El contexto maestro no está disponible. Contacta al administrador.', true);
       }
     } catch (err) {
       console.error('Error cargando contexto:', err);
-      dom.contextInput.value = 'Error al cargar el contexto. Revisa la conexión al servidor.';
+      dom.contextInput.value = '';
+      dom.contextInput.disabled = true;
+      dom.saveContextBtn.disabled = true;
+      showStatus('❌ Error al cargar el contexto. Verifica la conexión al servidor.', true);
     }
   };
 
@@ -107,10 +123,10 @@ const AgentsStudio = (() => {
   const saveContext = async () => {
     const newContext = dom.contextInput.value;
     try {
-      const res = await fetch('/api/config', {
+      const res = await fetch('/api/ai/master-context', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'AI_MASTER_CONTEXT', value: newContext })
+        body: JSON.stringify({ context: newContext })
       });
       
       if (res.ok) {
@@ -172,21 +188,25 @@ const AgentsStudio = (() => {
       const res = await fetch('/api/langgraph/tools');
       if (!res.ok) throw new Error('Error al cargar habilidades');
       const data = await res.json();
-      
+
       dom.skillsList.innerHTML = '';
       if (data.tools && data.tools.length > 0) {
+        let html = '';
         data.tools.forEach(tool => {
-          dom.skillsList.innerHTML += `
+          const toolName = escapeHtml(tool.function.name).replace(/_/g, ' ');
+          const description = escapeHtml(tool.function.description);
+          html += `
             <div class="skill-item">
               <i class="fas fa-tools text-primary"></i>
               <div class="skill-info">
-                <h4>${tool.function.name.replace(/_/g, ' ')}</h4>
-                <p><code>${tool.function.name}</code>: ${tool.function.description}</p>
+                <h4>${toolName}</h4>
+                <p><code>${escapeHtml(tool.function.name)}</code>: ${description}</p>
               </div>
               <div class="toggle active"><i class="fas fa-check"></i></div>
             </div>
           `;
         });
+        dom.skillsList.innerHTML = html;
         state.skillsLoaded = true;
       } else {
         dom.skillsList.innerHTML = '<p>No hay habilidades configuradas.</p>';
@@ -205,17 +225,22 @@ const AgentsStudio = (() => {
       const res = await fetch('/api/ai/knowledge');
       if (!res.ok) throw new Error('Error al cargar conocimiento');
       const data = await res.json();
-      
+
       dom.knowledgeList.innerHTML = '';
       if (data && data.length > 0) {
+        let html = '';
         data.forEach(kn => {
-          dom.knowledgeList.innerHTML += `
+          const title = escapeHtml(kn.section_title);
+          const raw = (kn.content || '').substring(0, 100);
+          const preview = escapeHtml(raw);
+          html += `
             <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-              <h4 style="margin: 0 0 0.5rem 0; color: #fff;">${kn.section_title}</h4>
-              <p style="margin: 0; font-size: 0.9rem; color: #aaa;">${kn.content.substring(0, 100)}...</p>
+              <h4 style="margin: 0 0 0.5rem 0; color: #fff;">${title}</h4>
+              <p style="margin: 0; font-size: 0.9rem; color: #aaa;">${preview}${raw.length === 100 ? '...' : ''}</p>
             </div>
           `;
         });
+        dom.knowledgeList.innerHTML = html;
         state.knowledgeLoaded = true;
       } else {
         dom.knowledgeList.innerHTML = '<p style="color: #9ba1a6;">Aún no hay bases de conocimiento agregadas.</p>';
