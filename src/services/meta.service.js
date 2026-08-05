@@ -62,6 +62,17 @@ async function sendMessage(recipientId, text, quickReplies = null) {
   }
 }
 
+// Envía texto largo en partes (límite Instagram ~1000 chars por mensaje).
+// Extraído del closure de webhook.handlers para poder reutilizarlo (injectHumanMessage).
+async function sendMessageInChunks(recipientId, text) {
+  if (!text) return;
+  const chunks = String(text).match(/[\s\S]{1,950}/g) || [];
+  for (const chunk of chunks) {
+    await sendMessage(recipientId, chunk);
+    await new Promise(r => setTimeout(r, 500)); // Pequeña pausa entre mensajes
+  }
+}
+
 async function sendTemplate(recipientId, text, buttons) {
   try {
     const formattedButtons = buttons.map(b =>
@@ -377,6 +388,7 @@ module.exports = {
   logMessageToDB,
   getUserProfile,
   sendMessage,
+  sendMessageInChunks,
   sendTemplate,
   sendIceBreaker,
   sendQuickReplies,

@@ -89,8 +89,8 @@ class HandleIncomingMessageUseCase {
       const result = await this.langGraphService.processConversation(senderId, text, contact);
       
       if (result.action === 'pause_bot') {
-        contact.switchToPaused();
-        await this.db.updateContact(contact);
+        contact.switchToPaused(); // estado en memoria
+        await this.db.pauseBot(senderId, 'escalado_langgraph'); // persistencia + timestamp
         if (result.reply) {
           await this._sendInChunks(senderId, result.reply);
         }
@@ -114,7 +114,7 @@ class HandleIncomingMessageUseCase {
       try {
         await this.meta.sendMessage(senderId, "Nuestro sistema inteligente se encuentra en mantenimiento momentáneo. 🛠️ Un asesor humano te contactará muy pronto para continuar tu atención.");
         contact.switchToPaused();
-        await this.db.updateContact(contact);
+        await this.db.pauseBot(senderId, 'contingencia_spof');
         this.broadcastLog('SYSTEM', `Bot pausado por contingencia para el usuario ${senderName}`);
       } catch (metaErr) {
         console.error('[LangGraph] Falló también la contingencia hacia Meta:', metaErr.message);

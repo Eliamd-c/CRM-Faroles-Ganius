@@ -71,7 +71,10 @@ class Contact {
       bot_state: this.state,
       tags: this.tags,
       fields: this.fields,
-      bot_paused: this.botPaused,
+      // bot_paused NO se serializa aquí: es un invariante compuesto
+      // (bot_paused + bot_paused_at + bot_paused_reason) gestionado exclusivamente
+      // por SupabaseGateway.pauseBot()/resumeBot(). Serializarlo aquí sobrescribía
+      // el estado de pausa en cualquier updateContact() genérico.
       awaiting_input_type: this.awaitingInputType,
       awaiting_input_field: this.awaitingInputField,
       awaiting_input_choices: this.awaitingInputChoices,

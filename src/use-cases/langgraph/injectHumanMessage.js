@@ -1,7 +1,21 @@
+/**
+ * Use Case: inyectar la respuesta de un operador humano y reanudar el bot.
+ *
+ * Dependency Injection por constructor (Node.js Design Patterns, cap. 7) para
+ * testeabilidad: langGraphService (checkpointer), supabaseGateway (estado del bot)
+ * y metaGateway (canal de salida).
+ *
+ * Orden de operaciones (importante):
+ *   1. LangGraph: updateState -> resetea human_needed en el checkpoint.
+ *   2. Canal: enviar el mensaje al usuario (troceado, límite Instagram ~1000 chars).
+ *   3. DB: resumeBot() -> limpia bot_paused/bot_paused_at/bot_paused_reason.
+ * Reanudar la DB al final evita que un mensaje entrante llegue al bot mientras
+ * el checkpoint aún tiene human_needed = true.
+ */
 class InjectHumanMessageUseCase {
-  constructor(langGraphService, customerGateway, metaGateway) {
+  constructor(langGraphService, supabaseGateway, metaGateway) {
     this.langGraphService = langGraphService;
-    this.customerGateway = customerGateway;
+    this.supabaseGateway = supabaseGateway;
     this.metaGateway = metaGateway;
   }
 
@@ -11,9 +25,7 @@ class InjectHumanMessageUseCase {
     }
 
     try {
-      // 1. Inyectar el mensaje como si fuera del 'assistant'
-      // Opcionalmente, si es Human in the loop, a veces se inyecta como 'user' o 'assistant'. 
-      // Si el humano responde en nombre del bot, el rol es 'assistant'.
+      // 1. Inyectar el mensaje como 'assistant' (el humano responde en nombre del bot)
       const payload = {
         messages: [{ role: 'assistant', content: message }],
         human_needed: false // Reseteamos la bandera de escalamiento
@@ -21,15 +33,14 @@ class InjectHumanMessageUseCase {
 
       await this.langGraphService.updateState(threadId, payload, checkpointId);
 
-      // 2. Opcional: Enviar el mensaje realmente por Instagram (si no lo enviaron por otro lado)
-      // Asumiremos que el CRM usará esto para responder directamente
+      // 2. Enviar realmente por Instagram, troceado (Bug A: sendMessage truncaba >1000)
       if (this.metaGateway) {
-        await this.metaGateway.sendMessage(threadId, message);
+        await this.metaGateway.sendMessageInChunks(threadId, message);
       }
 
-      // 3. Reanudar el bot en la base de datos (bot_paused = false)
-      if (this.customerGateway) {
-        await this.customerGateway.update(threadId, { bot_paused: false });
+      // 3. Reanudar el bot en la base de datos, limpiando el invariante completo
+      if (this.supabaseGateway) {
+        await this.supabaseGateway.resumeBot(threadId);
       }
 
       return {

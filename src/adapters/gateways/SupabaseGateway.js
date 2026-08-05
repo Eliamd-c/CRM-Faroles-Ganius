@@ -29,7 +29,8 @@ class SupabaseGateway {
     if (!this.db) return contact;
     const { data, error } = await this.db
       .from('customers')
-      .insert([contact.toDatabase()])
+      // bot_paused se fija explícitamente en la creación (toDatabase ya no lo incluye)
+      .insert([{ ...contact.toDatabase(), bot_paused: contact.botPaused || false }])
       .select()
       .single();
     if (error) throw error;
@@ -125,22 +126,15 @@ class SupabaseGateway {
     return this.updateContact(contact);
   }
 
-  async pauseContact(instagramId) {
-    if (!this.db) return null;
-    const contact = await this.getContactByInstagramId(instagramId);
-    if (!contact) return null;
-
-    contact.pause();
-    return this.updateContact(contact);
+  // Alias legacy: delegan en pauseBot/resumeBot para no romper el invariante
+  async pauseContact(instagramId, reason = 'requiere_atencion_humana') {
+    const row = await this.pauseBot(instagramId, reason);
+    return row ? Contact.fromDatabase(row) : null;
   }
 
   async resumeContact(instagramId) {
-    if (!this.db) return null;
-    const contact = await this.getContactByInstagramId(instagramId);
-    if (!contact) return null;
-
-    contact.resume();
-    return this.updateContact(contact);
+    const row = await this.resumeBot(instagramId);
+    return row ? Contact.fromDatabase(row) : null;
   }
 
   async getRecentMessages(instagramId, limit = 20) {

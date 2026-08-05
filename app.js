@@ -69,6 +69,8 @@ const di = bootstrap({
   recentReplies: state.recentReplies
 });
 console.log('✅ Clean Architecture initialized (Gateways + UseCases)');
+// Único punto de verdad para pausar/reanudar el bot (sella bot_paused_at/reason)
+const supabaseGateway = di.gateways.supabaseGateway;
 
 // ─── Express setup ───
 const app = express();
@@ -584,7 +586,7 @@ app.post('/api/contacts/:instagram_id/send', express.json(), async (req, res) =>
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'Mensaje vacío' });
     await meta.sendMessage(instagram_id, message);
-    if (supabase) await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', instagram_id);
+    await supabaseGateway.pauseBot(instagram_id, 'respuesta_manual_operador');
     res.json({ success: true, message: 'Mensaje enviado y bot pausado.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -592,9 +594,10 @@ app.post('/api/contacts/:instagram_id/send', express.json(), async (req, res) =>
 app.post('/api/contacts/:instagram_id/toggle-bot', express.json(), async (req, res) => {
   if (!supabase) return res.status(500).json({ error: 'No DB' });
   try {
-    const { error } = await supabase.from('customers').update({ bot_paused: req.body.bot_paused }).eq('instagram_id', req.params.instagram_id);
-    if (error) throw error;
-    res.json({ success: true, bot_paused: req.body.bot_paused });
+    const paused = req.body.bot_paused === true || req.body.bot_paused === 'true';
+    if (paused) await supabaseGateway.pauseBot(req.params.instagram_id, 'toggle_manual_crm');
+    else await supabaseGateway.resumeBot(req.params.instagram_id);
+    res.json({ success: true, bot_paused: paused });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -657,7 +660,14 @@ app.get('/api/contacts/:id', async (req, res) => {
 app.patch('/api/contacts/:id', async (req, res) => {
   if (!supabase) return res.status(500).json({ error: 'No DB' });
   try {
-    const allowedFields = ['name', 'tags', 'status', 'fields', 'bot_paused'];
+    // bot_paused NO se acepta como campo genérico: se maneja vía pauseBot/resumeBot
+    // para no romper el invariante bot_paused <-> bot_paused_at/bot_paused_reason.
+    if (req.body.bot_paused !== undefined) {
+      const paused = req.body.bot_paused === true || req.body.bot_paused === 'true';
+      if (paused) await supabaseGateway.pauseBot(req.params.id, 'patch_contacto_crm');
+      else await supabaseGateway.resumeBot(req.params.id);
+    }
+    const allowedFields = ['name', 'tags', 'status', 'fields'];
     const updates = {};
     for (const key of allowedFields) { if (req.body[key] !== undefined) updates[key] = req.body[key]; }
     updates.updated_at = new Date().toISOString();

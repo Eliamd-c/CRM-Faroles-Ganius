@@ -14,24 +14,16 @@ module.exports = function(di) {
   // Inyectamos las dependencias, que algunas vienen de la ruta (di) y el servicio central
   const getGraphStateUseCase = new GetGraphStateUseCase(langGraphService);
   
-  // Asumimos que `di.customerGateway` o `di.metaGateway` existen si los necesitamos
-  // En este caso, el flow routes o webhook handlers ya usan los repositorios directamente. 
-  // O podemos usar los requeridos globalmente como meta.service.js
   const meta = require('../services/meta.service');
-  
-  // Vamos a usar supabase directamente para actualizar el cliente
-  const supabase = require('../../db');
-  
-  // Creamos un wrapper simplificado para el gateway de cliente
-  const customerGateway = {
-    update: async (instagramId, payload) => {
-      await supabase.from('customers').update(payload).eq('instagram_id', instagramId);
-    }
-  };
+
+  // Usamos el SupabaseGateway del contenedor DI (fallback al singleton compartido)
+  // para que la reanudación pase por resumeBot() y limpie bot_paused_at/reason.
+  const supabaseGateway = di.gateways?.supabaseGateway
+    || require('../adapters/gateways/supabaseGateway.instance');
 
   const injectHumanMessageUseCase = new InjectHumanMessageUseCase(
-    langGraphService, 
-    customerGateway, 
+    langGraphService,
+    supabaseGateway,
     meta
   );
 

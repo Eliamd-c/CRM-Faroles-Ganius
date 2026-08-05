@@ -3,6 +3,7 @@ const path = require('path');
 const { state, broadcastLog } = require('../shared');
 const supabase = require('../../db');
 const meta = require('./meta.service');
+const supabaseGateway = require('../adapters/gateways/supabaseGateway.instance');
 
 // Lazy-loaded to avoid circular dependency
 let openaiService = null;
@@ -217,8 +218,8 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
           // Ejecución asíncrona ("Fire and forget")
           langGraph.processConversation(senderId, triggerText, customer).then(async (result) => {
             if (result.action === 'pause_bot') {
-              await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', senderId);
-              await meta.sendMessage(senderId, result.reply);
+              await supabaseGateway.pauseBot(senderId, 'escalado_langgraph');
+              await meta.sendMessageInChunks(senderId, result.reply);
               broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName} (Requiere humano)`);
             } else if (result.action === 'send_message' && result.reply) {
               await meta.sendMessage(senderId, result.reply);
@@ -304,8 +305,17 @@ async function executeAction(senderId, senderName, step) {
         broadcastLog('SYSTEM', `Contacto eliminado permanentemente: ${senderName}`);
         return;
       }
-      case 'pause_bot': { updates.bot_paused = true; break; }
-      case 'resume_bot': { updates.bot_paused = false; break; }
+      // pause/resume salen por el gateway dedicado (sella bot_paused_at/reason)
+      case 'pause_bot': {
+        await supabaseGateway.pauseBot(senderId, 'accion_flujo');
+        broadcastLog('SYSTEM', `Acción pause_bot ejecutada para ${senderName}`);
+        return;
+      }
+      case 'resume_bot': {
+        await supabaseGateway.resumeBot(senderId);
+        broadcastLog('SYSTEM', `Acción resume_bot ejecutada para ${senderName}`);
+        return;
+      }
       case 'mark_open': { updates.status = 'open'; break; }
       case 'mark_closed': { updates.status = 'closed'; break; }
       case 'subscribe_sequence': {

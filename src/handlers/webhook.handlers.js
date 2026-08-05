@@ -3,6 +3,7 @@ const supabase = require('../../db');
 const meta = require('../services/meta.service');
 const openai = require('../services/openai.service');
 const flow = require('../services/flow.service');
+const supabaseGateway = require('../adapters/gateways/supabaseGateway.instance');
 
 async function handleMessage(event) {
   const senderId = event.sender?.id;
@@ -149,21 +150,14 @@ async function handleMessage(event) {
   } else {
     console.log(`[LangGraph] Delegando mensaje de "${senderName}" a LangGraph (Fallback inteligente)`);
     const langGraph = require('../services/langgraph.service');
-    // Función para enviar mensajes largos en partes (Límite Instagram: 1000)
-    const sendInChunks = async (targetId, text) => {
-      const chunks = text.match(/[\s\S]{1,950}/g) || [];
-      for (const chunk of chunks) {
-        await meta.sendMessage(targetId, chunk);
-        await new Promise(r => setTimeout(r, 500)); // Pequeña pausa entre mensajes
-      }
-    };
+    // Envío por partes centralizado en meta.service (límite Instagram ~1000 chars)
+    const sendInChunks = (targetId, body) => meta.sendMessageInChunks(targetId, body);
 
     // Ejecución asíncrona para no bloquear el Event Loop ni causar Timeout en Meta
     langGraph.processConversation(senderId, text, customer).then(async (result) => {
       if (result.action === 'pause_bot') {
-        if (supabase) {
-          await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', senderId);
-        }
+        // Usa pauseBot() para sellar bot_paused_at/bot_paused_reason (invariante de la cola humana)
+        await supabaseGateway.pauseBot(senderId, 'escalado_langgraph');
         await sendInChunks(senderId, result.reply);
         broadcastLog('SYSTEM', `Bot pausado por LangGraph para el usuario ${senderName} (Requiere humano)`);
       } else if (result.action === 'send_message' && result.reply) {
@@ -413,7 +407,10 @@ async function handleHandoverProtocol(event) {
   console.log(`👤 Handover - Thread pasado a humano (${metadata})`);
   broadcastLog('HANDOVER', `Conversación pasada a humano`, { id: senderId });
   if (supabase) {
-    try { await supabase.from('customers').update({ bot_state: 'paused', bot_paused: true }).eq('instagram_id', senderId); }
+    try {
+      await supabase.from('customers').update({ bot_state: 'paused' }).eq('instagram_id', senderId);
+      await supabaseGateway.pauseBot(senderId, 'handover_protocol');
+    }
     catch (e) { console.error('Error en handover:', e.message); }
   }
 }
