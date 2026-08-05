@@ -199,17 +199,30 @@ async function processFlowSteps(steps, senderId, senderName, _visited = new Set(
     } else if (step.type === 'ai_agent') {
       if (supabase) {
         await supabase.from('customers').update({
-          bot_state: 'ai_agent',
+          bot_state: 'active',
           current_ai_prompt: step.system_prompt || '',
           ignore_master_context: step.ignore_master_context || false,
           ai_history: []
         }).eq('instagram_id', senderId);
-        broadcastLog('SYSTEM', `Agente IA activado para ${senderName}${step.ignore_master_context ? ' (modo standalone)' : ' (con Contexto Maestro)'}`);
+        broadcastLog('SYSTEM', `Cerebro LangGraph activado para ${senderName}${step.ignore_master_context ? ' (modo standalone)' : ' (con Contexto Maestro)'}`);
+        
         if (triggerText && customer) {
           customer.current_ai_prompt = step.system_prompt || '';
           customer.ignore_master_context = step.ignore_master_context || false;
-          customer.bot_state = 'ai_agent';
-          await getOpenAI().runAiAgent(senderId, senderName, triggerText, customer);
+          customer.bot_state = 'active';
+          
+          const langGraph = require('./langgraph.service');
+          const meta = require('./meta.service');
+          
+          // Ejecución asíncrona ("Fire and forget")
+          langGraph.processConversation(senderId, triggerText, customer).then(async (result) => {
+            if (result.action === 'pause_bot') {
+              await supabase.from('customers').update({ bot_paused: true }).eq('instagram_id', senderId);
+              await meta.sendMessage(senderId, result.reply);
+            } else if (result.action === 'send_message' && result.reply) {
+              await meta.sendMessage(senderId, result.reply);
+            }
+          }).catch(err => console.error('[LangGraph Flow Trigger] Error:', err));
         }
       } else {
         console.warn('⚠️ Supabase no conectado. No se puede activar el Agente IA.');

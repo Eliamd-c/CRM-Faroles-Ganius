@@ -83,20 +83,6 @@ class HandleIncomingMessageUseCase {
     // STATE-SPECIFIC HANDLERS (NO GUARD CONDITION)
     // ============================================
 
-    // Handle AI Agent state
-    if (contact.isInAiAgent()) {
-      const shouldExit = this._checkExitPattern(text);
-      if (shouldExit) {
-        contact.switchToActive();
-        await this.db.updateContact(contact);
-        await this.meta.sendMessage(senderId, "Saliendo del asistente IA...");
-        return { status: 'exited_ai_agent', contact };
-      }
-      // Run AI agent
-      await this.openai.runAiAgent(senderId, senderName, text, contact);
-      return { status: 'ai_agent_handled', contact };
-    }
-
     // Handle awaiting input state
     if (contact.isAwaitingInput()) {
       return await this._handleAwaitingInput(senderId, senderName, text, contact);

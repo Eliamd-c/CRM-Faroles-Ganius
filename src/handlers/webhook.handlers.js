@@ -75,27 +75,6 @@ async function handleMessage(event) {
       console.error('[DB] Error creando nuevo contacto:', e.message);
     }
   }
-
-  if (customer && customer.bot_state === 'ai_agent') {
-    const lowerTxt = text.trim().toLowerCase().replace(/\s+/g, ' ');
-    const exitPatterns = [/^(salir|exit|quit|menu|menú)$/, /^(volver al menú|menu principal)$/];
-    const shouldExit = exitPatterns.some(pattern => pattern.test(lowerTxt));
-    if (shouldExit) {
-      try {
-        await supabase.from('customers').update({ bot_state: 'active' }).eq('instagram_id', senderId);
-        customer.bot_state = 'active';
-        await meta.sendMessage(senderId, "Saliendo del asistente IA...");
-      } catch (e) {
-        console.error('[DB] Error cambiando estado al salir del ai_agent:', e.message);
-        await meta.sendMessage(senderId, "Error al salir del asistente. Por favor intenta de nuevo.");
-        return;
-      }
-    } else {
-      await openai.runAiAgent(senderId, senderName, text, customer);
-      return;
-    }
-  }
-
   if (customer && customer.bot_state === 'awaiting_input') {
     const inputType = customer.awaiting_input_type;
     const lowerTxt = text.trim();

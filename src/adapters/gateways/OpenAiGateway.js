@@ -4,11 +4,6 @@
 const openai = require('../../services/openai.service');
 
 class OpenAiGateway {
-  // AI Agent
-  async runAiAgent(senderId, senderName, text, contact) {
-    return openai.runAiAgent(senderId, senderName, text, contact);
-  }
-
   // Text processing
   removeAccents(text) {
     return openai.removeAccents(text);
