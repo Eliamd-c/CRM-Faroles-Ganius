@@ -159,7 +159,7 @@ class LangGraphService {
       
     } catch (err) {
       console.error('[LangGraphService] Error procesando conversacion:', err);
-      return { action: 'error' };
+      return { action: 'error', reply: err.message || err.toString() };
     }
   }
 }
