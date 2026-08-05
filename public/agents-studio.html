@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM 2.0 - Agents Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Estilos base compartidos y Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Estilos del CRM general -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Estilos específicos de Agents Studio (Glassmorphism) -->
+  <link rel="stylesheet" href="css/agents-studio.css">
+</head>
+<body class="dark-theme">
+  
+  <!-- Navbar Principal -->
+  <nav class="top-nav">
+    <div class="logo">
+      <i class="fas fa-robot text-primary"></i> <span>FarolesGenius CRM 2.0</span>
+    </div>
+    <div class="nav-links">
+      <a href="/index.html"><i class="fas fa-home"></i> Inicio</a>
+      <a href="/contacts.html"><i class="fas fa-users"></i> Contactos</a>
+      <a href="/flow-builder.html"><i class="fas fa-project-diagram"></i> Flujos</a>
+      <a href="/dashboard.html"><i class="fas fa-chart-line"></i> Dashboard</a>
+      <a href="/agents-studio.html" class="active"><i class="fas fa-brain"></i> Agents Studio</a>
+    </div>
+  </nav>
+
+  <!-- Contenedor Principal (Grid) -->
+  <div class="studio-container">
+    
+    <!-- Título de la página -->
+    <header class="studio-header">
+      <div>
+        <h1>Agents Studio</h1>
+        <p>Orquesta, configura y despliega tu ecosistema de Inteligencia Artificial.</p>
+      </div>
+      <button class="btn btn-primary" id="btn-new-agent" disabled title="Próximamente">
+        <i class="fas fa-plus"></i> Nuevo Agente
+      </button>
+    </header>
+
+    <!-- Grid de Tarjetas de Agentes -->
+    <main class="agents-grid">
+      
+      <!-- Agente 1: Ventas (El actual) -->
+      <div class="agent-card active-agent" onclick="agentsStudio.openConfigModal('sales')">
+        <div class="card-glow"></div>
+        <div class="agent-status online">En línea</div>
+        <div class="agent-icon">
+          <i class="fas fa-comments-dollar"></i>
+        </div>
+        <h3>Agente de Ventas</h3>
+        <p class="agent-role">Especialista en conversión y cierre de ventas (Faroles Solares).</p>
+        
+        <div class="agent-stats">
+          <div class="stat"><i class="fas fa-layer-group"></i> 4 Etapas</div>
+          <div class="stat"><i class="fas fa-tools"></i> 3 Herramientas</div>
+        </div>
+        
+        <div class="card-footer">
+          <button class="btn btn-outline">Configurar <i class="fas fa-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Agente 2: Soporte (Coming Soon) -->
+      <div class="agent-card disabled-agent">
+        <div class="agent-status offline">Inactivo</div>
+        <div class="agent-icon">
+          <i class="fas fa-headset"></i>
+        </div>
+        <h3>Agente de Soporte</h3>
+        <p class="agent-role">Resuelve problemas técnicos, envíos y garantías.</p>
+        
+        <div class="card-footer">
+          <button class="btn btn-outline" disabled>Próximamente</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Modal de Configuración (Glassmorphism) -->
+  <div id="config-modal" class="modal-overlay hidden">
+    <div class="glass-modal">
+      
+      <header class="modal-header">
+        <div class="modal-title">
+          <i class="fas fa-comments-dollar text-primary"></i> 
+          <h2>Configuración: Agente de Ventas</h2>
+        </div>
+        <button class="btn-close" onclick="agentsStudio.closeConfigModal()"><i class="fas fa-times"></i></button>
+      </header>
+
+      <!-- Pestañas -->
+      <div class="tabs-container">
+        <div class="tabs">
+          <button class="tab-btn active" data-target="tab-identity">
+            <i class="fas fa-fingerprint"></i> Identidad
+          </button>
+          <button class="tab-btn" data-target="tab-knowledge">
+            <i class="fas fa-database"></i> Conocimiento
+          </button>
+          <button class="tab-btn" data-target="tab-skills">
+            <i class="fas fa-tools"></i> Habilidades
+          </button>
+          <button class="tab-btn" data-target="tab-inspector">
+            <i class="fas fa-project-diagram"></i> Inspector
+          </button>
+        </div>
+
+        <!-- Contenido de las pestañas -->
+        <div class="tab-content-area">
+          
+          <!-- Pestaña: Identidad (Prompt Principal) -->
+          <div id="tab-identity" class="tab-pane active">
+            <h3>Contexto Maestro (Master Prompt)</h3>
+            <p>Define la personalidad, reglas y comportamiento base del agente de ventas.</p>
+            <div class="editor-container">
+              <textarea id="ai-context" class="glass-input" rows="15" placeholder="Cargando contexto..."></textarea>
+            </div>
+            <div class="form-actions">
+              <span id="save-status" class="status-msg"></span>
+              <button class="btn btn-primary" onclick="agentsStudio.saveContext()">
+                <i class="fas fa-save"></i> Guardar Identidad
+              </button>
+            </div>
+          </div>
+
+          <!-- Pestaña: Conocimiento -->
+          <div id="tab-knowledge" class="tab-pane">
+            <div class="empty-state">
+              <i class="fas fa-cogs"></i>
+              <h3>Próximamente</h3>
+              <p>Aquí podrás conectar bases de datos vectoriales (RAG) para que el agente responda preguntas técnicas basadas en PDFs o FAQs.</p>
+            </div>
+          </div>
+
+          <!-- Pestaña: Habilidades -->
+          <div id="tab-skills" class="tab-pane">
+            <h3>Habilidades Activadas (Command Pattern)</h3>
+            <p>Estas son las herramientas a las que este agente tiene acceso actualmente.</p>
+            
+            <div class="skills-list">
+              <div class="skill-item">
+                <i class="fas fa-images text-primary"></i>
+                <div class="skill-info">
+                  <h4>Enviar Catálogo de Productos</h4>
+                  <p><code>send_product_catalog</code></p>
+                </div>
+                <div class="toggle active"><i class="fas fa-check"></i></div>
+              </div>
+              
+              <div class="skill-item">
+                <i class="fas fa-save text-success"></i>
+                <div class="skill-info">
+                  <h4>Guardar Datos del Cliente</h4>
+                  <p><code>save_customer_data</code></p>
+                </div>
+                <div class="toggle active"><i class="fas fa-check"></i></div>
+              </div>
+
+              <div class="skill-item">
+                <i class="fas fa-reply-all text-warning"></i>
+                <div class="skill-info">
+                  <h4>Enviar Respuestas Rápidas</h4>
+                  <p><code>send_quick_replies</code></p>
+                </div>
+                <div class="toggle active"><i class="fas fa-check"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pestaña: Inspector -->
+          <div id="tab-inspector" class="tab-pane">
+            <div class="inspector-header">
+              <h3>Grafo de Estados de Venta</h3>
+              <button class="btn btn-outline btn-sm" onclick="agentsStudio.loadGraph()">
+                <i class="fas fa-sync-alt"></i> Refrescar
+              </button>
+            </div>
+            <div class="mermaid-container glass-panel">
+              <div id="graph-loader" class="loader"><i class="fas fa-spinner fa-spin"></i> Renderizando grafo...</div>
+              <div id="mermaid-graph" class="mermaid"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dependencias -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  
+  <!-- Lógica de la vista -->
+  <script src="js/agents-studio.js"></script>
+</body>
+</html>
