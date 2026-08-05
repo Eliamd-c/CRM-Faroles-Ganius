@@ -1,15 +1,20 @@
 const { StateGraph, END } = require('@langchain/langgraph');
 const { ChatOpenAI } = require('@langchain/openai');
-const { BaseCheckpointSaver } = require('@langchain/langgraph-checkpoint');
+const { PostgresSaver } = require('@langchain/langgraph-checkpoint-postgres');
+const { Pool } = require('pg');
 const supabase = require('../../db');
 
 // ==========================================
-// 2. DEFINICIÓN DEL GRAFO
+// 1. CONFIGURACIÓN DEL LLM
 // ==========================================
 const llm = new ChatOpenAI({
   modelName: 'gpt-4o-mini',
   temperature: 0.2
 });
+
+// ==========================================
+// 2. DEFINICIÓN DEL GRAFO
+// ==========================================
 
 const graphState = {
   messages: {
@@ -82,19 +87,60 @@ const workflow = new StateGraph({ channels: graphState })
   })
   .addEdge("respond", END);
 
-// Compilar con checkpointer
-const { MemorySaver } = require('@langchain/langgraph-checkpoint');
-const checkpointer = new MemorySaver();
-// Removemos interruptBefore porque ruteamos directamente a END cuando requiere humano
-const appGraph = workflow.compile({ checkpointer });
-
 // ==========================================
-// 3. FACHADA DEL SERVICIO (Facade Pattern)
+// 3. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
 // ==========================================
 class LangGraphService {
+  constructor() {
+    this.appGraph = null;
+    this.isInitialized = false;
+    this.initializationPromise = null;
+  }
+
+  // Patrón "Local Initialization Check" (Node.js Design Patterns - Cap. 11)
+  // Garantiza que la BD y LangGraph se preparen de forma segura antes de usarse.
+  async initialize() {
+    if (this.isInitialized) return;
+    
+    if (!this.initializationPromise) {
+      this.initializationPromise = (async () => {
+        try {
+          if (!process.env.SUPABASE_DB_URL) {
+            throw new Error('Falta la variable de entorno SUPABASE_DB_URL (PostgreSQL Connection String)');
+          }
+
+          // Usar la cadena de conexión nativa de Postgres
+          const pool = new Pool({
+            connectionString: process.env.SUPABASE_DB_URL,
+            // Importante para conexiones remotas y SSL con Supabase
+            ssl: { rejectUnauthorized: false } 
+          });
+
+          const checkpointer = new PostgresSaver(pool);
+          
+          // Ejecuta las migraciones internas (crea checkpoints, checkpoint_blobs, etc.)
+          await checkpointer.setup(); 
+
+          this.appGraph = workflow.compile({ checkpointer });
+          this.isInitialized = true;
+          console.log('[LangGraphService] PostgresSaver inicializado exitosamente en Supabase.');
+        } catch (error) {
+          console.error('[LangGraphService] Error inicializando checkpointer:', error.message);
+          this.initializationPromise = null; // Permite reintento en caso de fallo
+          throw error;
+        }
+      })();
+    }
+    
+    await this.initializationPromise;
+  }
+
   async processConversation(senderId, text, customerProfile) {
     try {
-      // Invocación del grafo de manera asíncrona
+      // 1. Garantizamos de manera asíncrona que la infraestructura esté lista.
+      await this.initialize();
+
+      // 2. Invocación del grafo compilado
       const threadConfig = { configurable: { thread_id: senderId } };
       
       const inputs = {
@@ -102,7 +148,7 @@ class LangGraphService {
         customer: customerProfile
       };
 
-      const result = await appGraph.invoke(inputs, threadConfig);
+      const result = await this.appGraph.invoke(inputs, threadConfig);
       
       if (result.human_needed) {
         return { action: 'pause_bot', reply: '¡Entendido! Un asesor humano (como María o uno de nuestros expertos) se pondrá en contacto contigo en breve para ayudarte personalmente.' };
