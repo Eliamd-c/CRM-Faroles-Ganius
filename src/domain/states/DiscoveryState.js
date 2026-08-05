@@ -37,6 +37,7 @@ REGLAS:
 - Haz máximo 1-2 preguntas por mensaje. No interrogues.
 - Usa lenguaje natural y cálido.
 - Máximo 800 caracteres.
+- CRÍTICO (RAG): Si el cliente pregunta detalles técnicos, precios, especificaciones o políticas, DEBES usar la herramienta "query_knowledge_base" para buscar la respuesta exacta en los manuales antes de contestar. No inventes datos.
 `;
   }
 

@@ -9,6 +9,7 @@ const SendProductCatalogCommand = require('./SendProductCatalogCommand');
 const SaveCustomerDataCommand = require('./SaveCustomerDataCommand');
 const SendQuickRepliesCommand = require('./SendQuickRepliesCommand');
 const TriggerStaticFlowCommand = require('./TriggerStaticFlowCommand');
+const QueryKnowledgeBaseCommand = require('./QueryKnowledgeBaseCommand');
 
 class CommandRegistry {
   constructor() {
@@ -65,5 +66,6 @@ registry.register(new SendProductCatalogCommand());
 registry.register(new SaveCustomerDataCommand());
 registry.register(new SendQuickRepliesCommand());
 registry.register(new TriggerStaticFlowCommand());
+registry.register(new QueryKnowledgeBaseCommand());
 
 module.exports = registry;
