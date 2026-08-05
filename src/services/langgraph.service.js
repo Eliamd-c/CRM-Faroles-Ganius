@@ -398,6 +398,17 @@ class LangGraphService {
     return this.appGraph.getGraph().drawMermaid();
   }
 
+  /**
+   * Devuelve las etapas del embudo registradas (State Pattern).
+   * Fuente única de verdad para la UI: evita números hardcodeados en el HTML.
+   */
+  getSalesStates() {
+    return Object.keys(SALES_STATES).map((key) => ({
+      id: key,
+      name: SALES_STATES[key].name || key
+    }));
+  }
+
   async getStateHistory(threadId, limit = 10) {
     await this.initialize();
     const config = { configurable: { thread_id: threadId } };

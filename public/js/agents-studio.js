@@ -15,7 +15,9 @@ const AgentsStudio = (() => {
   // Estado local
   const state = {
     activeAgent: null,
-    isGraphLoaded: false
+    isGraphLoaded: false,
+    isGraphRendering: false, // guarda de concurrencia para mermaid.render
+    graphRenderSeq: 0        // ID único por render (evita colisión de IDs en el DOM)
   };
 
   // Referencias DOM
@@ -32,7 +34,9 @@ const AgentsStudio = (() => {
     knowledgeList: document.getElementById('knowledge-list'),
     knowledgeModal: document.getElementById('knowledge-modal'),
     knTitle: document.getElementById('kn-title'),
-    knContent: document.getElementById('kn-content')
+    knContent: document.getElementById('kn-content'),
+    statStates: document.getElementById('stat-states'),
+    statTools: document.getElementById('stat-tools')
   };
 
   /**
@@ -156,6 +160,10 @@ const AgentsStudio = (() => {
    * Carga el grafo Mermaid desde LangGraph
    */
   const loadGraph = async () => {
+    // Guarda de concurrencia: dos clicks seguidos en "Refrescar" podían
+    // dejar dos renders compitiendo por el mismo contenedor.
+    if (state.isGraphRendering) return;
+    state.isGraphRendering = true;
     try {
       dom.graphLoader.style.display = 'flex';
       dom.mermaidGraph.innerHTML = '';
@@ -167,7 +175,8 @@ const AgentsStudio = (() => {
       dom.graphLoader.style.display = 'none';
       
       if (diagram && window.mermaid) {
-        const { svg } = await mermaid.render('langgraph-mermaid', diagram);
+        const renderId = `langgraph-mermaid-${++state.graphRenderSeq}`;
+        const { svg } = await mermaid.render(renderId, diagram);
         dom.mermaidGraph.innerHTML = svg;
         state.isGraphLoaded = true;
       } else {
@@ -177,6 +186,36 @@ const AgentsStudio = (() => {
       console.error("Error al cargar diagrama:", error);
       dom.graphLoader.style.display = 'none';
       dom.mermaidGraph.innerHTML = '<p class="text-warning">Error cargando el grafo. Asegúrate de que el servidor está corriendo.</p>';
+    } finally {
+      state.isGraphRendering = false;
+    }
+  };
+
+  /**
+   * Carga los contadores reales de la tarjeta del agente.
+   * Fuente única de verdad: el backend (CommandRegistry y SALES_STATES).
+   * Evita la incoherencia de números hardcodeados en el HTML.
+   */
+  const loadAgentStats = async () => {
+    const setStat = (el, value) => { if (el) el.textContent = value; };
+    try {
+      const [toolsRes, statesRes] = await Promise.all([
+        fetch('/api/langgraph/tools'),
+        fetch('/api/langgraph/states')
+      ]);
+      if (toolsRes.ok) {
+        const { tools } = await toolsRes.json();
+        setStat(dom.statTools, Array.isArray(tools) ? tools.length : '?');
+      } else { setStat(dom.statTools, '?'); }
+
+      if (statesRes.ok) {
+        const { states } = await statesRes.json();
+        setStat(dom.statStates, Array.isArray(states) ? states.length : '?');
+      } else { setStat(dom.statStates, '?'); }
+    } catch (e) {
+      console.error('Error cargando estadísticas del agente:', e);
+      setStat(dom.statTools, '?');
+      setStat(dom.statStates, '?');
     }
   };
 
@@ -202,7 +241,10 @@ const AgentsStudio = (() => {
                 <h4>${toolName}</h4>
                 <p><code>${escapeHtml(tool.function.name)}</code>: ${description}</p>
               </div>
-              <div class="toggle active"><i class="fas fa-check"></i></div>
+              <!-- Badge de solo lectura: NO es un interruptor.
+                   No existe endpoint de activación/desactivación, y una UI
+                   que finge control es peor que no tenerlo (Shevat). -->
+              <div class="toggle active" title="Registrada en el CommandRegistry"><i class="fas fa-check"></i></div>
             </div>
           `;
         });
@@ -233,10 +275,18 @@ const AgentsStudio = (() => {
           const title = escapeHtml(kn.section_title);
           const raw = (kn.content || '').substring(0, 100);
           const preview = escapeHtml(raw);
+          const id = escapeHtml(String(kn.id));
           html += `
-            <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-              <h4 style="margin: 0 0 0.5rem 0; color: #fff;">${title}</h4>
-              <p style="margin: 0; font-size: 0.9rem; color: #aaa;">${preview}${raw.length === 100 ? '...' : ''}</p>
+            <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); display: flex; gap: 1rem; align-items: flex-start;">
+              <div style="flex: 1; min-width: 0;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #fff;">${title}</h4>
+                <p style="margin: 0; font-size: 0.9rem; color: #aaa;">${preview}${raw.length === 100 ? '...' : ''}</p>
+              </div>
+              <!-- Sin onclick inline: el título puede contener comillas.
+                   Delegación de eventos + data-attribute (ver initKnowledgeDelegation). -->
+              <button class="btn-close" title="Eliminar conocimiento" data-kn-delete="${id}">
+                <i class="fas fa-trash"></i>
+              </button>
             </div>
           `;
         });
@@ -249,6 +299,34 @@ const AgentsStudio = (() => {
       console.error(e);
       dom.knowledgeList.innerHTML = '<p class="text-warning">Error al cargar conocimiento.</p>';
     }
+  };
+
+  /**
+   * Elimina una base de conocimiento del índice RAG.
+   * Patrón: delegación de eventos sobre el contenedor (un solo listener,
+   * sobrevive al re-render de la lista).
+   */
+  const initKnowledgeDelegation = () => {
+    if (!dom.knowledgeList) return;
+    dom.knowledgeList.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-kn-delete]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-kn-delete');
+      if (!confirm('¿Eliminar esta base de conocimiento? El agente dejará de usarla.')) return;
+
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/ai/knowledge/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('DELETE falló');
+        state.knowledgeLoaded = false;
+        await loadKnowledge();
+        showStatus('Conocimiento eliminado.');
+      } catch (err) {
+        console.error(err);
+        btn.disabled = false;
+        showStatus('No se pudo eliminar el conocimiento.', true);
+      }
+    });
   };
 
   const openAddKnowledgeModal = () => {
@@ -294,8 +372,11 @@ const AgentsStudio = (() => {
   // Inicialización global
   document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    initKnowledgeDelegation();
+    loadAgentStats();
     if (window.mermaid) {
-      mermaid.initialize({ startOnLoad: false, theme: 'default' });
+      // Tema oscuro: el Studio usa fondo dark; 'default' era ilegible.
+      mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
     }
   });
 
@@ -307,7 +388,8 @@ const AgentsStudio = (() => {
     loadGraph,
     openAddKnowledgeModal,
     closeAddKnowledgeModal,
-    saveKnowledge
+    saveKnowledge,
+    loadAgentStats
   };
 })();
 

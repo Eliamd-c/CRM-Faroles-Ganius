@@ -55,6 +55,16 @@ module.exports = function(di) {
     }
   });
 
+  // GET /api/langgraph/states - Etapas del embudo registradas (State Pattern)
+  router.get('/states', (req, res) => {
+    try {
+      const states = langGraphService.getSalesStates();
+      res.json({ success: true, states });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
   // GET /api/langgraph/state/:thread_id - Obtener el historial de estado de un hilo
   router.get('/state/:thread_id', async (req, res) => {
     try {
