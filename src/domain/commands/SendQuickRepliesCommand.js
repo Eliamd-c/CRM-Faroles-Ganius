@@ -48,7 +48,7 @@ class SendQuickRepliesCommand extends Command {
   }
 
   async execute(params, context) {
-    const { meta, senderId } = context;
+    const { meta, senderId, supabaseGateway } = context;
     const { message, options } = params;
 
     try {
@@ -59,7 +59,30 @@ class SendQuickRepliesCommand extends Command {
       }));
 
       await meta.sendQuickReplies(senderId, message, quickReplies);
-      return { success: true, message: `Quick Replies enviados con ${quickReplies.length} opciones` };
+
+      // Arquitectura: Marcar estado de espera en BD después de enviar quick_replies
+      // Esto permite que webhook.handlers valide y respete la pausa conversacional
+      if (supabaseGateway && senderId) {
+        try {
+          await supabaseGateway.db
+            .from('customers')
+            .update({
+              bot_state: 'awaiting_input',  // Estado transitorio: esperando click
+              awaiting_input_type: 'choice' // Tipo: respuesta múltiple
+            })
+            .eq('instagram_id', String(senderId))
+            .catch(err => console.warn('⚠️ Error marcando awaiting_input:', err.message));
+        } catch (err) {
+          console.warn('[SendQuickReplies] ⚠️ No se pudo marcar pausa en BD:', err.message);
+          // No romper el flujo si falla actualizar la BD
+        }
+      }
+
+      return {
+        success: true,
+        message: `Quick Replies enviados con ${quickReplies.length} opciones`,
+        awaiting_input: true
+      };
 
     } catch (err) {
       console.error('[SendQuickReplies] Error:', err.message);

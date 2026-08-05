@@ -155,6 +155,14 @@ async function handleMessage(event) {
 
     // Ejecución asíncrona para no bloquear el Event Loop ni causar Timeout en Meta
     langGraph.processConversation(senderId, text, customer).then(async (result) => {
+      // Arquitectura de Pausa: Validar si estamos esperando input (quick_replies)
+      if (result.awaiting_quick_reply) {
+        console.log(`[PauseArchitecture] ⏸️ Esperando click en quick_replies para ${senderName}`);
+        broadcastLog('SYSTEM', `Esperando respuesta del usuario en botones...`);
+        // NO enviar mensaje adicional: permitir que el usuario interactúe con los botones
+        return;
+      }
+
       if (result.action === 'pause_bot') {
         // Usa pauseBot() para sellar bot_paused_at/bot_paused_reason (invariante de la cola humana)
         await supabaseGateway.pauseBot(senderId, 'escalado_langgraph');

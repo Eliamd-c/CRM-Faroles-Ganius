@@ -71,6 +71,10 @@ const graphState = {
   tool_calls: {
     value: (x, y) => y || x,
     default: () => []
+  },
+  awaiting_quick_reply: {
+    value: (x, y) => y !== undefined ? y : x,
+    default: () => false
   }
 };
 
@@ -220,9 +224,48 @@ function routerNode(graphData) {
 }
 
 // ─── Router post-respuesta: Decidir si ejecutar herramientas o terminar ───
+// Arquitectura: Detecta si hay send_quick_replies para pausar la conversación
 function postRespondRouter(graphData) {
-  if (graphData.tool_calls && graphData.tool_calls.length > 0) return "TOOLS";
+  const toolCalls = graphData.tool_calls || [];
+
+  // Detectar si hay invocación de send_quick_replies
+  const hasSendQuickReplies = toolCalls.some(tc => tc.function?.name === 'send_quick_replies');
+
+  if (hasSendQuickReplies) {
+    return "PAUSE_FOR_INPUT"; // → Nuevo nodo de pausa
+  }
+
+  // Si hay otras tool_calls, procesarlas
+  if (toolCalls.length > 0) return "TOOLS";
+
   return "END_GRAPH";
+}
+
+// ─── Nodo 2.5: Pausa Conversacional (Arquitectura de Quick Replies) ───
+// Detecta cuando se invoca send_quick_replies y marca el estado de espera
+// Sin este nodo, el grafo continuaría sin dar al usuario la oportunidad de hacer click
+// Patrón: Middleware -> State -> Router (detecta pausa -> ejecuta tools -> pauseForInputNode marca estado)
+async function pauseForInputNode(graphData) {
+  const toolCalls = graphData.tool_calls || [];
+
+  // Verificar si el último envío fue send_quick_replies
+  const hasSendQuickReplies = toolCalls.some(tc => tc.function?.name === 'send_quick_replies');
+
+  if (hasSendQuickReplies) {
+    console.log('[PauseForInputNode] ⏸️ Pausa conversacional activada: esperando click en quick_replies');
+    // Marcar que estamos en estado de espera
+    return {
+      awaiting_quick_reply: true,
+      // NO generar más mensajes: permitir que el usuario haga su elección
+      messages: graphData.messages
+    };
+  }
+
+  // Si no hay send_quick_replies, pasar directamente (fallback, no debería ocurrir)
+  return {
+    awaiting_quick_reply: false,
+    messages: graphData.messages
+  };
 }
 
 // ─── Nodo 3: Ejecutar Herramientas (Command Pattern + ReAct Feedback Loop) ───
@@ -249,11 +292,13 @@ async function toolNode(graphData) {
     }
 
     // Ejecutar el Comando correspondiente (Command Pattern)
+    const supabaseGateway = require('../adapters/gateways/supabaseGateway.instance');
     const context = {
       senderId: graphData.customer?.instagramId || 'unknown',
       customer: graphData.customer,
       meta,
-      supabase
+      supabase,
+      supabaseGateway // ← Inyectar para que SendQuickRepliesCommand pueda marcar pausa en BD
     };
 
     let resultContent;
@@ -287,6 +332,7 @@ const workflow = new StateGraph({ channels: graphState })
   .addNode("analyzeIntent", analyzeIntentNode)
   .addNode("respond", respondNode)
   .addNode("tools", toolNode)
+  .addNode("pauseForInput", pauseForInputNode)
   .addEdge("__start__", "analyzeIntent")
   .addConditionalEdges("analyzeIntent", routerNode, {
     "END_GRAPH": END,
@@ -294,12 +340,16 @@ const workflow = new StateGraph({ channels: graphState })
   })
   .addConditionalEdges("respond", postRespondRouter, {
     "TOOLS": "tools",
+    "PAUSE_FOR_INPUT": "pauseForInput",
     "END_GRAPH": END
   })
   // Corrección del Arquitecto: después de ejecutar herramientas,
   // volver a 'respond' para que el LLM genere respuesta natural
   // basada en los resultados (ReAct Feedback Loop).
-  .addEdge("tools", "respond");
+  .addEdge("tools", "respond")
+  // Nueva arquitectura: pauseForInput siempre termina el flujo
+  // El usuario debe hacer click en un botón para continuar
+  .addEdge("pauseForInput", END);
 
 // ==========================================
 // 6. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
@@ -366,20 +416,22 @@ class LangGraphService {
       };
 
       const result = await this.appGraph.invoke(inputs, threadConfig);
-      
+
       if (result.human_needed) {
-        return { 
-          action: 'pause_bot', 
+        return {
+          action: 'pause_bot',
           reply: '¡Entendido! Un asesor humano se pondrá en contacto contigo en breve para ayudarte personalmente. 🙌',
-          funnel_stage: result.funnel_stage
+          funnel_stage: result.funnel_stage,
+          awaiting_quick_reply: result.awaiting_quick_reply || false
         };
       }
 
       const lastMsg = result.messages[result.messages.length - 1];
-      return { 
-        action: 'send_message', 
+      return {
+        action: 'send_message',
         reply: lastMsg.content,
-        funnel_stage: result.funnel_stage 
+        funnel_stage: result.funnel_stage,
+        awaiting_quick_reply: result.awaiting_quick_reply || false
       };
       
     } catch (err) {
