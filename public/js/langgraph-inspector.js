@@ -21,12 +21,7 @@ async function renderGraphDiagram() {
   container.innerHTML = '<p style="color: #666;">Cargando arquitectura del agente...</p>';
 
   try {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No autorizado');
-
-    const res = await fetch('/api/langgraph/diagram', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    const res = await fetch('/api/langgraph/diagram');
     
     if (!res.ok) throw new Error('Fallo al cargar el diagrama');
     
