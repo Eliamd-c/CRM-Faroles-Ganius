@@ -421,11 +421,42 @@ class LangGraphService {
       await this.initialize();
 
       const threadConfig = { configurable: { thread_id: senderId } };
-      
+
+      // 🔧 FIX CRÍTICO: Recuperar checkpoint anterior (historial acumulado)
+      let accumulatedMessages = [];
+      try {
+        const historyGenerator = await this.appGraph.getStateHistory(threadConfig);
+        for await (const snapshot of historyGenerator) {
+          // El snapshot más reciente contiene el estado acumulado
+          accumulatedMessages = snapshot.values.messages || [];
+          console.log(`[LangGraphService] ✅ Recuperado checkpoint anterior con ${accumulatedMessages.length} mensajes`);
+          break;  // Solo necesitamos el más reciente
+        }
+      } catch (e) {
+        console.warn(`[LangGraphService] ⚠️ Sin historial previo para thread ${senderId}: ${e.message}`);
+        // Fallback: comenzar desde cero (primer mensaje del usuario)
+        accumulatedMessages = [];
+      }
+
+      // Acumular: mensajes previos + mensaje actual
       const inputs = {
-        messages: [{ role: 'user', content: text }],
-        customer: customerProfile
+        messages: [
+          ...accumulatedMessages,
+          { role: 'user', content: text }
+        ],
+        customer: customerProfile,
+        // Preservar estados anteriores si existen
+        funnel_stage: customerProfile?.funnel_stage || 'ONBOARDING',
+        intent: customerProfile?.intent || null
       };
+
+      // 📊 LOGGING PARA VISIBILIDAD
+      console.log(`[LangGraphService] 📨 Procesando mensaje:`);
+      console.log(`   Thread ID: ${senderId}`);
+      console.log(`   Historial: ${accumulatedMessages.length} mensajes previos`);
+      console.log(`   Nuevo mensaje: "${text.substring(0, 50)}..."`);
+      console.log(`   Total en inputs: ${inputs.messages.length} mensajes`);
+      console.log(`   Customer state: ${customerProfile?.bot_state || 'unknown'}`);
 
       const result = await this.appGraph.invoke(inputs, threadConfig);
 
@@ -439,13 +470,20 @@ class LangGraphService {
       }
 
       const lastMsg = result.messages[result.messages.length - 1];
+
+      // 🔍 LOGGING DE RESULTADO
+      console.log(`[LangGraphService] ✅ Respuesta generada:`);
+      console.log(`   Etapa: ${result.funnel_stage}`);
+      console.log(`   Intención: ${result.intent}`);
+      console.log(`   Respuesta: "${lastMsg.content.substring(0, 50)}..."`);
+
       return {
         action: 'send_message',
         reply: lastMsg.content,
         funnel_stage: result.funnel_stage,
         awaiting_quick_reply: result.awaiting_quick_reply || false
       };
-      
+
     } catch (err) {
       console.error('[LangGraphService] Error procesando conversacion:', err);
       return { action: 'error', reply: err.message || err.toString() };
