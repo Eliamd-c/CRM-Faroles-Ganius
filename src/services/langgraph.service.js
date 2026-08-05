@@ -151,40 +151,52 @@ Devuelve SOLO el JSON, sin texto adicional.`));
 }
 
 // ─── Nodo 2: Generar Respuesta (Delegada al State Pattern) ───
+// ARQUITECTURA (Corrección de Alucinaciones):
+// Usa getSystemInstruction() + getHistoryContext() en lugar de getPrompt().
+// Esto previene duplicación de historial y separación clara de responsabilidades (SoC).
 async function respondNode(graphData) {
   const context = state.AI_MASTER_CONTEXT || "Eres Faroles Genius, vendes faroles solares apoyando comunidades.";
   const currentStage = graphData.funnel_stage || 'ONBOARDING';
-  
+
   // Obtener la clase de estado correspondiente
   const stateObj = SALES_STATES[currentStage];
-  
+
   if (!stateObj) {
     console.error(`[StateMachine] Estado desconocido: ${currentStage}, usando ONBOARDING`);
     const fallback = SALES_STATES['ONBOARDING'];
-    const prompt = fallback.getPrompt({
+
+    // NUEVO: Separar sistema + historial
+    const systemInstr = fallback.getSystemInstruction({
       context,
-      messages: graphData.messages,
       intent: graphData.intent,
       customer: graphData.customer
     });
+    const historyContext = fallback.getHistoryContext({
+      messages: graphData.messages
+    });
+    const prompt = systemInstr + '\n\n' + historyContext;
+
     try {
       const response = await openAICircuitBreaker.fire(() => llm.invoke(prompt));
       return { messages: [{ role: 'assistant', content: response.content }] };
     } catch (e) {
       if (e.name === 'CircuitOpenError' || e.isCircuitBreakerError) {
-        return { messages: [{ role: 'assistant', content: "Disculpa, estoy experimentando intermitencias en mi sistema. 😔 ¡Pero no te preocupes! Un asesor humano te responderá a la brevedad." }] };
+        return { messages: [{ role: 'assistant', content: "Disculpa, estoy experimentando intermitencias. Un asesor te responderá pronto." }] };
       }
       return { messages: [{ role: 'assistant', content: "Hubo un error procesando tu solicitud." }] };
     }
   }
 
-  // Delegar la generación del prompt al objeto de estado (State Pattern)
-  const prompt = stateObj.getPrompt({
+  // NUEVO: Separar sistema + historial (State Pattern + SoC)
+  const systemInstr = stateObj.getSystemInstruction({
     context,
-    messages: graphData.messages,
     intent: graphData.intent,
     customer: graphData.customer
   });
+  const historyContext = stateObj.getHistoryContext({
+    messages: graphData.messages
+  });
+  const prompt = systemInstr + '\n\n' + historyContext;
 
   // Obtener las herramientas disponibles del CommandRegistry
   const tools = commandRegistry.getAllToolSchemas();
@@ -207,13 +219,14 @@ async function respondNode(graphData) {
 
   } catch (e) {
     if (e.name === 'CircuitOpenError' || e.isCircuitBreakerError) {
-      console.warn('[CircuitBreaker] Circuito Abierto en respondNode. Retornando fallback.');
-      return { 
-        messages: [{ role: 'assistant', content: "Disculpa, estoy experimentando intermitencias en mi sistema. 😔 ¡Pero no te preocupes! Un asesor humano te responderá a la brevedad." }], 
-        tool_calls: [] 
+      console.warn('[CircuitBreaker] Circuito Abierto en respondNode');
+      return {
+        messages: [{ role: 'assistant', content: "Disculpa, estoy experimentando intermitencias. Un asesor te responderá pronto." }],
+        tool_calls: []
       };
     }
-    return { messages: [{ role: 'assistant', content: "Hubo un error generando mi respuesta." }], tool_calls: [] };
+    console.error('[RespondNode] Error:', e.message);
+    return { messages: [{ role: 'assistant', content: "Hubo un error procesando tu solicitud." }], tool_calls: [] };
   }
 }
 
