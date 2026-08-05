@@ -198,9 +198,10 @@ function postRespondRouter(graphData) {
   return "END_GRAPH";
 }
 
-// ─── Nodo 3: Ejecutar Herramientas (Command Pattern) ───
+// ─── Nodo 3: Ejecutar Herramientas (Command Pattern + ReAct Feedback Loop) ───
 async function toolNode(graphData) {
   const toolCalls = graphData.tool_calls || [];
+  const toolResults = [];
   
   for (const toolCall of toolCalls) {
     const fnName = toolCall.function?.name;
@@ -209,6 +210,12 @@ async function toolNode(graphData) {
       fnArgs = JSON.parse(toolCall.function?.arguments || '{}');
     } catch (e) {
       console.error(`[ToolNode] Error parseando argumentos de ${fnName}:`, e.message);
+      toolResults.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        name: fnName,
+        content: JSON.stringify({ success: false, message: 'Error parseando argumentos' })
+      });
       continue;
     }
 
@@ -220,13 +227,22 @@ async function toolNode(graphData) {
       supabase
     };
 
-    await commandRegistry.execute(fnName, fnArgs, context);
+    const result = await commandRegistry.execute(fnName, fnArgs, context);
+
+    // Crítico: Devolver el resultado como mensaje tipo 'tool' (OpenAI ReAct)
+    toolResults.push({
+      role: 'tool',
+      tool_call_id: toolCall.id,
+      name: fnName,
+      content: JSON.stringify(result)
+    });
   }
 
-  return { tool_calls: [] }; // Limpiar tool_calls tras la ejecución
+  // Devolver los resultados como mensajes y limpiar tool_calls
+  return { messages: toolResults, tool_calls: [] };
 }
 
-// ─── Compilar el Grafo ───
+// ─── Compilar el Grafo (con ReAct Loop para herramientas) ───
 const workflow = new StateGraph({ channels: graphState })
   .addNode("analyzeIntent", analyzeIntentNode)
   .addNode("respond", respondNode)
@@ -240,7 +256,10 @@ const workflow = new StateGraph({ channels: graphState })
     "TOOLS": "tools",
     "END_GRAPH": END
   })
-  .addEdge("tools", END);
+  // Corrección del Arquitecto: después de ejecutar herramientas,
+  // volver a 'respond' para que el LLM genere respuesta natural
+  // basada en los resultados (ReAct Feedback Loop).
+  .addEdge("tools", "respond");
 
 // ==========================================
 // 5. FACHADA DEL SERVICIO (Facade & Singleton Pattern)
