@@ -128,7 +128,9 @@ class FlowRepository {
 
   async _persistFlows() {
     let savedToDb = false;
+    let savedToFile = false;
 
+    // CRÍTICO: Supabase es la fuente de verdad. Guardar aquí PRIMERO.
     if (this.supabase) {
       try {
         await this.supabase
@@ -144,15 +146,25 @@ class FlowRepository {
       }
     }
 
+    // flows.json es BACKUP: se regenera desde state.flowsConfig (que viene de Supabase)
     try {
       const filePath = path.join(__dirname, '..', '..', '..', 'flows.json');
       await fs.promises.writeFile(
         filePath,
         JSON.stringify(state.flowsConfig, null, 2)
       );
+      savedToFile = true;
     } catch (e) {
       if (!savedToDb) throw e;
       console.error('⚠️ Error guardando flows.json:', e.message);
+    }
+
+    // Validación de sincronización (verboso, pero necesario para debugging)
+    if (savedToDb && savedToFile) {
+      const dbCount = state.flowsConfig.flows?.length || 0;
+      console.log(`✅ Flujos sincronizados: Supabase + flows.json (${dbCount} flujos)`);
+    } else if (savedToDb && !savedToFile) {
+      console.warn(`⚠️ Supabase guardado, pero flows.json falló (el backup puede estar desactualizado)`);
     }
   }
 }

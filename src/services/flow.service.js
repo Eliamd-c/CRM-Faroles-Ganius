@@ -48,19 +48,23 @@ async function loadFlowsFromSupabase() {
     const { data, error } = await supabase.from('app_flows').select('config').eq('id', 1).single();
     if (error) {
       if (error.code === 'PGRST116' || /no rows|0 rows/i.test(error.message || '')) {
-        console.log('ℹ️ No hay flujos guardados en Supabase todavía. Sembrando con flows.json...');
+        console.log('ℹ️ Supabase vacío. Sembrando desde flows.json...');
+        // SAFETY NET: Si BD está vacía, usa flows.json como seed
         await saveFlowsConfig();
+        console.log(`✅ Flujos sembrados en Supabase desde flows.json (${state.flowsConfig.flows?.length || 0} flujos)`);
       } else {
-        console.error('⚠️ No se pudieron cargar flujos de Supabase, se usa flows.json:', error.message);
+        console.error('⚠️ No se pudieron cargar flujos de Supabase:', error.message);
+        console.warn('   Continuando con configuración en memoria (archivo local ignorado)');
       }
       return;
     }
     if (data && data.config && Array.isArray(data.config.flows)) {
       state.flowsConfig = data.config;
-      console.log(`✅ Flujos cargados desde Supabase (${state.flowsConfig.flows.length} flujos) — persistentes entre despliegues.`);
+      console.log(`✅ Flujos cargados desde Supabase (${state.flowsConfig.flows.length} flujos) — FUENTE DE VERDAD`);
     }
   } catch (e) {
-    console.error('⚠️ Excepción cargando flujos de Supabase, se usa flows.json:', e.message);
+    console.error('⚠️ Excepción cargando flujos de Supabase:', e.message);
+    console.warn('   Continuando con configuración en memoria');
   }
 }
 

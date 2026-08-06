@@ -15,6 +15,7 @@ const { state, broadcastLog } = require('./src/shared');
 const meta = require('./src/services/meta.service');
 const openai = require('./src/services/openai.service');
 const flowService = require('./src/services/flow.service');
+const { syncFlowsFromSupabase } = require('./src/services/flow.sync');
 const handlers = require('./src/handlers/webhook.handlers');
 
 // ─── Clean Architecture Bootstrap ───
@@ -57,7 +58,10 @@ try {
   console.warn('⚠️ Contexto maestro no encontrado. El agente usará prompt genérico.');
 }
 
-// Cargar flujos desde archivo
+// ⚠️ IMPORTANTE: flows.json se carga PRIMERO como estado temporal.
+// Luego loadFlowsFromSupabase() decidirá si usar Supabase (fuente de verdad)
+// o mantener flows.json si Supabase está vacío.
+console.log('📋 Cargando configuración inicial de flujos...');
 flowService.loadFlowsFromFile();
 
 // ─── Inicializar Clean Architecture DI Container ───
@@ -983,7 +987,31 @@ if (!process.env.API_SECRET) {
 
 // Init bot & start server
 meta.initBot();
+
+// ⚠️ ARQUITECTURA CRÍTICA: Supabase es la FUENTE DE VERDAD para flujos.
+// Esta llamada sobrescribe state.flowsConfig con lo que hay en la BD.
+// Si Supabase está vacío, se siembra con flows.json (safety net).
+// NUNCA flows.json sobrescribe Supabase una vez que BD tiene datos.
+console.log('\n🔄 Sincronizando flujos desde Supabase (BD es fuente de verdad)...');
 flowService.loadFlowsFromSupabase();
+
+// Forzar sincronización de flows.json con Supabase (resuelve desincronización)
+(async () => {
+  const result = await syncFlowsFromSupabase(supabase);
+  if (result.success && result.stats) {
+    console.log(`📊 Estado de sincronización:`);
+    console.log(`   Flujos en Supabase: ${result.stats.flowsInDb}`);
+    console.log(`   Flujos en flows.json: ${result.stats.nowSynced}`);
+    if (result.stats.onlyInDb.length > 0) {
+      console.log(`   ✅ Agregados desde BD: ${result.stats.onlyInDb.length}`);
+    }
+    if (result.stats.onlyInFile.length > 0) {
+      console.log(`   ⚠️ Descartados (solo en archivo): ${result.stats.onlyInFile.length}`);
+    }
+  } else if (!result.success) {
+    console.warn(`⚠️ Sincronización no disponible: ${result.message}`);
+  }
+})();
 
 app.listen(PORT, async () => {
   await meta.loadAppConfig();
