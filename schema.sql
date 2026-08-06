@@ -1,5 +1,16 @@
 -- Definición de la base de datos Supabase para CRM 2.0
 
+-- Instrucciones dinámicas por etapa (Opción B Híbrida)
+CREATE TABLE IF NOT EXISTS public.instruction_overrides (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    stage_name TEXT NOT NULL UNIQUE, -- 'ONBOARDING', 'DISCOVERY', 'RECOMMENDATION', 'CHECKOUT'
+    instruction_text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_instruction_overrides_stage ON instruction_overrides(stage_name);
+
 -- Crear tabla customers
 CREATE TABLE IF NOT EXISTS public.customers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

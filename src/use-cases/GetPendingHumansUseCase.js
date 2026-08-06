@@ -49,7 +49,9 @@ class GetPendingHumansUseCase {
       bot_paused_at: human.bot_paused_at
         ? new Date(human.bot_paused_at).toISOString()
         : null,
-      bot_paused_reason: human.bot_paused_reason || null
+      bot_paused_reason: human.bot_paused_reason || null,
+      bot_state: human.bot_state || 'unknown',
+      funnel_stage: human.funnel_stage || null
     }));
 
     return normalized;
