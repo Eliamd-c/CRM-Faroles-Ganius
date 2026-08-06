@@ -113,6 +113,9 @@
           <button class="tab-btn" data-target="tab-escalados">
             <i class="fas fa-exclamation-circle"></i> Escalados Pendientes
           </button>
+          <button class="tab-btn" data-target="tab-instructions">
+            <i class="fas fa-graduation-cap"></i> Instrucciones Dinámicas
+          </button>
         </div>
 
         <!-- Contenido de las pestañas -->
@@ -186,6 +189,78 @@
             </div>
           </div>
 
+          <!-- Pestaña: Instrucciones Dinámicas -->
+          <div id="tab-instructions" class="tab-pane">
+            <div class="inspector-header">
+              <h3>Instrucciones por Etapa (Dinámicas con Cache)</h3>
+              <button class="btn btn-outline btn-sm" onclick="agentsStudio.loadInstructions()">
+                <i class="fas fa-sync-alt"></i> Refrescar
+              </button>
+            </div>
+
+            <!-- Estadísticas de Cache -->
+            <div id="cache-stats-panel" class="glass-panel" style="margin-bottom: 1.5rem; padding: 1rem;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                <div class="stat-card">
+                  <span class="stat-label">Cache Hits</span>
+                  <span class="stat-value" id="stat-cache-hits">-</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label">Cache Misses</span>
+                  <span class="stat-value" id="stat-cache-misses">-</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label">Hit Rate</span>
+                  <span class="stat-value" id="stat-hit-rate">-</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label">Cache Size</span>
+                  <span class="stat-value" id="stat-cache-size">-</span>
+                </div>
+              </div>
+              <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button class="btn btn-outline btn-sm" onclick="agentsStudio.invalidateInstructionCache()">
+                  <i class="fas fa-trash"></i> Invalidar Cache
+                </button>
+              </div>
+            </div>
+
+            <!-- Selector de Etapa -->
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Selecciona una Etapa:</label>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="stage-btn active" data-stage="ONBOARDING" onclick="agentsStudio.selectInstructionStage('ONBOARDING')">
+                  <i class="fas fa-door-open"></i> Onboarding
+                </button>
+                <button class="stage-btn" data-stage="DISCOVERY" onclick="agentsStudio.selectInstructionStage('DISCOVERY')">
+                  <i class="fas fa-compass"></i> Discovery
+                </button>
+                <button class="stage-btn" data-stage="RECOMMENDATION" onclick="agentsStudio.selectInstructionStage('RECOMMENDATION')">
+                  <i class="fas fa-lightbulb"></i> Recommendation
+                </button>
+                <button class="stage-btn" data-stage="CHECKOUT" onclick="agentsStudio.selectInstructionStage('CHECKOUT')">
+                  <i class="fas fa-shopping-cart"></i> Checkout
+                </button>
+              </div>
+            </div>
+
+            <!-- Editor de Instrucción -->
+            <div id="instruction-editor" style="display: none;">
+              <div class="editor-container">
+                <textarea id="instruction-text" class="glass-input" rows="12" placeholder="Instrucción del sistema..."></textarea>
+              </div>
+              <div style="font-size: 0.85rem; color: #9ba1a6; margin-top: 0.5rem;">
+                <span id="char-count">0</span> / 5000 caracteres
+              </div>
+              <div class="form-actions" style="margin-top: 1rem;">
+                <span id="instruction-save-status" class="status-msg"></span>
+                <button class="btn btn-primary" onclick="agentsStudio.saveInstruction()">
+                  <i class="fas fa-save"></i> Guardar Instrucción
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -231,27 +306,48 @@
         <button class="btn-close" onclick="agentsStudio.closeEscaladoModal()"><i class="fas fa-times"></i></button>
       </header>
       <div style="padding: 2rem;">
-        <!-- Información del contacto -->
-        <div class="escalado-info">
-          <div style="margin-bottom: 1.5rem;">
-            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Instagram ID</label>
-            <p id="escalado-instagram-id" style="margin: 0; font-family: monospace; color: #fff;"></p>
+        <!-- Tabs dentro del modal de escalado -->
+        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
+          <button class="escalado-tab-btn active" data-escalado-tab="info" onclick="agentsStudio.switchEscaladoTab('info')">
+            <i class="fas fa-info-circle"></i> Información
+          </button>
+          <button class="escalado-tab-btn" data-escalado-tab="historial" onclick="agentsStudio.switchEscaladoTab('historial')">
+            <i class="fas fa-comments"></i> Historial
+          </button>
+        </div>
+
+        <!-- Tab: Información -->
+        <div id="escalado-tab-info" class="escalado-tab-content active">
+          <div class="escalado-info">
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Instagram ID</label>
+              <p id="escalado-instagram-id" style="margin: 0; font-family: monospace; color: #fff;"></p>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Nombre</label>
+              <p id="escalado-name" style="margin: 0; color: #fff;"></p>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Usuario</label>
+              <p id="escalado-username" style="margin: 0; color: #fff;"></p>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Pausado a</label>
+              <p id="escalado-paused-at" style="margin: 0; color: #fff; font-size: 0.9rem;"></p>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Razón</label>
+              <p id="escalado-reason" style="margin: 0;"></p>
+            </div>
           </div>
-          <div style="margin-bottom: 1.5rem;">
-            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Nombre</label>
-            <p id="escalado-name" style="margin: 0; color: #fff;"></p>
-          </div>
-          <div style="margin-bottom: 1.5rem;">
-            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Usuario</label>
-            <p id="escalado-username" style="margin: 0; color: #fff;"></p>
-          </div>
-          <div style="margin-bottom: 1.5rem;">
-            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Pausado a</label>
-            <p id="escalado-paused-at" style="margin: 0; color: #fff; font-size: 0.9rem;"></p>
-          </div>
-          <div style="margin-bottom: 1.5rem;">
-            <label style="display:block; margin-bottom: 0.3rem; font-weight: 600; color: #9ba1a6; font-size: 0.85rem;">Razón</label>
-            <p id="escalado-reason" style="margin: 0;"></p>
+        </div>
+
+        <!-- Tab: Historial -->
+        <div id="escalado-tab-historial" class="escalado-tab-content hidden">
+          <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--glass-border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <div id="historial-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+              <div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando historial...</div>
+            </div>
           </div>
         </div>
 

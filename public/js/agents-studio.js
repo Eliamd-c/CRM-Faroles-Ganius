@@ -377,9 +377,12 @@ const AgentsStudio = (() => {
     try {
       container.innerHTML = '<div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando escalados...</div>';
 
-      const res = await fetch('/api/pending-humans');
+      const res = await fetch('/api/langgraph/pending-humans');
       if (!res.ok) throw new Error('Error fetching escalados');
-      const data = await res.json();
+      const response = await res.json();
+
+      // El endpoint devuelve { success, data: [...], count, timestamp }
+      const data = response.data || response;
 
       if (data && Array.isArray(data) && data.length > 0) {
         renderEscaladosTable(data);
@@ -402,6 +405,7 @@ const AgentsStudio = (() => {
         <thead>
           <tr>
             <th>Usuario</th>
+            <th>Etapa</th>
             <th>Pausado hace</th>
             <th class="escalados-razon">Razón</th>
             <th>Acciones</th>
@@ -412,12 +416,14 @@ const AgentsStudio = (() => {
 
     escalados.forEach(escalado => {
       const username = escapeHtml(escalado.username || 'Desconocido');
-      const timeDiff = formatTimeDiff(escalado.paused_at);
-      const reasonBadge = formatReasonBadge(escalado.pause_reason);
+      const stage = escapeHtml(escalado.bot_state || escalado.funnel_stage || '—');
+      const timeDiff = formatTimeDiff(escalado.bot_paused_at);
+      const reasonBadge = formatReasonBadge(escalado.bot_paused_reason);
 
       html += `
         <tr>
           <td>${username}</td>
+          <td>${stage}</td>
           <td>${timeDiff}</td>
           <td class="escalados-razon">${reasonBadge}</td>
           <td>
@@ -561,9 +567,10 @@ const AgentsStudio = (() => {
 
       // Si no lo encontramos en la tabla actual, hacer fetch completo
       if (!escaladoData) {
-        const res = await fetch('/api/pending-humans');
+        const res = await fetch('/api/langgraph/pending-humans');
         if (!res.ok) throw new Error('Error fetching escalados');
-        const escalados = await res.json();
+        const response = await res.json();
+        const escalados = response.data || response;
         escaladoData = escalados.find(e => String(e.instagram_id) === String(instagramId));
         if (!escaladoData) throw new Error('Escalado no encontrado');
       }
@@ -593,8 +600,21 @@ const AgentsStudio = (() => {
       // Guardar referencia del escalado actual
       state.currentEscalado = escaladoData;
 
+      // Resetear tabs al tab de "Información"
+      const infoBtn = document.querySelector('[data-escalado-tab="info"]');
+      if (infoBtn) {
+        infoBtn.click(); // Usa el click handler que ya existe
+      } else {
+        switchEscaladoTab('info');
+      }
+
       // Mostrar modal
       modal.classList.remove('hidden');
+
+      // Cargar historial de mensajes automáticamente
+      setTimeout(() => {
+        loadHistorialMessages(escaladoData.instagram_id);
+      }, 300);
     } catch (error) {
       console.error('Error abriendo modal de escalado:', error);
       alert('Error al cargar detalles del escalado.');
@@ -714,6 +734,263 @@ const AgentsStudio = (() => {
     }
   };
 
+  /**
+   * Escalados: Cambia entre tabs en el modal de escalado
+   */
+  const switchEscaladoTab = (tabName) => {
+    // Desactivar todos los tabs
+    document.querySelectorAll('.escalado-tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    document.querySelectorAll('.escalado-tab-content').forEach(content => {
+      content.classList.remove('active');
+      content.classList.add('hidden');
+    });
+
+    // Activar el tab seleccionado
+    const btn = document.querySelector(`[data-escalado-tab="${tabName}"]`);
+    const content = document.getElementById(`escalado-tab-${tabName}`);
+    if (btn) btn.classList.add('active');
+    if (content) {
+      content.classList.add('active');
+      content.classList.remove('hidden');
+    }
+
+    // Si es el tab de historial, cargar mensajes
+    if (tabName === 'historial' && state.currentEscalado) {
+      loadHistorialMessages(state.currentEscalado.instagram_id);
+    }
+  };
+
+  /**
+   * Escalados: Carga el historial de mensajes de un contacto
+   */
+  const loadHistorialMessages = async (instagramId) => {
+    const container = document.getElementById('historial-container');
+    if (!container) return;
+
+    try {
+      container.innerHTML = '<div class="loader"><i class="fas fa-spinner fa-spin"></i> Cargando historial...</div>';
+
+      const res = await fetch(`/api/contacts/${encodeURIComponent(instagramId)}/messages`);
+      if (!res.ok) throw new Error('Error al cargar historial');
+      const messages = await res.json();
+
+      if (messages && Array.isArray(messages) && messages.length > 0) {
+        // Tomar últimos 50 mensajes
+        const recentMessages = messages.slice(-50);
+        renderHistorialChat(recentMessages);
+      } else {
+        container.innerHTML = '<p style="color: #9ba1a6; text-align: center; padding: 1rem;">Sin historial de mensajes.</p>';
+      }
+    } catch (error) {
+      console.error('Error cargando historial:', error);
+      container.innerHTML = '<p class="text-warning" style="text-align: center; padding: 1rem;">Error al cargar el historial.</p>';
+    }
+  };
+
+  /**
+   * Escalados: Renderiza el historial de chat en formato de globos
+   */
+  const renderHistorialChat = (messages) => {
+    const container = document.getElementById('historial-container');
+    if (!container) return;
+
+    let html = '';
+
+    messages.forEach(msg => {
+      // Normalizar estructura: el endpoint devuelve diferentes formatos
+      const direction = msg.direction || 'inbound';
+      const content = msg.content || msg.text || msg.message || '';
+      const timestamp = msg.created_at || msg.timestamp || null;
+
+      if (!content.trim()) return; // Ignorar mensajes vacíos
+
+      const directionClass = direction === 'outbound' ? 'outbound' : 'inbound';
+      const displayTime = timestamp
+        ? new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : '';
+
+      html += `
+        <div class="chat-message ${directionClass}">
+          <div>
+            <div class="chat-bubble">${escapeHtml(content)}</div>
+            ${displayTime ? `<div class="chat-timestamp">${displayTime}</div>` : ''}
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  };
+
+  /**
+   * Instrucciones Dinámicas: Cargar estadísticas de cache
+   */
+  const loadCacheStats = async () => {
+    try {
+      const res = await fetch('/api/ai/instructions/stats', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}` }
+      });
+      if (!res.ok) throw new Error('Error al cargar estadísticas');
+      const data = await res.json();
+      const stats = data.stats || {};
+
+      document.getElementById('stat-cache-hits').textContent = stats.cacheHits || 0;
+      document.getElementById('stat-cache-misses').textContent = stats.cacheMisses || 0;
+      document.getElementById('stat-hit-rate').textContent = stats.hitRate ? (stats.hitRate * 100).toFixed(1) + '%' : 'N/A';
+      document.getElementById('stat-cache-size').textContent = stats.cacheSize || 0;
+    } catch (error) {
+      console.error('Error loading cache stats:', error);
+      document.getElementById('stat-cache-hits').textContent = '-';
+      document.getElementById('stat-cache-misses').textContent = '-';
+      document.getElementById('stat-hit-rate').textContent = '-';
+      document.getElementById('stat-cache-size').textContent = '-';
+    }
+  };
+
+  /**
+   * Instrucciones Dinámicas: Cargar todas las instrucciones
+   */
+  const loadInstructions = async () => {
+    await loadCacheStats();
+    // Cargar la instrucción por defecto (ONBOARDING)
+    await selectInstructionStage('ONBOARDING');
+  };
+
+  /**
+   * Instrucciones Dinámicas: Seleccionar una etapa y cargar su instrucción
+   */
+  const selectInstructionStage = async (stage) => {
+    // Actualizar botones activos
+    document.querySelectorAll('.stage-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.stage === stage);
+    });
+
+    try {
+      const res = await fetch(`/api/ai/instructions/${stage}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}` }
+      });
+      if (!res.ok) throw new Error('Error al cargar instrucción');
+      const data = await res.json();
+      const instruction = data.instruction || '';
+
+      const editor = document.getElementById('instruction-editor');
+      const textArea = document.getElementById('instruction-text');
+
+      textArea.value = instruction;
+      textArea.dataset.stage = stage;
+
+      // Actualizar contador de caracteres
+      updateCharCount();
+
+      // Mostrar editor
+      editor.style.display = 'block';
+    } catch (error) {
+      console.error('Error loading instruction:', error);
+      const editor = document.getElementById('instruction-editor');
+      editor.style.display = 'block';
+      document.getElementById('instruction-text').value = 'Error al cargar la instrucción. Intenta nuevamente.';
+    }
+  };
+
+  /**
+   * Instrucciones Dinámicas: Actualizar contador de caracteres
+   */
+  const updateCharCount = () => {
+    const textArea = document.getElementById('instruction-text');
+    const charCount = textArea.value.length;
+    document.getElementById('char-count').textContent = charCount;
+
+    // Cambiar color si excede límite
+    if (charCount > 5000) {
+      document.getElementById('char-count').style.color = '#ff6b6b';
+    } else {
+      document.getElementById('char-count').style.color = 'inherit';
+    }
+  };
+
+  /**
+   * Instrucciones Dinámicas: Guardar instrucción
+   */
+  const saveInstruction = async () => {
+    const textArea = document.getElementById('instruction-text');
+    const stage = textArea.dataset.stage;
+    const instruction = textArea.value.trim();
+    const statusEl = document.getElementById('instruction-save-status');
+
+    if (!instruction || instruction.length < 50) {
+      statusEl.textContent = 'La instrucción debe tener al menos 50 caracteres.';
+      statusEl.style.color = '#ff6b6b';
+      return;
+    }
+
+    if (instruction.length > 5000) {
+      statusEl.textContent = 'La instrucción no debe exceder 5000 caracteres.';
+      statusEl.style.color = '#ff6b6b';
+      return;
+    }
+
+    try {
+      statusEl.textContent = 'Guardando...';
+      statusEl.style.color = '#ffb822';
+
+      const res = await fetch(`/api/ai/instructions/${stage}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}`
+        },
+        body: JSON.stringify({ instruction_text: instruction })
+      });
+
+      if (!res.ok) throw new Error('Error al guardar instrucción');
+      const data = await res.json();
+
+      statusEl.textContent = '✅ Instrucción guardada exitosamente.';
+      statusEl.style.color = '#00d26a';
+
+      // Recargar estadísticas después de guardar
+      setTimeout(() => loadCacheStats(), 1000);
+    } catch (error) {
+      console.error('Error saving instruction:', error);
+      statusEl.textContent = '❌ Error al guardar la instrucción.';
+      statusEl.style.color = '#ff6b6b';
+    }
+  };
+
+  /**
+   * Instrucciones Dinámicas: Invalidar cache
+   */
+  const invalidateInstructionCache = async () => {
+    try {
+      const res = await fetch('/api/ai/instructions/cache/invalidate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}`
+        }
+      });
+
+      if (!res.ok) throw new Error('Error al invalidar cache');
+
+      // Recargar estadísticas
+      await loadCacheStats();
+      alert('✅ Cache invalidado exitosamente.');
+    } catch (error) {
+      console.error('Error invalidating cache:', error);
+      alert('❌ Error al invalidar el cache.');
+    }
+  };
+
+  // Agregar listener para contador de caracteres
+  document.addEventListener('DOMContentLoaded', () => {
+    const textArea = document.getElementById('instruction-text');
+    if (textArea) {
+      textArea.addEventListener('input', updateCharCount);
+    }
+  });
+
   // Inicialización global
   document.addEventListener('DOMContentLoaded', () => {
     initTabs();
@@ -748,7 +1025,14 @@ const AgentsStudio = (() => {
     loadEscalados,
     openEscaladoModal,
     closeEscaladoModal,
-    sendHumanMessage
+    sendHumanMessage,
+    switchEscaladoTab,
+    // Instrucciones Dinámicas
+    loadInstructions,
+    selectInstructionStage,
+    saveInstruction,
+    invalidateInstructionCache,
+    updateCharCount
   };
 })();
 
