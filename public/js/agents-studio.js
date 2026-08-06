@@ -838,7 +838,11 @@ const AgentsStudio = (() => {
 
       document.getElementById('stat-cache-hits').textContent = stats.cacheHits || 0;
       document.getElementById('stat-cache-misses').textContent = stats.cacheMisses || 0;
-      document.getElementById('stat-hit-rate').textContent = stats.hitRate ? (stats.hitRate * 100).toFixed(1) + '%' : 'N/A';
+      // El endpoint devuelve hitRate como número (0-1), convertir a porcentaje
+      const hitRateValue = typeof stats.hitRate === 'string'
+        ? stats.hitRate  // Si ya es string con %, usar directamente
+        : stats.hitRate ? (stats.hitRate * 100).toFixed(1) + '%' : 'N/A';
+      document.getElementById('stat-hit-rate').textContent = hitRateValue;
       document.getElementById('stat-cache-size').textContent = stats.cacheSize || 0;
     } catch (error) {
       console.error('Error loading cache stats:', error);

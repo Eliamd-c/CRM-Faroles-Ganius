@@ -276,9 +276,17 @@ app.use('/api/langgraph', requireAuth, langgraphRoutes);
     const { getInstance: getInstructionService } = require('./src/domain/services/InstructionService.instance');
     const InstructionOverridesGateway = require('./src/adapters/gateways/InstructionOverridesGateway');
 
-    // Obtener InstructionService singleton
-    const instructionService = await getInstructionService();
+    // Obtener InstructionService singleton (necesita re-inicialización con gateway)
     const instructionOverridesGateway = new InstructionOverridesGateway(supabase);
+
+    // CRÍTICO: Re-instanciar el servicio CON el gateway inyectado
+    // (el singleton anterior se inicializó sin gateway)
+    const { InstructionService: InstructionServiceClass, InstructionConfigGateway } = require('./src/domain/services/InstructionService.instance');
+    const instructionService = new InstructionServiceClass(
+      instructionOverridesGateway,  // ✅ Gateway para leer/escribir overrides
+      await instructionOverridesGateway.getDefaultInstructions(),  // Instrucciones por defecto
+      { stdTTL: 300, maxKeys: 50, checkperiod: 60 }  // Config caching
+    );
 
     // Registrar rutas
     const aiInstructionsRoutes = require('./src/routes/aiInstructionsRoutes')(instructionOverridesGateway, instructionService);
