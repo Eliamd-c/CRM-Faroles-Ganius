@@ -994,12 +994,12 @@ meta.initBot();
 // NUNCA flows.json sobrescribe Supabase una vez que BD tiene datos.
 console.log('\n🔄 Sincronizando flujos desde Supabase (BD es fuente de verdad)...');
 
-// Paso 1: Cargar desde Supabase (FUENTE DE VERDAD) ANTES de esperar sync
-flowService.loadFlowsFromSupabase();
-
-// Paso 2: Esperar sincronización de flows.json ANTES de levantar servidor
+// Paso 1 + 2: Cargar desde Supabase + sincronizar flows.json
 (async () => {
   try {
+    // Paso 1: Cargar desde Supabase (FUENTE DE VERDAD) ANTES de esperar sync
+    await flowService.loadFlowsFromSupabase();
+
     const result = await syncFlowsFromSupabase(supabase);
     if (result.success && result.stats) {
       console.log(`📊 Estado de sincronización:`);
@@ -1026,8 +1026,9 @@ flowService.loadFlowsFromSupabase();
   }
 
   app.listen(PORT, async () => {
-  await meta.loadAppConfig();
-  console.log(`🚀 CRM 2.0 Webhook escuchando en http://localhost:${PORT}/webhook`);
-  console.log(`   Account ID : ${state.INSTAGRAM_ACCOUNT_ID}`);
-  console.log(`   Verify Token: ${VERIFY_TOKEN}`);
-});
+    await meta.loadAppConfig();
+    console.log(`🚀 CRM 2.0 Webhook escuchando en http://localhost:${PORT}/webhook`);
+    console.log(`   Account ID : ${state.INSTAGRAM_ACCOUNT_ID}`);
+    console.log(`   Verify Token: ${VERIFY_TOKEN}`);
+  });
+})();
