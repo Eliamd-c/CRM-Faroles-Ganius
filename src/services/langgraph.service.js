@@ -8,6 +8,7 @@ const { Pool } = require('pg');
 const supabase = require('../../db');
 const { state } = require('../shared');
 const meta = require('./meta.service');
+const { getInstance: getInstructionService } = require('../domain/services/InstructionService.instance');
 
 // ==========================================
 // 1. ESTADO DE VENTAS (State Pattern)
@@ -161,16 +162,44 @@ async function respondNode(graphData) {
   // Obtener la clase de estado correspondiente
   const stateObj = SALES_STATES[currentStage];
 
+  /**
+   * Helper: Obtener instrucción del sistema
+   * Intenta usar InstructionService (con caching), fallback a state por defecto
+   */
+  async function getSystemInstruction() {
+    try {
+      // Intentar obtener del servicio de instrucciones (con caching)
+      const instructionService = await getInstructionService();
+      const cached = await instructionService.getInstruction(currentStage);
+
+      if (cached) {
+        const stats = instructionService.getStats();
+        console.debug(`[RespondNode] 📦 Instruction loaded (cache hit: ${stats.cacheHits}, miss: ${stats.cacheMisses})`);
+        return cached;
+      }
+    } catch (err) {
+      console.warn(`[RespondNode] ⚠️ InstructionService error, falling back to state:`, err.message);
+    }
+
+    // Fallback: usar la instrucción del estado por defecto
+    if (stateObj) {
+      return stateObj.getSystemInstruction({
+        context,
+        intent: graphData.intent,
+        customer: graphData.customer
+      });
+    }
+
+    // Última línea de defensa
+    return `You are a helpful assistant. Current stage: ${currentStage}. Guide the user accordingly.`;
+  }
+
   if (!stateObj) {
     console.error(`[StateMachine] Estado desconocido: ${currentStage}, usando ONBOARDING`);
     const fallback = SALES_STATES['ONBOARDING'];
 
-    // NUEVO: Separar sistema + historial
-    const systemInstr = fallback.getSystemInstruction({
-      context,
-      intent: graphData.intent,
-      customer: graphData.customer
-    });
+    // Obtener instrucción (con caching y fallback)
+    const systemInstr = await getSystemInstruction();
     const historyContext = fallback.getHistoryContext({
       messages: graphData.messages
     });
@@ -187,12 +216,8 @@ async function respondNode(graphData) {
     }
   }
 
-  // NUEVO: Separar sistema + historial (State Pattern + SoC)
-  const systemInstr = stateObj.getSystemInstruction({
-    context,
-    intent: graphData.intent,
-    customer: graphData.customer
-  });
+  // Obtener instrucción (con caching y fallback)
+  const systemInstr = await getSystemInstruction();
   const historyContext = stateObj.getHistoryContext({
     messages: graphData.messages
   });
