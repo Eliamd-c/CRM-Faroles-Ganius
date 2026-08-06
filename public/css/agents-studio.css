@@ -521,7 +521,7 @@ label {
 .tabs-container {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-width: 0;
   flex-grow: 1;
 }
 
@@ -530,6 +530,19 @@ label {
   border-bottom: 1px solid var(--glass-border);
   background: rgba(0, 0, 0, 0.2);
   padding: 0 2rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar sutil para la barra de tabs */
+.tabs::-webkit-scrollbar {
+  height: 4px;
+}
+.tabs::-webkit-scrollbar-thumb {
+  background: rgba(77, 163, 255, 0.3);
+  border-radius: 2px;
 }
 
 .tab-btn {
@@ -545,6 +558,8 @@ label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
@@ -658,11 +673,11 @@ label {
   align-items: center;
 }
 .mermaid {
-  background: #ffffff;
-  padding: 2rem;
+  background: transparent;
+  padding: 1rem;
   border-radius: 8px;
   width: 100%;
-  overflow-x: auto;
+  overflow: auto;
 }
 .loader { display: flex; gap: 0.5rem; align-items: center; color: #9ba1a6; }
 
@@ -763,13 +778,15 @@ label {
 /* ===== Mermaid Container ===== */
 .mermaid-container {
   min-height: 300px;
+  max-height: 60vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow-x: auto;
+  overflow: auto;
+  padding: 1rem;
 }
 
 /* ===== Escalados Tab Styles ===== */
