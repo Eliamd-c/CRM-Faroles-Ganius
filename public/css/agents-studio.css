@@ -1,31 +1,238 @@
 /* =========================================================
-   Agents Studio CSS - Glassmorphism & Dark Mode Theme
+   Agents Studio CSS - Design System Implementation
+   Generated from UI/UX Pro Max Skill
    ========================================================= */
 
+/* ─── CSS CUSTOM PROPERTIES (Design Tokens) ─── */
 :root {
+  /* Colors - Primary */
+  --primary: #4da3ff;
+  --primary-dark: #3b7eff;
+  --primary-light: #6bb3ff;
+
+  /* Colors - Accent */
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+
+  /* Colors - Semantic */
+  --success: #00d26a;
+  --warning: #ffb822;
+  --error: #ff6b6b;
+  --info: #4da3ff;
+
+  /* Colors - Backgrounds */
+  --bg-base: #0f0f12;
+  --bg-elevated: #1a1a24;
+  --bg-hover: #25252f;
+
+  /* Colors - Text */
+  --text-primary: #e0e0e0;
+  --text-secondary: #9ba1a6;
+  --text-tertiary: #6b7280;
+
+  /* Colors - Glass & Borders */
   --glass-bg: rgba(30, 30, 35, 0.6);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --primary-glow: rgba(0, 123, 255, 0.4);
-  --bg-gradient: linear-gradient(135deg, #121215 0%, #1a1a24 100%);
+
+  /* Gradients */
+  --bg-gradient: linear-gradient(135deg, #0f0f12 0%, #1a1a24 100%);
+  --primary-glow: rgba(77, 163, 255, 0.4);
+
+  /* Typography */
+  --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: 'Courier New', monospace;
+
+  /* Font Sizes (base 16px) */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+  --text-4xl: 40px;
+
+  /* Font Weights */
+  --font-light: 300;
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.4;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+
+  /* Spacing Scale (8px grid) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* Transitions & Animations */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 20px;
+}
+
+/* ─── ACCESSIBILITY: Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── BASE STYLES ─── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-base);
+  font-size: var(--text-base);
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+  background: var(--bg-gradient);
+  min-height: 100vh;
 }
 
 body.dark-theme {
   background: var(--bg-gradient);
-  color: #e0e0e0;
-  min-height: 100vh;
+  color: var(--text-primary);
 }
 
-/* Typography Enhancements */
-h1, h2, h3, h4 {
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
+/* ─── TYPOGRAPHY ─── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-base);
+  font-weight: var(--font-semibold);
   letter-spacing: -0.5px;
+  line-height: var(--line-height-tight);
+  margin: 0;
 }
 
-.text-primary { color: #4da3ff; }
-.text-success { color: #00d26a; }
-.text-warning { color: #ffb822; }
+h1 {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-bold);
+}
+
+h2 {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-semibold);
+}
+
+h3 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+}
+
+h4 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+}
+
+p {
+  margin: 0;
+  line-height: var(--line-height-normal);
+}
+
+/* ─── TEXT UTILITIES ─── */
+.text-primary { color: var(--primary); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-error { color: var(--error); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+
+/* ─── BUTTONS (Accessibility + Design System) ─── */
+button, .btn {
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-base);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all 200ms var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Focus Ring (Accessibility) */
+button:focus, .btn:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Primary Button */
+.btn-primary, button.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Outline Button */
+.btn-outline, button.btn-outline {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.btn-outline:hover {
+  background: rgba(77, 163, 255, 0.1);
+  border-color: var(--primary-dark);
+}
+
+/* Small Button */
+.btn-sm {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+}
 
 /* ----------------------------------
    Layout & Grid
@@ -33,30 +240,34 @@ h1, h2, h3, h4 {
 .studio-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--space-2xl);
 }
 
 .studio-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 3rem;
+  align-items: flex-start;
+  margin-bottom: var(--space-3xl);
   border-bottom: 1px solid var(--glass-border);
-  padding-bottom: 1.5rem;
+  padding-bottom: var(--space-lg);
+  gap: var(--space-lg);
+}
+
+.studio-header > div {
+  flex: 1;
 }
 
 .studio-header h1 {
-  font-size: 2.5rem;
-  margin: 0 0 0.5rem 0;
-  background: linear-gradient(90deg, #fff, #8da0cf);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: var(--text-3xl);
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
 }
 
 .studio-header p {
-  color: #9ba1a6;
+  color: var(--text-secondary);
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
+  line-height: var(--line-height-normal);
 }
 
 .agents-grid {
@@ -68,26 +279,36 @@ h1, h2, h3, h4 {
 /* ----------------------------------
    Agent Cards (Glassmorphism)
    ---------------------------------- */
-.agent-card {
+/* ─── CARDS (Glassmorphism + Accessibility) ─── */
+.glass-card, .agent-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  padding: 2rem;
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   box-shadow: var(--glass-shadow);
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
-  cursor: pointer;
+  transition: all 200ms var(--ease-out);
   display: flex;
   flex-direction: column;
 }
 
+.agent-card {
+  cursor: pointer;
+}
+
+.agent-card:focus-within {
+  border-color: var(--primary);
+  box-shadow: var(--glass-shadow), 0 0 0 3px rgba(77, 163, 255, 0.1);
+}
+
 .agent-card.active-agent:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), 0 0 20px var(--primary-glow);
+  background: rgba(30, 30, 35, 0.75);
   border-color: rgba(77, 163, 255, 0.3);
+  transform: translateY(-4px);
+  box-shadow: var(--glass-shadow), 0 0 20px var(--primary-glow);
 }
 
 .card-glow {
@@ -190,14 +411,52 @@ h1, h2, h3, h4 {
   cursor: not-allowed;
 }
 
-/* ----------------------------------
-   Modal & Tabs (Glassmorphism)
-   ---------------------------------- */
+/* ─── FORM INPUTS (Accessibility + Design System) ─── */
+input, textarea, select {
+  font-family: var(--font-family-base);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  min-height: 40px;
+  transition: all 200ms var(--ease-out);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.1);
+}
+
+input:disabled, textarea:disabled, select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-base);
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: var(--line-height-relaxed);
+}
+
+label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+/* ─── MODALS & DIALOGS (Glassmorphism + Accessibility) ─── */
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -747,18 +1006,16 @@ h1, h2, h3, h4 {
   }
 }
 
-/* ----------------------------------
-   Instrucciones Dinámicas - Stats & Editor
-   ---------------------------------- */
+/* ─── INSTRUCTIONS COMPONENTS (Design System) ─── */
 .stat-card {
   display: flex;
   flex-direction: column;
   background: rgba(77, 163, 255, 0.05);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 1rem;
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
   text-align: center;
-  transition: all 0.3s ease;
+  transition: all 200ms var(--ease-out);
 }
 
 .stat-card:hover {
@@ -767,63 +1024,140 @@ h1, h2, h3, h4 {
   transform: translateY(-2px);
 }
 
+.stat-card:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(77, 163, 255, 0.1);
+}
+
 .stat-label {
-  font-size: 0.85rem;
-  color: #9ba1a6;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  font-weight: var(--font-medium);
 }
 
 .stat-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #4da3ff;
-  font-family: 'Courier New', monospace;
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  color: var(--primary);
+  font-family: var(--font-family-mono);
+  line-height: var(--line-height-tight);
 }
 
 .stage-btn {
-  padding: 0.75rem 1rem;
+  padding: var(--space-sm) var(--space-md);
   background: rgba(77, 163, 255, 0.1);
   border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  color: #9ba1a6;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  display: flex;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  transition: all 200ms var(--ease-out);
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-sm);
+  min-height: 40px;
 }
 
 .stage-btn:hover {
   background: rgba(77, 163, 255, 0.2);
-  color: #4da3ff;
+  color: var(--primary);
   border-color: rgba(77, 163, 255, 0.3);
+}
+
+.stage-btn:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .stage-btn.active {
   background: rgba(77, 163, 255, 0.3);
-  color: #4da3ff;
-  border-color: #4da3ff;
+  color: var(--primary);
+  border-color: var(--primary);
   box-shadow: 0 0 20px rgba(77, 163, 255, 0.2);
 }
 
-#instruction-editor {
-  animation: fadeIn 0.3s ease;
+.editor-container {
+  margin-bottom: var(--space-lg);
 }
 
-/* Responsive */
+#instruction-editor {
+  animation: fadeIn 200ms var(--ease-out);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.status-msg {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.status-msg.success {
+  color: var(--success);
+}
+
+.status-msg.error {
+  color: var(--error);
+}
+
+/* ─── RESPONSIVE BREAKPOINTS (Mobile-First) ─── */
+
+/* Mobile: 375px */
+@media (max-width: 375px) {
+  .studio-container {
+    padding: var(--space-lg);
+  }
+
+  h1 { font-size: var(--text-2xl); }
+  h2 { font-size: var(--text-xl); }
+
+  .agents-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+  }
+}
+
+/* Tablet: 768px */
 @media (max-width: 768px) {
+  .studio-header {
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .agents-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .glass-modal, .modal {
+    max-width: 90%;
+    width: 100%;
+  }
+
+  .tabs {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .tab-btn {
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-sm);
+  }
+
   .escalados-table {
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
   }
 
   .escalados-table th,
   .escalados-table td {
-    padding: 0.75rem 0.5rem;
+    padding: var(--space-sm);
   }
 
-  /* En mobile, ocultar razón y mostrar solo lo esencial */
   .escalados-table .escalados-razon {
     display: none;
   }
@@ -834,15 +1168,42 @@ h1, h2, h3, h4 {
   }
 
   .stat-card {
-    padding: 0.75rem;
+    padding: var(--space-md);
   }
 
   .stat-value {
-    font-size: 1.25rem;
+    font-size: var(--text-2xl);
   }
 
   .stage-btn {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
+    padding: var(--space-sm);
+    font-size: var(--text-sm);
+    min-height: 36px;
+  }
+
+  button, .btn {
+    min-height: 40px;
+  }
+}
+
+/* Desktop: 1280px (baseline is already desktop) */
+@media (min-width: 1280px) {
+  .studio-container {
+    padding: var(--space-3xl) var(--space-2xl);
+  }
+
+  .agents-grid {
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  }
+
+  .glass-modal, .modal {
+    max-width: 600px;
+  }
+}
+
+/* Large screens: 1920px */
+@media (min-width: 1920px) {
+  .studio-container {
+    max-width: 1400px;
   }
 }
