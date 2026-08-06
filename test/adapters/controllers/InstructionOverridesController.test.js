@@ -35,7 +35,8 @@ describe('InstructionOverridesController', () => {
         cacheSize: 15,
         hitRate: 0.667
       }),
-      invalidateCache: jest.fn()
+      invalidateCache: jest.fn(),
+      invalidateAllCache: jest.fn()
     };
 
     // Mock Express request/response
@@ -258,10 +259,13 @@ describe('InstructionOverridesController', () => {
   });
 
   describe('invalidateCache', () => {
-    it('debe invalidar el cache', async () => {
+    // invalidateCache(stage) hace `if (!stageName) return;`, así que llamarlo sin
+    // argumento no borraba nada. Vaciar todo el cache exige invalidateAllCache().
+    it('debe vaciar TODO el cache (no invalidateCache sin etapa)', async () => {
       await controller.invalidateCache(mockReq, mockRes);
 
-      expect(mockInstructionService.invalidateCache).toHaveBeenCalled();
+      expect(mockInstructionService.invalidateAllCache).toHaveBeenCalled();
+      expect(mockInstructionService.invalidateCache).not.toHaveBeenCalled();
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
@@ -283,7 +287,7 @@ describe('InstructionOverridesController', () => {
     });
 
     it('debe manejar errores del servicio', async () => {
-      mockInstructionService.invalidateCache.mockImplementation(() => {
+      mockInstructionService.invalidateAllCache.mockImplementation(() => {
         throw new Error('Service error');
       });
 

@@ -11,12 +11,33 @@
  * - DELETE /api/ai/instructions/cache → Invalidar cache
  */
 class InstructionOverridesController {
+  /**
+   * @param {InstructionOverridesGateway} instructionOverridesGateway
+   * @param {InstructionService|Function|null} instructionService - Instancia, o una
+   *   función que la resuelva (p.ej. el getInstance() del singleton). Pasar la
+   *   función evita crear una segunda instancia: si el CRM invalidara el cache de
+   *   una instancia distinta a la que usa el agente, el cambio no surtiría efecto.
+   */
   constructor(instructionOverridesGateway, instructionService = null) {
     if (!instructionOverridesGateway) {
       throw new Error('InstructionOverridesGateway is required');
     }
     this.gateway = instructionOverridesGateway;
-    this.instructionService = instructionService; // Optional: puede ser null si no hay singleton
+    this.instructionService = instructionService;
+  }
+
+  /** Resuelve el servicio, acepte instancia o proveedor. */
+  async _getService() {
+    if (!this.instructionService) return null;
+    if (typeof this.instructionService === 'function') {
+      try {
+        return await this.instructionService();
+      } catch (err) {
+        console.error('[InstructionOverridesController] No se pudo resolver InstructionService:', err.message);
+        return null;
+      }
+    }
+    return this.instructionService;
   }
 
   /**
@@ -84,10 +105,25 @@ class InstructionOverridesController {
         return res.status(500).json({ error: 'Failed to save instruction' });
       }
 
+      // Sin esto el agente seguiría sirviendo la versión anterior hasta que
+      // expire el TTL (300s). Con esto el cambio aplica en el siguiente mensaje.
+      let applied = false;
+      try {
+        const svc = await this._getService();
+        if (svc) {
+          svc.invalidateCache(stage);
+          applied = true;
+        }
+      } catch (err) {
+        console.error('[InstructionOverridesController] Cache invalidation failed:', err.message);
+      }
+
       res.json({
         success: true,
         stage: stage.toUpperCase(),
-        message: 'Instruction saved. Server restart required to activate.',
+        message: applied
+          ? 'Instrucción guardada y activa de inmediato.'
+          : 'Instrucción guardada. Puede tardar hasta 5 minutos en aplicarse.',
         character_count: trimmed.length
       });
     } catch (error) {
@@ -120,14 +156,15 @@ class InstructionOverridesController {
    */
   async getCacheStats(req, res) {
     try {
-      if (!this.instructionService) {
+      const svc = await this._getService();
+      if (!svc) {
         return res.status(503).json({
           error: 'InstructionService not available',
           stats: null
         });
       }
 
-      const stats = this.instructionService.getStats();
+      const stats = svc.getStats();
 
       res.json({
         success: true,
@@ -152,13 +189,16 @@ class InstructionOverridesController {
    */
   async invalidateCache(req, res) {
     try {
-      if (!this.instructionService) {
+      const svc = await this._getService();
+      if (!svc) {
         return res.status(503).json({
           error: 'InstructionService not available'
         });
       }
 
-      this.instructionService.invalidateCache();
+      // invalidateCache(stage) ignora la llamada si no recibe etapa;
+      // para vaciar todo el cache hay que usar invalidateAllCache().
+      svc.invalidateAllCache();
 
       res.json({
         success: true,

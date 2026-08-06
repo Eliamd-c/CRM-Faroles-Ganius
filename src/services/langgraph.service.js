@@ -8,7 +8,10 @@ const { Pool } = require('pg');
 const supabase = require('../../db');
 const { state } = require('../shared');
 const meta = require('./meta.service');
-const { getInstance: getInstructionService } = require('../domain/services/InstructionService.instance');
+const {
+  getInstance: getInstructionService,
+  CONTEXT_PLACEHOLDER
+} = require('../domain/services/InstructionService.instance');
 
 // ==========================================
 // 1. ESTADO DE VENTAS (State Pattern)
@@ -163,6 +166,87 @@ async function respondNode(graphData) {
   const stateObj = SALES_STATES[currentStage];
 
   /**
+   * Recordatorio de herramientas, generado desde el CommandRegistry.
+   * Vive en el código (no en la BD) para que una edición del operador no pueda
+   * borrar la regla anti-alucinación.
+   */
+  function toolsReminder() {
+    try {
+      const names = (commandRegistry.getAllToolSchemas() || [])
+        .map(s => s?.function?.name || s?.name)
+        .filter(Boolean);
+      if (names.length === 0) return '';
+      return [
+        '## HERRAMIENTAS',
+        `Dispones de: ${names.join(', ')}.`,
+        'REGLA ANTI-INVENCIÓN: si te preguntan por materiales, especificaciones,',
+        'precios, costos de envío o garantía, DEBES llamar a \'query_knowledge_base\'',
+        'antes de responder. Nunca respondas esos datos de memoria ni los inventes.',
+        'Si la herramienta no devuelve el dato, dilo y ofrece escalar a un humano.'
+      ].join('\n');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /**
+   * Compone el prompt de sistema con jerarquía explícita:
+   *   Contexto Global (identidad, precios, políticas) → Etapa → Herramientas
+   *
+   * Es idempotente: si la instrucción ya trae el contexto (por marcador o
+   * literal), no lo duplica. Duplicarlo produciría dos versiones en conflicto.
+   */
+  function composeSystemInstruction(stageInstruction) {
+    // El contexto se lee de disco con CRLF y los overrides llegan por JSON con LF.
+    // Sin normalizar, la detección del Caso B falla siempre y el contexto se duplica.
+    const norm = s => String(s == null ? '' : s).replace(/\r\n/g, '\n');
+    const stage = norm(stageInstruction);
+    const ctx = norm(context);
+
+    // Caso A: default de estado con marcador → sustituir por el contexto real
+    if (stage.includes(CONTEXT_PLACEHOLDER)) {
+      return joinBlocks([stage.split(CONTEXT_PLACEHOLDER).join(ctx), toolsReminder()]);
+    }
+
+    // Si el contexto no se pudo cargar, no lo rotules como "fuente de verdad":
+    // darle autoridad a un stub de una línea es peor que omitirlo.
+    if (ctx.trim().length < 200) {
+      return joinBlocks([stage, toolsReminder()]);
+    }
+
+    // Caso B: la instrucción ya embebe el contexto literal → no duplicar.
+    // Se usa una firma de 3 fragmentos (inicio/medio/fin) en vez del encabezado,
+    // que cambia cada vez que se edita el título o la versión del documento.
+    const frag = [ctx.slice(0, 200), ctx.slice(Math.floor(ctx.length / 2), Math.floor(ctx.length / 2) + 200)]
+      .map(s => s.trim())
+      .filter(s => s.length >= 50);
+    if (frag.length && frag.every(f => stage.includes(f))) {
+      return joinBlocks([stage, toolsReminder()]);
+    }
+
+    // Caso C: override escrito por el operador → el contexto es COMPLEMENTO.
+    // Jerarquía por dimensión: identidad/tono manda la etapa; los datos de
+    // producto los manda el RAG, NO este documento (puede quedar desactualizado).
+    return joinBlocks([
+      '## CONTEXTO GLOBAL (identidad, misión, tono, políticas de conversación)',
+      ctx,
+      [
+        `## INSTRUCCIÓN DE ESTA ETAPA — ${currentStage}`,
+        '(Define el objetivo y el tono de este turno. Si contradice al CONTEXTO GLOBAL',
+        'en nombre, género o estilo, MANDA esta sección. Para MATERIALES, PRECIOS,',
+        "ESPECIFICACIONES o GARANTÍA manda siempre 'query_knowledge_base', no el texto de arriba.)",
+        stage
+      ].join('\n'),
+      toolsReminder()
+    ]);
+  }
+
+  /** Une bloques con línea en blanco, descartando los vacíos. */
+  function joinBlocks(blocks) {
+    return blocks.filter(b => b && String(b).trim()).join('\n\n');
+  }
+
+  /**
    * Helper: Obtener instrucción del sistema
    * Intenta usar InstructionService (con caching), fallback a state por defecto
    */
@@ -175,7 +259,7 @@ async function respondNode(graphData) {
       if (cached) {
         const stats = instructionService.getStats();
         console.debug(`[RespondNode] 📦 Instruction loaded (cache hit: ${stats.cacheHits}, miss: ${stats.cacheMisses})`);
-        return cached;
+        return composeSystemInstruction(cached);
       }
     } catch (err) {
       console.warn(`[RespondNode] ⚠️ InstructionService error, falling back to state:`, err.message);
@@ -183,15 +267,17 @@ async function respondNode(graphData) {
 
     // Fallback: usar la instrucción del estado por defecto
     if (stateObj) {
-      return stateObj.getSystemInstruction({
+      return composeSystemInstruction(stateObj.getSystemInstruction({
         context,
         intent: graphData.intent,
         customer: graphData.customer
-      });
+      }));
     }
 
     // Última línea de defensa
-    return `You are a helpful assistant. Current stage: ${currentStage}. Guide the user accordingly.`;
+    return composeSystemInstruction(
+      `Eres el asesor de Faroles Genius. Etapa actual: ${currentStage}. Guía al cliente hacia el cierre.`
+    );
   }
 
   if (!stateObj) {
@@ -206,7 +292,11 @@ async function respondNode(graphData) {
     const prompt = systemInstr + '\n\n' + historyContext;
 
     try {
-      const response = await openAICircuitBreaker.fire(() => llm.invoke(prompt));
+      // Con tools: el prompt anuncia query_knowledge_base, así que deben ir
+      // disponibles o el modelo narraría la llamada en texto plano.
+      const response = await openAICircuitBreaker.fire(() =>
+        llm.invoke(prompt, { tools: commandRegistry.getAllToolSchemas() })
+      );
       return { messages: [{ role: 'assistant', content: response.content }] };
     } catch (e) {
       if (e.name === 'CircuitOpenError' || e.isCircuitBreakerError) {

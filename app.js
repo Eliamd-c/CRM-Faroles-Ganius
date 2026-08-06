@@ -277,29 +277,17 @@ app.use('/api/langgraph', requireAuth, langgraphRoutes);
 // los overrides se leen del gateway bajo demanda (OverrideInstructionStrategy).
 try {
   const InstructionOverridesGateway = require('./src/adapters/gateways/InstructionOverridesGateway');
-  const {
-    InstructionService: InstructionServiceClass,
-    buildDefaultInstructions
-  } = require('./src/domain/services/InstructionService.instance');
+  const { getInstance: getInstructionService } = require('./src/domain/services/InstructionService.instance');
 
   const instructionOverridesGateway = new InstructionOverridesGateway(supabase);
 
-  // Instrucciones por defecto desde los estados del embudo (fallback).
-  // Los overrides editados por el operador los aporta el gateway en runtime.
-  let defaultInstructions = {};
-  try {
-    defaultInstructions = buildDefaultInstructions();
-  } catch (err) {
-    console.warn('⚠️ No se pudieron construir instrucciones por defecto:', err.message);
-  }
-
-  const instructionService = new InstructionServiceClass(
-    instructionOverridesGateway,  // Gateway para leer/escribir overrides
-    defaultInstructions,
-    { stdTTL: 300, maxKeys: 50, checkperiod: 60 }
+  // Se pasa el PROVEEDOR del singleton, no una instancia nueva: el CRM y el
+  // agente deben compartir el mismo servicio, o invalidar el cache desde el CRM
+  // no tendría efecto sobre las respuestas del agente.
+  const aiInstructionsRoutes = require('./src/routes/aiInstructionsRoutes')(
+    instructionOverridesGateway,
+    getInstructionService
   );
-
-  const aiInstructionsRoutes = require('./src/routes/aiInstructionsRoutes')(instructionOverridesGateway, instructionService);
   app.use('/api/ai', requireAuth, aiInstructionsRoutes);
 
   console.log('✅ AI Instructions API initialized with caching');

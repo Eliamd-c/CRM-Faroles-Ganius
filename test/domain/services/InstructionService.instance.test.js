@@ -10,7 +10,7 @@
  */
 
 // Mock de Supabase antes de importar
-jest.mock('../../../../db', () => ({
+jest.mock('../../../db', () => ({
   from: jest.fn()
 }));
 

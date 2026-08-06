@@ -21,6 +21,14 @@
 
 const { InstructionService } = require('./InstructionService');
 const InstructionConfigGateway = require('../../adapters/gateways/InstructionConfigGateway');
+const InstructionOverridesGateway = require('../../adapters/gateways/InstructionOverridesGateway');
+
+/**
+ * Marcador que ocupa el lugar del Contexto Maestro dentro de las instrucciones
+ * por defecto. respondNode lo sustituye por state.AI_MASTER_CONTEXT en cada
+ * llamada, de modo que editar la Identidad surta efecto sin esperar al TTL.
+ */
+const CONTEXT_PLACEHOLDER = '{{MASTER_CONTEXT}}';
 
 // ─── Importar Estados para Instrucciones por Defecto ───
 const OnboardingState = require('../states/OnboardingState');
@@ -34,14 +42,10 @@ const CheckoutState = require('../states/CheckoutState');
  * @returns {Object} { ONBOARDING: '...', DISCOVERY: '...', ... }
  */
 function buildDefaultInstructions() {
-  // Obtener contexto maestro del estado global de la app
-  let context = 'Eres Faroles Genius, vendes faroles solares apoyando comunidades.';
-  try {
-    const stateModule = require('../../../src/state');
-    context = stateModule.AI_MASTER_CONTEXT || context;
-  } catch (err) {
-    // Si no está disponible, usa default
-  }
+  // El Contexto Maestro NO se hornea aquí: se inyecta en runtime desde respondNode.
+  // Motivo: el operador lo edita en caliente (tab Identidad) y si quedara embebido
+  // en el cache de instrucciones (TTL 300s) serviría una versión obsoleta.
+  const context = CONTEXT_PLACEHOLDER;
 
   const stateInstances = {
     ONBOARDING: new OnboardingState(),
@@ -88,13 +92,19 @@ async function initializeInstructionService() {
     console.warn('[InstructionService.instance] ⚠️ Supabase no conectado. Usando solo defaults.');
   }
 
-  // ─── Crear Gateway ───
+  // ─── Crear Gateways ───
   let instructionConfigGateway = null;
+  let instructionOverridesGateway = null;
   if (supabase) {
     try {
       instructionConfigGateway = new InstructionConfigGateway(supabase);
     } catch (err) {
       console.error('[InstructionService.instance] Error creating InstructionConfigGateway:', err.message);
+    }
+    try {
+      instructionOverridesGateway = new InstructionOverridesGateway(supabase);
+    } catch (err) {
+      console.error('[InstructionService.instance] Error creating InstructionOverridesGateway:', err.message);
     }
   }
 
@@ -123,8 +133,10 @@ async function initializeInstructionService() {
   }
 
   // ─── Inicializar InstructionService ───
+  // El gateway es lo que permite que las instrucciones editadas desde el CRM
+  // lleguen al agente. Sin él, OverrideInstructionStrategy siempre devuelve null.
   const service = new InstructionService(
-    null, // No hay InstructionOverridesGateway por ahora
+    instructionOverridesGateway,
     defaultInstructions,
     cachingConfig
   );
@@ -186,6 +198,9 @@ module.exports = {
   // Construcción síncrona de defaults desde los estados del embudo.
   // La usa app.js para registrar las rutas sin bloquear en un await.
   buildDefaultInstructions,
+
+  // respondNode lo necesita para sustituir el marcador por el Contexto Maestro real.
+  CONTEXT_PLACEHOLDER,
 
   // Exporta también las clases por si se necesita crear instancias adicionales (testing)
   InstructionService,
