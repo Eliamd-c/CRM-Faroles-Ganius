@@ -268,6 +268,28 @@ app.get('/api/flows', (req, res) => res.json(state.flowsConfig));
 const langgraphRoutes = require('./src/routes/langgraphRoutes')(di);
 app.use('/api/langgraph', requireAuth, langgraphRoutes);
 
+// ═══════════════════════════════════════════════
+// AI INSTRUCTIONS API (Dynamic Instructions with Caching)
+// ═══════════════════════════════════════════════
+(async () => {
+  try {
+    const { getInstance: getInstructionService } = require('./src/domain/services/InstructionService.instance');
+    const InstructionOverridesGateway = require('./src/adapters/gateways/InstructionOverridesGateway');
+
+    // Obtener InstructionService singleton
+    const instructionService = await getInstructionService();
+    const instructionOverridesGateway = new InstructionOverridesGateway(supabase);
+
+    // Registrar rutas
+    const aiInstructionsRoutes = require('./src/routes/aiInstructionsRoutes')(instructionOverridesGateway, instructionService);
+    app.use('/api/ai', requireAuth, aiInstructionsRoutes);
+
+    console.log('✅ AI Instructions API initialized with caching');
+  } catch (err) {
+    console.error('⚠️ Failed to initialize AI Instructions API:', err.message);
+    console.error('    Instructions API will be unavailable');
+  }
+})();
 
 app.get('/api/instagram/media', async (req, res) => {
   try {
