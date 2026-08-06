@@ -994,7 +994,10 @@ meta.initBot();
 // NUNCA flows.json sobrescribe Supabase una vez que BD tiene datos.
 console.log('\n🔄 Sincronizando flujos desde Supabase (BD es fuente de verdad)...');
 
-// Esperar sincronización ANTES de levantar el servidor
+// Paso 1: Cargar desde Supabase (FUENTE DE VERDAD) ANTES de esperar sync
+flowService.loadFlowsFromSupabase();
+
+// Paso 2: Esperar sincronización de flows.json ANTES de levantar servidor
 (async () => {
   try {
     const result = await syncFlowsFromSupabase(supabase);
@@ -1013,6 +1016,13 @@ console.log('\n🔄 Sincronizando flujos desde Supabase (BD es fuente de verdad)
     }
   } catch (err) {
     console.error(`❌ Error en sincronización: ${err.message}`);
+  }
+
+  // Validar estado final ANTES de levantar servidor
+  const loadedFlows = state.flowsConfig?.flows?.length || 0;
+  console.log(`🔍 Estado FINAL de flujos en memoria: ${loadedFlows} flujos`);
+  if (loadedFlows === 0) {
+    console.warn(`⚠️ ADVERTENCIA: state.flowsConfig está VACÍO. La UI mostrará 0 automatizaciones.`);
   }
 
   app.listen(PORT, async () => {
