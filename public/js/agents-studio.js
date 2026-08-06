@@ -829,9 +829,7 @@ const AgentsStudio = (() => {
    */
   const loadCacheStats = async () => {
     try {
-      const res = await fetch('/api/ai/instructions/stats', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}` }
-      });
+      const res = await fetch('/api/ai/instructions/stats');
       if (!res.ok) throw new Error('Error al cargar estadísticas');
       const data = await res.json();
       const stats = data.stats || {};
@@ -871,30 +869,31 @@ const AgentsStudio = (() => {
       btn.classList.toggle('active', btn.dataset.stage === stage);
     });
 
+    const editor = document.getElementById('instruction-editor');
+    const textArea = document.getElementById('instruction-text');
+    const statusEl = document.getElementById('instruction-save-status');
+
+    // La etapa debe quedar fijada aunque la carga falle, o "Guardar" apuntaría a undefined
+    textArea.dataset.stage = stage;
+    editor.style.display = 'block';
+
     try {
-      const res = await fetch(`/api/ai/instructions/${stage}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}` }
-      });
-      if (!res.ok) throw new Error('Error al cargar instrucción');
+      // auth.js intercepta fetch e inyecta el header Authorization automáticamente
+      const res = await fetch(`/api/ai/instructions/${stage}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const instruction = data.instruction || '';
 
-      const editor = document.getElementById('instruction-editor');
-      const textArea = document.getElementById('instruction-text');
-
-      textArea.value = instruction;
-      textArea.dataset.stage = stage;
-
-      // Actualizar contador de caracteres
-      updateCharCount();
-
-      // Mostrar editor
-      editor.style.display = 'block';
+      textArea.value = data.instruction || '';
+      if (statusEl) statusEl.textContent = '';
     } catch (error) {
       console.error('Error loading instruction:', error);
-      const editor = document.getElementById('instruction-editor');
-      editor.style.display = 'block';
-      document.getElementById('instruction-text').value = 'Error al cargar la instrucción. Intenta nuevamente.';
+      // No sobrescribir el textarea: destruiría el texto que el operador esté redactando
+      if (statusEl) {
+        statusEl.textContent = `No se pudo cargar la instrucción guardada (${error.message}). Puedes escribirla y guardar.`;
+        statusEl.style.color = '#ffb822';
+      }
+    } finally {
+      updateCharCount();
     }
   };
 
@@ -941,10 +940,7 @@ const AgentsStudio = (() => {
 
       const res = await fetch(`/api/ai/instructions/${stage}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instruction_text: instruction })
       });
 
@@ -970,10 +966,7 @@ const AgentsStudio = (() => {
     try {
       const res = await fetch('/api/ai/instructions/cache/invalidate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('apiToken') || ''}`
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!res.ok) throw new Error('Error al invalidar cache');

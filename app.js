@@ -271,33 +271,42 @@ app.use('/api/langgraph', requireAuth, langgraphRoutes);
 // ═══════════════════════════════════════════════
 // AI INSTRUCTIONS API (Dynamic Instructions with Caching)
 // ═══════════════════════════════════════════════
-(async () => {
+// IMPORTANTE: el registro debe ser SÍNCRONO. Dentro de un IIFE async, el primer
+// `await` cede el control y app.use() termina corriendo después de app.listen(),
+// dejando /api/ai en 404. El constructor de InstructionService no necesita await:
+// los overrides se leen del gateway bajo demanda (OverrideInstructionStrategy).
+try {
+  const InstructionOverridesGateway = require('./src/adapters/gateways/InstructionOverridesGateway');
+  const {
+    InstructionService: InstructionServiceClass,
+    buildDefaultInstructions
+  } = require('./src/domain/services/InstructionService.instance');
+
+  const instructionOverridesGateway = new InstructionOverridesGateway(supabase);
+
+  // Instrucciones por defecto desde los estados del embudo (fallback).
+  // Los overrides editados por el operador los aporta el gateway en runtime.
+  let defaultInstructions = {};
   try {
-    const { getInstance: getInstructionService } = require('./src/domain/services/InstructionService.instance');
-    const InstructionOverridesGateway = require('./src/adapters/gateways/InstructionOverridesGateway');
-
-    // Obtener InstructionService singleton (necesita re-inicialización con gateway)
-    const instructionOverridesGateway = new InstructionOverridesGateway(supabase);
-
-    // CRÍTICO: Re-instanciar el servicio CON el gateway inyectado
-    // (el singleton anterior se inicializó sin gateway)
-    const { InstructionService: InstructionServiceClass, InstructionConfigGateway } = require('./src/domain/services/InstructionService.instance');
-    const instructionService = new InstructionServiceClass(
-      instructionOverridesGateway,  // ✅ Gateway para leer/escribir overrides
-      await instructionOverridesGateway.getDefaultInstructions(),  // Instrucciones por defecto
-      { stdTTL: 300, maxKeys: 50, checkperiod: 60 }  // Config caching
-    );
-
-    // Registrar rutas
-    const aiInstructionsRoutes = require('./src/routes/aiInstructionsRoutes')(instructionOverridesGateway, instructionService);
-    app.use('/api/ai', requireAuth, aiInstructionsRoutes);
-
-    console.log('✅ AI Instructions API initialized with caching');
+    defaultInstructions = buildDefaultInstructions();
   } catch (err) {
-    console.error('⚠️ Failed to initialize AI Instructions API:', err.message);
-    console.error('    Instructions API will be unavailable');
+    console.warn('⚠️ No se pudieron construir instrucciones por defecto:', err.message);
   }
-})();
+
+  const instructionService = new InstructionServiceClass(
+    instructionOverridesGateway,  // Gateway para leer/escribir overrides
+    defaultInstructions,
+    { stdTTL: 300, maxKeys: 50, checkperiod: 60 }
+  );
+
+  const aiInstructionsRoutes = require('./src/routes/aiInstructionsRoutes')(instructionOverridesGateway, instructionService);
+  app.use('/api/ai', requireAuth, aiInstructionsRoutes);
+
+  console.log('✅ AI Instructions API initialized with caching');
+} catch (err) {
+  console.error('⚠️ Failed to initialize AI Instructions API:', err.message);
+  console.error('    Instructions API will be unavailable');
+}
 
 app.get('/api/instagram/media', async (req, res) => {
   try {

@@ -183,6 +183,10 @@ module.exports = {
   getInstanceSync,
   reset,
 
+  // Construcción síncrona de defaults desde los estados del embudo.
+  // La usa app.js para registrar las rutas sin bloquear en un await.
+  buildDefaultInstructions,
+
   // Exporta también las clases por si se necesita crear instancias adicionales (testing)
   InstructionService,
   InstructionConfigGateway
