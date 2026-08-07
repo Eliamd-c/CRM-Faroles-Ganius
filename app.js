@@ -1060,7 +1060,7 @@ console.log('\n🔄 Sincronizando flujos desde Supabase (BD es fuente de verdad)
   }
 
   app.listen(PORT, async () => {
-    await meta.loadAppConfig();
+    // await meta.loadAppConfig(); // DESHABILITADO: forzar uso de tokens del archivo .env
     console.log(`🚀 CRM 2.0 Webhook escuchando en http://localhost:${PORT}/webhook`);
     console.log(`   Account ID : ${state.INSTAGRAM_ACCOUNT_ID}`);
     console.log(`   Verify Token: ${VERIFY_TOKEN}`);
