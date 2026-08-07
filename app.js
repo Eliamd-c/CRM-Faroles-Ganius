@@ -187,7 +187,39 @@ app.post('/webhook', async (req, res) => {
       else if (event.read) await handlers.handleReadReceipt(event);
       else if (event.typing) await handlers.handleTypingIndicator(event);
       else if (event.referral?.ref && event.referral.ref.includes('welcome')) await handlers.handleWelcomeMessageAd(event);
-      else if (event.postback) await handlers.handlePostback(event);
+      else if (event.postback) {
+        const payload = event.postback.payload || '';
+        try {
+          console.log(`[Router] Postback detectado (${payload}), intentando LangGraph...`);
+          const timeoutMs = 8000;
+          let timeoutId;
+          const abortController = new AbortController();
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+              abortController.abort();
+              reject(new Error('LangGraph Timeout'));
+            }, timeoutMs);
+          });
+
+          const langGraphExecution = di.handleMessage.execute({
+            senderId: event.sender.id,
+            text: payload,
+            storyMention: false,
+            hasAttachments: false,
+            event: event,
+            isPostback: true,
+            signal: abortController.signal
+          });
+
+          await Promise.race([langGraphExecution, timeoutPromise])
+            .finally(() => clearTimeout(timeoutId));
+
+        } catch (err) {
+          console.warn(`[Fallback] LangGraph falló para postback (${payload}). Usando flujo estático. Error: ${err.message}`);
+          await handlers.handlePostback(event);
+        }
+      }
       else if (event.message?.reaction) await handlers.handleMessageReaction(event);
       else if (event.message?.attachments) await handlers.handleAttachments(event);
       else if (event.message?.location) await handlers.handleLocation(event);

@@ -85,8 +85,35 @@ class HandleIncomingMessageUseCase {
     // ============================================
     console.log(`[Router] Delegando mensaje de "${senderName}" a LangGraph`);
     
+    // Adapter Pattern: Traducir payloads técnicos a lenguaje natural para OpenAI
+    let processText = text;
+    if (inputData.isPostback || event?.message?.quick_reply) {
+      const payloadMap = {
+        'AGENTE_SOY_ALIADO': 'El usuario hizo clic en el botón: Quiero ser Aliado/Distribuidor',
+        'AGENTE_COMPARTIR_DATOS': 'El usuario hizo clic en el botón: Aceptar y compartir datos',
+        'AGENTE_CAMBIAR': 'El usuario hizo clic en el botón: Cambiar datos',
+        'AGENTE_CONFIRMO': 'El usuario hizo clic en el botón: Confirmar pedido',
+        'AGENTE_SOY_OCTAL': 'El usuario hizo clic en el botón: Comprar al detal (Para el hogar)',
+        'DETAL_CONTACTO_WSP': 'El usuario hizo clic en el botón: Contactar por WhatsApp'
+      };
+      
+      const translated = payloadMap[text];
+      if (translated) {
+        console.log(`[Adapter] Payload traducido: "${text}" -> "${translated}"`);
+        processText = translated;
+      } else {
+        processText = `El usuario seleccionó la opción: ${text}`;
+      }
+    }
+    
     try {
-      const result = await this.langGraphService.processConversation(senderId, text, contact);
+      const result = await this.langGraphService.processConversation(senderId, processText, contact);
+
+      // CRITICAL FIX (Architect): Prevent Ghost Processing
+      if (inputData.signal?.aborted) {
+        console.warn(`[HandleMessage] 🛑 Ejecución de LangGraph abortada por timeout. Descartando respuesta fantasma.`);
+        return { status: 'aborted', contact };
+      }
 
       // CRITICAL FIX: Verificar awaiting_quick_reply PRIMERO
       // Si el agente envió quick_replies, pausar conversación sin enviar mensaje adicional
