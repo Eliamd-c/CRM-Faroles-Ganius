@@ -552,39 +552,19 @@ class LangGraphService {
     this.initializationPromise = null;
   }
 
-  async processConversation(senderId, text, customerProfile) {
+  async processConversation(senderId, text, customerProfile, signal) {
     try {
       await this.initialize();
 
-      const threadConfig = { configurable: { thread_id: senderId } };
+      const threadConfig = { configurable: { thread_id: senderId }, signal };
 
-      // 🔧 FIX CRÍTICO: Recuperar checkpoint anterior (historial acumulado)
-      let accumulatedMessages = [];
-      try {
-        const historyGenerator = await this.appGraph.getStateHistory(threadConfig);
-        for await (const snapshot of historyGenerator) {
-          // El snapshot más reciente contiene el estado acumulado
-          accumulatedMessages = snapshot.values.messages || [];
-          console.log(`[LangGraphService] ✅ Recuperado checkpoint anterior con ${accumulatedMessages.length} mensajes`);
-          break;  // Solo necesitamos el más reciente
-        }
-      } catch (e) {
-        console.warn(`[LangGraphService] ⚠️ Sin historial previo para thread ${senderId}: ${e.message}`);
-        // Fallback: comenzar desde cero (primer mensaje del usuario)
-        accumulatedMessages = [];
-      }
-
-      // Acumular: mensajes previos + mensaje actual
       const inputs = {
         messages: [
-          ...accumulatedMessages,
           { role: 'user', content: text }
         ],
         customer: customerProfile,
-        // Preservar estados anteriores si existen
         funnel_stage: customerProfile?.funnel_stage || 'ONBOARDING',
         intent: customerProfile?.intent || null,
-        // FIX CRITICO: Resetear flag para evitar fuga de estado (State Leak)
         awaiting_quick_reply: false
       };
 
@@ -641,7 +621,7 @@ class LangGraphService {
 
     } catch (err) {
       console.error('[LangGraphService] Error procesando conversacion:', err);
-      return { action: 'error', reply: err.message || err.toString() };
+      throw err; // Permite que el Use Case ejecute la contingencia (SPOF)
     }
   }
 

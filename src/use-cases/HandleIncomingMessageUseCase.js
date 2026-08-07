@@ -107,7 +107,7 @@ class HandleIncomingMessageUseCase {
     }
     
     try {
-      const result = await this.langGraphService.processConversation(senderId, processText, contact);
+      const result = await this.langGraphService.processConversation(senderId, processText, contact, inputData.signal);
 
       // CRITICAL FIX (Architect): Prevent Ghost Processing
       if (inputData.signal?.aborted) {
