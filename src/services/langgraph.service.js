@@ -583,7 +583,9 @@ class LangGraphService {
         customer: customerProfile,
         // Preservar estados anteriores si existen
         funnel_stage: customerProfile?.funnel_stage || 'ONBOARDING',
-        intent: customerProfile?.intent || null
+        intent: customerProfile?.intent || null,
+        // FIX CRITICO: Resetear flag para evitar fuga de estado (State Leak)
+        awaiting_quick_reply: false
       };
 
       // 📊 LOGGING PARA VISIBILIDAD
