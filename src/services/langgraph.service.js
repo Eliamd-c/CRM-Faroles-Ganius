@@ -571,7 +571,6 @@ class LangGraphService {
       // 📊 LOGGING PARA VISIBILIDAD
       console.log(`[LangGraphService] 📨 Procesando mensaje:`);
       console.log(`   Thread ID: ${senderId}`);
-      console.log(`   Historial: ${accumulatedMessages.length} mensajes previos`);
       console.log(`   Nuevo mensaje: "${text.substring(0, 50)}..."`);
       console.log(`   Total en inputs: ${inputs.messages.length} mensajes`);
       console.log(`   Customer state: ${customerProfile?.bot_state || 'unknown'}`);

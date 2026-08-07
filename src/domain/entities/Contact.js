@@ -77,7 +77,6 @@ class Contact {
       // el estado de pausa en cualquier updateContact() genérico.
       awaiting_input_type: this.awaitingInputType,
       awaiting_input_field: this.awaitingInputField,
-      awaiting_input_choices: this.awaitingInputChoices,
       awaiting_input_prompt: this.awaitingInputPrompt,
       awaiting_input_retries: this.awaitingInputRetries,
       current_flow_id: this.currentFlowId,
