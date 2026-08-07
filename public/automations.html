@@ -19,6 +19,11 @@
             <button class="crm-btn-primary" onclick="window.location='/builder.html?new=1'">+ Nueva Automatizacion</button>
         </div>
 
+        <div class="tabs-container" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); display: flex; gap: 20px;">
+            <div class="tab active" id="tab-main" onclick="switchTab('main')" style="padding: 10px 0; cursor: pointer; border-bottom: 2px solid var(--primary); font-weight: 500; color: var(--text-main);">Flujos Principales</div>
+            <div class="tab" id="tab-subflows" onclick="switchTab('subflows')" style="padding: 10px 0; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent;">Sub-Flujos Internos</div>
+        </div>
+
         <div class="crm-table-container">
             <table class="crm-table" id="flows-table">
                 <thead>

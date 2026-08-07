@@ -19,6 +19,19 @@ function getAuthHeader() {
 
 let allFlows = [];
 let deleteTarget = null;
+let currentTab = 'main';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-main').style = tab === 'main'
+    ? "padding: 10px 0; cursor: pointer; border-bottom: 2px solid var(--primary); font-weight: 500; color: var(--text-main);"
+    : "padding: 10px 0; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent;";
+  document.getElementById('tab-subflows').style = tab === 'subflows'
+    ? "padding: 10px 0; cursor: pointer; border-bottom: 2px solid var(--primary); font-weight: 500; color: var(--text-main);"
+    : "padding: 10px 0; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent;";
+  
+  renderFlows(allFlows);
+}
 
 function escapeHtml(str) {
   const div = document.createElement('div');
@@ -108,7 +121,10 @@ function stepTypeIcons(types) {
 
 function renderFlows(flows) {
   const referencedIds = getReferencedFlowIds(flows);
-  const visible = flows.filter(f => !isInternalSubFlow(f, referencedIds));
+  const visible = flows.filter(f => {
+    const isSub = isInternalSubFlow(f, referencedIds);
+    return currentTab === 'main' ? !isSub : isSub;
+  });
   const tbody = document.getElementById('flows-tbody');
   const empty = document.getElementById('empty-state');
   const count = document.getElementById('flow-count');
