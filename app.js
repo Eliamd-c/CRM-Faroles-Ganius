@@ -30,7 +30,8 @@ const { PAGE_ACCESS_TOKEN, VERIFY_TOKEN, PORT = 3000, INSTAGRAM_ACCESS_TOKEN } =
 state.ACCESS_TOKEN = INSTAGRAM_ACCESS_TOKEN || PAGE_ACCESS_TOKEN;
 state.INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
-// Cargar configuración de base de datos
+// Cargar configuración de base de datos (DESHABILITADO PARA FORZAR USO DE .ENV)
+/*
 (async () => {
   try {
     if (supabase) {
@@ -47,6 +48,7 @@ state.INSTAGRAM_ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
     console.error('⚠️ No se pudo cargar la configuración desde Supabase:', err.message);
   }
 })();
+*/
 
 // Cargar contexto maestro IA
 try {
