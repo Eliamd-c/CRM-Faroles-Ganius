@@ -901,6 +901,7 @@ app.post('/api/mention-flow', async (req, res) => {
 // ═══════════════════════════════════════════════
 // AUTH / OAUTH
 // ═══════════════════════════════════════════════
+/*
 app.get('/auth/instagram', (req, res) => {
   const host = req.get('host');
   const redirectUri = process.env.META_REDIRECT_URI || `${req.protocol}://${host}/auth/callback`;
@@ -949,6 +950,7 @@ app.post('/api/auth/disconnect', async (req, res) => {
     res.status(500).json({ error: 'Failed to disconnect Instagram', details: e.message });
   }
 });
+*/
 
 // ═══════════════════════════════════════════════
 // SYNC & INSIGHTS
