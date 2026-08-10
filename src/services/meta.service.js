@@ -52,10 +52,16 @@ async function sendMessage(recipientId, text, quickReplies = null) {
         payload: qr.payload || qr.title
       }));
     }
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: messagePayload,
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    
+    if (process.env.N8N_WEBHOOK_URL) {
+      await axios.post(process.env.N8N_WEBHOOK_URL, payload);
+    } else {
+      await axios.post(graphUrl('/me/messages'), payload, { params: { access_token: state.ACCESS_TOKEN } });
+    }
     console.log(`✅ DM enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Respuesta enviada a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'text', text);
