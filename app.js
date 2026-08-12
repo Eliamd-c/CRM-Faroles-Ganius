@@ -953,6 +953,53 @@ app.post('/api/auth/disconnect', async (req, res) => {
 */
 
 // ═══════════════════════════════════════════════
+// META DATA DELETION (GDPR / Platform Policy)
+// ═══════════════════════════════════════════════
+function parseSignedRequest(signedRequest, secret) {
+  const [encodedSig, payload] = signedRequest.split('.', 2);
+  const sig = Buffer.from(encodedSig.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  const data = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+  const expectedSig = crypto.createHmac('sha256', secret).update(payload).digest();
+  if (!crypto.timingSafeEqual(sig, expectedSig)) throw new Error('Invalid signature');
+  return data;
+}
+
+app.post('/data-deletion', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const signedRequest = req.body.signed_request;
+    if (!signedRequest) return res.status(400).json({ error: 'Missing signed_request' });
+
+    const appSecret = (process.env.META_APP_SECRET || '').trim();
+    if (!appSecret) return res.status(500).json({ error: 'META_APP_SECRET not configured' });
+
+    const data = parseSignedRequest(signedRequest, appSecret);
+    const userId = data.user_id;
+    const confirmationCode = 'del_' + crypto.randomBytes(10).toString('hex');
+
+    // Delete user data from Supabase
+    if (supabase && userId) {
+      // Delete messages first (foreign key safety)
+      await supabase.from('messages').delete().eq('instagram_id', String(userId));
+      await supabase.from('customers').delete().eq('instagram_id', String(userId));
+    }
+
+    console.log(`🗑️ Data deletion processed for user ${userId} (code: ${confirmationCode})`);
+
+    res.json({
+      url: 'https://crm.farolesgenius.com/data-deletion-status',
+      confirmation_code: confirmationCode
+    });
+  } catch (err) {
+    console.error('[DATA-DELETION] Error:', err.message);
+    res.status(400).json({ error: 'Invalid request' });
+  }
+});
+
+app.get('/data-deletion-status', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Data Deletion Status</title></head><body style="font-family:sans-serif;text-align:center;padding:60px;"><h1>Data Deletion Confirmed</h1><p>Your data has been successfully deleted from our systems.</p><p>If you have any questions, please contact us.</p></body></html>`);
+});
+
+// ═══════════════════════════════════════════════
 // SYNC & INSIGHTS
 // ═══════════════════════════════════════════════
 app.post('/api/sync-conversations', express.json(), async (req, res) => {

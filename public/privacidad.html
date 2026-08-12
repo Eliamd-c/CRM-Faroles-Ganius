@@ -9,30 +9,147 @@
         .legal-container { max-width: 800px; margin: 40px auto; padding: 32px; background: var(--bg-panel); border-radius: var(--border-radius-lg); }
         h1 { margin-bottom: 24px; color: var(--primary); }
         h2 { margin-top: 32px; margin-bottom: 16px; color: var(--text-main); }
+        h3 { margin-top: 20px; margin-bottom: 10px; color: var(--text-main); }
         p, li { margin-bottom: 12px; color: var(--text-muted); line-height: 1.6; }
+        ul { padding-left: 24px; }
+        .highlight { background: var(--bg-hover, #f5f5f5); padding: 16px; border-radius: 8px; margin: 16px 0; }
     </style>
 </head>
 <body>
     <div class="legal-container">
-        <h1>Política de Privacidad</h1>
-        <p>Última actualización: Agosto 2026</p>
-        
-        <h2>1. Información que Recopilamos</h2>
-        <p>Faroles Genius CRM recopila información básica del perfil público de Instagram y Facebook de los usuarios que interactúan con nuestros servicios (nombre, nombre de usuario y mensajes de chat) con el único fin de proveer nuestro servicio de automatización de respuestas (bots).</p>
+        <h1>Politica de Privacidad</h1>
+        <p><strong>Ultima actualizacion:</strong> 12 de agosto de 2026</p>
+        <p><strong>Nombre de la aplicacion:</strong> CRM 2.0</p>
+        <p><strong>Empresa responsable:</strong> Faroles Genius</p>
+        <p><strong>Sitio web:</strong> <a href="https://crm.farolesgenius.com">crm.farolesgenius.com</a></p>
 
-        <h2>2. Uso de la Información</h2>
-        <p>La información recopilada se utiliza exclusivamente para:</p>
+        <p>En Faroles Genius ("nosotros", "nuestro" o "la empresa"), respetamos su privacidad y nos comprometemos a proteger los datos personales que usted nos proporciona o que recopilamos a traves de nuestra plataforma CRM 2.0. Esta Politica de Privacidad describe como recopilamos, usamos, almacenamos y protegemos su informacion cuando usted utiliza nuestros servicios.</p>
+        <p>Al utilizar CRM 2.0, usted acepta las practicas descritas en esta politica. Si no esta de acuerdo, le rogamos que no utilice nuestros servicios.</p>
+
+        <h2>1. Informacion que Recopilamos</h2>
+        <p>Recopilamos los siguientes tipos de informacion:</p>
+
+        <h3>1.1 Datos obtenidos de Meta (Instagram y Facebook)</h3>
+        <p>Cuando usted conecta su cuenta de Instagram o Facebook a CRM 2.0 a traves de la API oficial de Meta, recopilamos:</p>
         <ul>
-            <li>Gestionar conversaciones y automatizar respuestas a través de Instagram DM.</li>
-            <li>Mejorar el servicio de atención al cliente mediante Inteligencia Artificial.</li>
-            <li>Analizar métricas de interacción (Insights).</li>
+            <li><strong>Identificador de Instagram (instagram_id):</strong> identificador unico de la cuenta de Instagram conectada.</li>
+            <li><strong>Nombre de usuario (username):</strong> el nombre de usuario publico de Instagram.</li>
+            <li><strong>Foto de perfil (profile_picture_url):</strong> la URL de la foto de perfil publica.</li>
+            <li><strong>Contenido de mensajes:</strong> los mensajes directos (DMs) enviados y recibidos a traves de Instagram Messaging API.</li>
+            <li><strong>Comentarios:</strong> los comentarios realizados en publicaciones de Instagram gestionadas por la cuenta conectada.</li>
+            <li><strong>Informacion basica de la pagina de Facebook:</strong> nombre, identificador y token de acceso de la pagina vinculada.</li>
         </ul>
 
-        <h2>3. Protección de Datos</h2>
-        <p>Mantenemos medidas de seguridad administrativas, técnicas y físicas para proteger su información personal. No compartimos, vendemos ni alquilamos datos de mensajes a terceros.</p>
+        <h3>1.2 Datos proporcionados por el usuario</h3>
+        <ul>
+            <li>Nombre y correo electronico de registro.</li>
+            <li>Configuraciones de agentes de IA y respuestas automatizadas.</li>
+            <li>Notas y etiquetas asociadas a contactos dentro del CRM.</li>
+        </ul>
 
-        <h2>4. Contacto</h2>
-        <p>Para preguntas sobre esta política o solicitar la eliminación de sus datos, contáctenos en: elamd.se@gmail.com</p>
+        <h3>1.3 Datos recopilados automaticamente</h3>
+        <ul>
+            <li>Direccion IP y datos basicos del navegador (user agent).</li>
+            <li>Registros de actividad (logs) de uso de la plataforma.</li>
+            <li>Datos de sesion y autenticacion.</li>
+        </ul>
+
+        <h2>2. Como Utilizamos su Informacion</h2>
+        <p>Utilizamos la informacion recopilada para los siguientes fines:</p>
+        <ul>
+            <li><strong>Gestion de contactos CRM:</strong> organizar, etiquetar y gestionar los contactos que interactuan con su cuenta de Instagram.</li>
+            <li><strong>Respuestas automatizadas con IA:</strong> generar respuestas inteligentes a mensajes y comentarios utilizando modelos de inteligencia artificial.</li>
+            <li><strong>Atencion al cliente:</strong> facilitar la comunicacion entre su negocio y sus clientes a traves de Instagram y WhatsApp.</li>
+            <li><strong>Automatizacion de flujos de trabajo:</strong> ejecutar flujos automatizados basados en eventos de mensajeria.</li>
+            <li><strong>Analisis y metricas:</strong> proporcionar estadisticas de interaccion y rendimiento del servicio.</li>
+            <li><strong>Mejora del servicio:</strong> analizar el uso de la plataforma para mejorar funcionalidades y experiencia de usuario.</li>
+        </ul>
+
+        <h2>3. Servicios de Terceros que Procesan Datos</h2>
+        <p>Para proporcionar nuestros servicios, compartimos datos con los siguientes proveedores de terceros, cada uno sujeto a sus propias politicas de privacidad:</p>
+
+        <h3>3.1 Supabase (Base de datos y autenticacion)</h3>
+        <p>Utilizamos Supabase como nuestra plataforma de base de datos y autenticacion. Los datos de contactos, mensajes y configuraciones se almacenan en servidores de Supabase. Mas informacion: <a href="https://supabase.com/privacy" target="_blank">supabase.com/privacy</a></p>
+
+        <h3>3.2 OpenAI (Respuestas de Inteligencia Artificial)</h3>
+        <p>El contenido de los mensajes puede ser enviado a la API de OpenAI para generar respuestas automatizadas inteligentes. OpenAI procesa estos datos de acuerdo con su politica de uso de datos de API (los datos enviados a traves de la API no se utilizan para entrenar modelos). Mas informacion: <a href="https://openai.com/policies/privacy-policy" target="_blank">openai.com/policies/privacy-policy</a></p>
+
+        <h3>3.3 n8n (Automatizacion de flujos de trabajo)</h3>
+        <p>Utilizamos n8n como motor de automatizacion para procesar eventos, enviar notificaciones y ejecutar flujos de trabajo. Los datos necesarios para la ejecucion de cada flujo son transmitidos a n8n. En nuestra configuracion, n8n se ejecuta en infraestructura controlada por nosotros.</p>
+
+        <h3>3.4 Meta Platform (Instagram y Facebook APIs)</h3>
+        <p>Accedemos a datos a traves de las APIs oficiales de Meta. El uso de datos obtenidos de Meta esta sujeto a la <a href="https://developers.facebook.com/policy/" target="_blank">Politica de la Plataforma de Meta</a> y sus <a href="https://www.facebook.com/privacy/policy/" target="_blank">Politicas de Privacidad</a>.</p>
+
+        <h2>4. Retencion de Datos</h2>
+        <p>Conservamos sus datos de acuerdo con los siguientes criterios:</p>
+        <ul>
+            <li><strong>Datos de contactos y mensajes:</strong> se conservan mientras su cuenta este activa y durante 90 dias posteriores a la eliminacion de la cuenta o la desconexion de la integracion con Instagram.</li>
+            <li><strong>Registros de actividad (logs):</strong> se conservan durante un maximo de 12 meses con fines de depuracion y seguridad.</li>
+            <li><strong>Datos de autenticacion:</strong> se eliminan inmediatamente al cerrar la cuenta.</li>
+            <li><strong>Copias de seguridad:</strong> pueden contener datos durante un periodo adicional de 30 dias antes de su eliminacion completa.</li>
+        </ul>
+        <p>Cuando los datos ya no sean necesarios para los fines descritos, seran eliminados de forma segura.</p>
+
+        <h2>5. Derechos del Usuario</h2>
+        <p>Usted tiene los siguientes derechos sobre sus datos personales:</p>
+        <ul>
+            <li><strong>Derecho de acceso:</strong> puede solicitar una copia de todos los datos personales que tenemos sobre usted.</li>
+            <li><strong>Derecho de rectificacion:</strong> puede solicitar la correccion de datos inexactos o incompletos.</li>
+            <li><strong>Derecho de eliminacion:</strong> puede solicitar la eliminacion de sus datos personales en cualquier momento.</li>
+            <li><strong>Derecho de portabilidad:</strong> puede solicitar sus datos en un formato estructurado y legible por maquina (JSON o CSV).</li>
+            <li><strong>Derecho de oposicion:</strong> puede oponerse al procesamiento de sus datos para fines especificos.</li>
+            <li><strong>Derecho a retirar el consentimiento:</strong> puede revocar su consentimiento en cualquier momento desconectando su cuenta de Instagram desde la configuracion de la plataforma.</li>
+        </ul>
+        <p>Para ejercer cualquiera de estos derechos, envie un correo a <a href="mailto:elamd.se@gmail.com">elamd.se@gmail.com</a>. Responderemos a su solicitud en un plazo maximo de 30 dias.</p>
+
+        <h2>6. Proceso de Eliminacion de Datos</h2>
+        <p>Ofrecemos multiples formas de solicitar la eliminacion de sus datos:</p>
+        <ul>
+            <li><strong>Eliminacion automatica mediante callback:</strong> cuando usted elimina la aplicacion desde la configuracion de su cuenta de Facebook/Instagram, Meta envia automaticamente una solicitud a nuestro endpoint de eliminacion de datos (<code>/data-deletion</code>), que procesa la eliminacion de todos los datos asociados a su cuenta.</li>
+            <li><strong>Solicitud manual por correo electronico:</strong> puede enviar un correo a <a href="mailto:elamd.se@gmail.com">elamd.se@gmail.com</a> con el asunto "Solicitud de eliminacion de datos" indicando su nombre de usuario de Instagram.</li>
+        </ul>
+        <p>Una vez recibida la solicitud, eliminaremos todos sus datos personales, incluyendo mensajes, datos de contacto y configuraciones, en un plazo maximo de 30 dias. Recibirá una confirmacion por correo electronico cuando el proceso se haya completado.</p>
+
+        <div class="highlight">
+            <p><strong>URL de eliminacion de datos:</strong> <code>https://crm.farolesgenius.com/data-deletion</code></p>
+            <p>Este endpoint cumple con los requisitos de Meta para el callback de eliminacion de datos de usuario.</p>
+        </div>
+
+        <h2>7. Seguridad de los Datos</h2>
+        <p>Implementamos las siguientes medidas de seguridad para proteger su informacion:</p>
+        <ul>
+            <li>Cifrado de datos en transito mediante HTTPS/TLS.</li>
+            <li>Autenticacion basada en tokens seguros.</li>
+            <li>Control de acceso basado en roles (Row Level Security) en la base de datos.</li>
+            <li>Almacenamiento seguro de credenciales y tokens de acceso.</li>
+            <li>Monitoreo y registro de actividades sospechosas.</li>
+        </ul>
+
+        <h2>8. Cookies y Tecnologias de Rastreo</h2>
+        <p>CRM 2.0 utiliza las siguientes cookies y tecnologias de almacenamiento local:</p>
+        <ul>
+            <li><strong>Cookies de sesion:</strong> necesarias para mantener su sesion activa mientras utiliza la plataforma. Son estrictamente funcionales y se eliminan al cerrar sesion.</li>
+            <li><strong>Almacenamiento local (localStorage):</strong> utilizado para guardar preferencias de interfaz de usuario (tema, configuraciones de vista).</li>
+            <li><strong>Tokens de autenticacion:</strong> almacenados de forma segura para mantener su sesion entre visitas.</li>
+        </ul>
+        <p>No utilizamos cookies de terceros con fines publicitarios ni de seguimiento.</p>
+
+        <h2>9. Transferencias Internacionales de Datos</h2>
+        <p>Sus datos pueden ser procesados en servidores ubicados fuera de su pais de residencia, incluyendo Estados Unidos (donde se encuentran los servidores de Supabase y OpenAI). Estas transferencias se realizan bajo las garantias de seguridad y confidencialidad de cada proveedor.</p>
+
+        <h2>10. Menores de Edad</h2>
+        <p>CRM 2.0 no esta dirigido a menores de 18 anos. No recopilamos intencionalmente datos de menores de edad. Si descubrimos que hemos recopilado datos de un menor, los eliminaremos de inmediato.</p>
+
+        <h2>11. Cambios en esta Politica</h2>
+        <p>Nos reservamos el derecho de actualizar esta Politica de Privacidad en cualquier momento. Cuando realicemos cambios significativos, se lo notificaremos a traves de un aviso en la plataforma o por correo electronico. La fecha de "ultima actualizacion" en la parte superior refleja cuando se realizaron los ultimos cambios.</p>
+
+        <h2>12. Contacto</h2>
+        <p>Si tiene preguntas, comentarios o solicitudes relacionadas con esta Politica de Privacidad o el tratamiento de sus datos personales, puede contactarnos a traves de:</p>
+        <ul>
+            <li><strong>Correo electronico:</strong> <a href="mailto:elamd.se@gmail.com">elamd.se@gmail.com</a></li>
+            <li><strong>Sitio web:</strong> <a href="https://crm.farolesgenius.com">crm.farolesgenius.com</a></li>
+            <li><strong>Responsable:</strong> Faroles Genius</li>
+        </ul>
     </div>
 </body>
 </html>
