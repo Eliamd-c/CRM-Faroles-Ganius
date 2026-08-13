@@ -38,10 +38,18 @@ async function getUserProfile(senderId) {
   }
 }
 
+async function _postToMetaOrProxy(payload) {
+  if (process.env.N8N_WEBHOOK_URL) {
+    await axios.post(process.env.N8N_WEBHOOK_URL, payload);
+  } else {
+    await axios.post(graphUrl('/me/messages'), payload, { params: { access_token: state.ACCESS_TOKEN } });
+  }
+}
+
 async function sendMessage(recipientId, text, quickReplies = null) {
   try {
-    if (!state.ACCESS_TOKEN) {
-      console.error('❌ Error enviando DM: ACCESS_TOKEN no configurado');
+    if (!state.ACCESS_TOKEN && !process.env.N8N_WEBHOOK_URL) {
+      console.error('❌ Error enviando DM: ACCESS_TOKEN o Proxy no configurado');
       return;
     }
     const messagePayload = { text };
@@ -57,11 +65,8 @@ async function sendMessage(recipientId, text, quickReplies = null) {
       message: messagePayload,
     };
     
-    if (process.env.N8N_WEBHOOK_URL) {
-      await axios.post(process.env.N8N_WEBHOOK_URL, payload);
-    } else {
-      await axios.post(graphUrl('/me/messages'), payload, { params: { access_token: state.ACCESS_TOKEN } });
-    }
+    await _postToMetaOrProxy(payload);
+    
     console.log(`✅ DM enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Respuesta enviada a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'text', text);
@@ -91,7 +96,7 @@ async function sendTemplate(recipientId, text, buttons) {
         ? { type: 'web_url', url: b.url, title: b.title }
         : { type: 'postback', title: b.title, payload: b.payload }
     );
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: {
         attachment: {
@@ -99,7 +104,8 @@ async function sendTemplate(recipientId, text, buttons) {
           payload: { template_type: 'button', text, buttons: formattedButtons }
         }
       },
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`✅ Plantilla enviada a ${recipientId}`);
     broadcastLog('SYSTEM', `Plantilla de botones enviada a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'template', text);
@@ -121,10 +127,11 @@ async function sendIceBreaker(recipientId, question, suggestions = []) {
         image_url: s.image_url
       }));
     }
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: messagePayload,
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`❄️ Ice Breaker enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Ice Breaker enviado a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'text', question);
@@ -147,10 +154,11 @@ async function sendQuickReplies(recipientId, text, options = []) {
         location_coordinates: opt.location_coordinates
       }))
     };
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: messagePayload,
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`⚡ Quick Replies enviado a ${normalizeId(recipientId)}`);
     broadcastLog('SYSTEM', `Quick Replies enviado a ${normalizeId(recipientId)}`);
     logMessageToDB(recipientId, 'outbound', 'text', text);
@@ -164,12 +172,13 @@ async function sendQuickReplies(recipientId, text, options = []) {
 
 async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPDATE') {
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { text },
       messaging_type: 'MESSAGE_TAG',
       tag: messagingTag
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`🏷️ Mensaje con tag "${messagingTag}" enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Mensaje con tag "${messagingTag}" enviado`);
     logMessageToDB(recipientId, 'outbound', 'text', text);
@@ -182,10 +191,11 @@ async function sendMessageWithTag(recipientId, text, messagingTag = 'ACCOUNT_UPD
 
 async function sendMediaMessage(recipientId, type, url) {
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type, payload: { url, is_reusable: true } } }
-    }, { params: { access_token: state.ACCESS_TOKEN }, timeout: 15000 });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`✅ Media (${type}) enviado a ${recipientId}`);
     broadcastLog('SYSTEM', `Media enviado a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', type, url);
@@ -207,10 +217,11 @@ async function sendCard(recipientId, cardData) {
       subtitle: cardData.subtitle,
       buttons: [button]
     };
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'template', payload: { template_type: 'generic', elements: [element] } } },
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`✅ Tarjeta enviada a ${recipientId}`);
     broadcastLog('SYSTEM', `Tarjeta (Imagen) enviada a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'template', cardData.title);
@@ -238,10 +249,11 @@ async function sendCarousel(recipientId, elements) {
     };
   });
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'template', payload: { template_type: 'generic', elements: formattedElements } } }
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     broadcastLog('SYSTEM', `Carrusel (${formattedElements.length} tarjetas) enviado a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'template', '[Carrusel]');
   } catch (err) {
@@ -255,10 +267,11 @@ async function sendCarousel(recipientId, elements) {
 async function sendGallery(recipientId, images, delayBetweenMs = 300) {
   for (const img of images) {
     try {
-      await axios.post(graphUrl('/me/messages'), {
+      const payload = {
         recipient: { id: normalizeId(recipientId) },
         message: { attachment: { type: 'image', payload: { url: img.url, is_reusable: true } } }
-      }, { params: { access_token: state.ACCESS_TOKEN } });
+      };
+      await _postToMetaOrProxy(payload);
     } catch (err) {
       console.error('❌ Error enviando imagen de galería:', err.response?.data?.error?.message || err.message);
     }
@@ -270,10 +283,11 @@ async function sendGallery(recipientId, images, delayBetweenMs = 300) {
 
 async function sendAudio(recipientId, audioUrl) {
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'audio', payload: { url: audioUrl, is_reusable: true } } }
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     broadcastLog('SYSTEM', `Audio enviado a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'audio', audioUrl);
   } catch (err) {
@@ -285,10 +299,11 @@ async function sendAudio(recipientId, audioUrl) {
 
 async function sendVideo(recipientId, videoUrl) {
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'video', payload: { url: videoUrl, is_reusable: true } } }
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     broadcastLog('SYSTEM', `Video enviado a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'video', videoUrl);
   } catch (err) {
@@ -300,10 +315,11 @@ async function sendVideo(recipientId, videoUrl) {
 
 async function sendFile(recipientId, fileUrl) {
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { id: normalizeId(recipientId) },
       message: { attachment: { type: 'file', payload: { url: fileUrl, is_reusable: true } } }
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     broadcastLog('SYSTEM', `Archivo enviado a ${recipientId}`);
     logMessageToDB(recipientId, 'outbound', 'file', fileUrl);
   } catch (err) {
@@ -329,10 +345,11 @@ async function replyComment(commentId, text) {
 
 async function sendPrivateReply(commentId, text) {
   try {
-    await axios.post(graphUrl('/me/messages'), {
+    const payload = {
       recipient: { comment_id: commentId },
       message: { text },
-    }, { params: { access_token: state.ACCESS_TOKEN } });
+    };
+    await _postToMetaOrProxy(payload);
     console.log(`✅ DM privado enviado al autor del comentario ${commentId}`);
     broadcastLog('SYSTEM', `DM enviado en privado al autor del comentario`);
   } catch (err) {
