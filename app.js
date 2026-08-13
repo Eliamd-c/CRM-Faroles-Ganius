@@ -7,6 +7,14 @@ const axios = require('axios');
 const multer = require('multer');
 const supabase = require('./db');
 
+// 🔥 ATRAPAR ERRORES SILENCIOSOS GLOBALES 🔥
+process.on('uncaughtException', (err) => {
+  console.error('\n🚨 CRASH FATAL (uncaughtException):', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('\n🚨 CRASH FATAL (unhandledRejection):', reason);
+});
+
 // ─── Constantes de configuración ───
 const MASTER_CONTEXT_PATH = path.join(__dirname, 'Agente_IA_Faroles_Genius_Contexto_Maestro_Oficial.md');
 
