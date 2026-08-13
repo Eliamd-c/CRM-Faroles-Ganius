@@ -186,9 +186,11 @@ app.post('/webhook', async (req, res) => {
       console.warn('⚠️ Firma de webhook inválida (NO BLOQUEANTE)');
     }
   }
-  res.sendStatus(200);
   const body = req.body;
-  if (body.object !== 'instagram') return;
+  if (body.object !== 'instagram') {
+    if (!res.headersSent) res.sendStatus(200);
+    return;
+  }
 
   for (const entry of body.entry || []) {
     for (const event of entry.messaging || []) {
@@ -273,6 +275,11 @@ app.post('/webhook', async (req, res) => {
       else if (change.field === 'message_template_quality_update') handlers.handleMessageTags(change.value);
       else if (change.field === 'messaging_handover') handlers.handleMessagingHandover(change.value);
     }
+  }
+  
+  // Enviar 200 OK al final para evitar que Hostinger mate el proceso en background
+  if (!res.headersSent) {
+    res.sendStatus(200);
   }
 });
 
