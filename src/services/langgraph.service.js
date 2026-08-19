@@ -526,6 +526,11 @@ class LangGraphService {
             ssl: { rejectUnauthorized: false } 
           });
 
+          // 🔥 ATRAPAR ERRORES DE BASE DE DATOS 🔥
+          this.pool.on('error', (err) => {
+            console.error('\n🚨 CRASH FATAL (Postgres Pool Error):', err);
+          });
+
           const checkpointer = new PostgresSaver(this.pool);
           await checkpointer.setup(); 
 

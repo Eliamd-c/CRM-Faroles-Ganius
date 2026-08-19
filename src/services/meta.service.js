@@ -61,7 +61,10 @@ async function _postToMetaOrProxy(payload) {
     if (!text) text = "[Mensaje multimedia/plantilla]";
 
     const success = await kommoService.sendMessage(recipientId, text);
-    if (success) return; // Si se envía por Kommo, salimos para no llamar a Meta
+    if (!success) {
+      console.error('❌ Falló el envío por Kommo. Abortando para no caer en Meta.');
+    }
+    return; // ⛔ NUNCA intentar Meta si estamos usando el puente de Kommo
   }
 
   // Comportamiento por defecto (Graph API)

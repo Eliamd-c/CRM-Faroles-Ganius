@@ -1,6 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { broadcastLog } = require('../shared');
 
 const TOKENS_FILE = path.join(__dirname, '..', '..', 'kommo_tokens.json');
 
@@ -37,11 +38,17 @@ class KommoService {
   }
 
   async ensureAccessToken() {
-    if (!this.kommoDomain) throw new Error("Falta KOMMO_DOMAIN en las variables de entorno");
+    if (!this.kommoDomain) {
+      broadcastLog('ERROR', 'Falta KOMMO_DOMAIN en el .env');
+      throw new Error("Falta KOMMO_DOMAIN en las variables de entorno");
+    }
 
     // 1. Si no hay tokens en lo absoluto, intercambiar el Código de Autorización
     if (!this.tokens) {
-      if (!this.authCode) throw new Error("No hay tokens y falta KOMMO_AUTH_CODE para generarlos");
+      if (!this.authCode) {
+        broadcastLog('ERROR', 'Falta KOMMO_AUTH_CODE en el .env');
+        throw new Error("No hay tokens y falta KOMMO_AUTH_CODE para generarlos");
+      }
       console.log('🔄 [KOMMO] Realizando intercambio inicial del Código de Autorización...');
       
       try {
@@ -55,7 +62,9 @@ class KommoService {
         this.saveTokens(response.data);
         return response.data.access_token;
       } catch (error) {
+        const errDetail = error.response?.data?.hint || error.message;
         console.error('❌ [KOMMO] Error en intercambio inicial:', error.response?.data || error.message);
+        broadcastLog('ERROR', `Error Kommo OAuth: ${errDetail} (Genera un nuevo Código de Autorización)`);
         throw new Error("El código de autorización ya expiró (dura 20 min). Genera uno nuevo en Kommo.");
       }
     }
@@ -107,7 +116,9 @@ class KommoService {
         await this.refreshToken();
         return this.sendMessage(chatId, text, true);
       }
+      const errMsg = error.response?.data?.detail || error.message;
       console.error('❌ [KOMMO] Error enviando mensaje:', error.response?.data || error.message);
+      broadcastLog('ERROR', `Error al enviar por Kommo: ${errMsg}`);
       return false;
     }
   }
