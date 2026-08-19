@@ -92,22 +92,64 @@ class KommoService {
     }
   }
 
+  async ensureCustomField(token) {
+    if (this.customFieldId) return this.customFieldId;
+    
+    // 1. Buscar si el campo ya existe
+    try {
+      const res = await axios.get(`https://${this.kommoDomain}/api/v4/contacts/custom_fields`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const fields = res.data?._embedded?.custom_fields || [];
+      const field = fields.find(f => f.name === 'Respuesta_CRM');
+      if (field) {
+        this.customFieldId = field.id;
+        return field.id;
+      }
+    } catch(e) {
+      console.error('⚠️ [KOMMO] Error buscando campo:', e.message);
+    }
+
+    // 2. Si no existe, crearlo automáticamente
+    try {
+      console.log('🔄 [KOMMO] Creando campo personalizado Respuesta_CRM...');
+      const res = await axios.post(`https://${this.kommoDomain}/api/v4/contacts/custom_fields`, [
+        { name: 'Respuesta_CRM', type: 'text' }
+      ], {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const newField = res.data?._embedded?.custom_fields?.[0];
+      if (newField) {
+        this.customFieldId = newField.id;
+        return newField.id;
+      }
+    } catch(e) {
+      console.error('❌ [KOMMO] Error creando campo:', e.message);
+    }
+    throw new Error("No se pudo obtener ni crear el campo Respuesta_CRM en Kommo");
+  }
+
   async sendMessage(chatId, text, isRetry = false) {
     try {
       const token = await this.ensureAccessToken();
+      const fieldId = await this.ensureCustomField(token);
 
       const payload = [{
-        contact_id: parseInt(chatId),
-        text: text
-      }]; // Formato de Kommo para enviar mensajes vía API (puede requerir Chat API o Notas según el caso)
+        id: parseInt(chatId),
+        custom_fields_values: [
+          {
+            field_id: fieldId,
+            values: [{ value: text }]
+          }
+        ]
+      }];
       
-      // Nota: Si usas la API conversacional estricta, la URL y payload cambian a /api/v4/messages
-      // Dejaremos la estructura base preparada para la Chat API.
-      const url = `https://${this.kommoDomain}/api/v4/contacts/${chatId}/notes`; 
+      const url = `https://${this.kommoDomain}/api/v4/contacts`; 
+      await axios.patch(url, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // ESTE ES UN EJEMPLO DE ENVÍO DE NOTA (como respuesta temporal). 
-      // Para enviar al Chat de IG se usa la integración de Chat de Kommo.
-      console.log(`✅ [KOMMO SIMULACRO] Enviando a ${chatId}: "${text}"`);
+      console.log(`✅ [KOMMO REAL] Campo Respuesta_CRM actualizado para el contacto ${chatId}`);
       return true;
 
     } catch (error) {
