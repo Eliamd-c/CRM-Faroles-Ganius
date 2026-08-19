@@ -92,11 +92,12 @@ app.set('trust proxy', true);
 app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; }
 }));
+app.use(express.urlencoded({ extended: true })); // Necesario para procesar webhooks de Kommo
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Auth middleware ───
 function requireAuth(req, res, next) {
-  if (req.path === '/webhook' || req.path === '/chat-init' || req.path === '/status' || req.path === '/status/detailed') return next();
+  if (req.path.startsWith('/webhook') || req.path === '/chat-init' || req.path === '/status' || req.path === '/status/detailed') return next();
   const validToken = process.env.API_SECRET;
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -175,6 +176,41 @@ app.get('/webhook', (req, res) => {
   }
   console.warn('❌ Verificación fallida — token incorrecto');
   res.sendStatus(403);
+});
+
+// --- WEBHOOK PARA RECIBIR MENSAJES DESDE KOMMO ---
+app.post('/webhook/kommo', async (req, res) => {
+  res.sendStatus(200); // 1. Responder rápido a Kommo para evitar reintentos
+
+  try {
+    const data = req.body;
+    // Kommo agrupa los mensajes entrantes en el arreglo message.add
+    if (data && data.message && data.message.add && data.message.add.length > 0) {
+      const incomingMessage = data.message.add[0];
+      
+      // Si el mensaje es saliente (lo envió un agente o bot), lo ignoramos
+      if (incomingMessage.is_out === '1' || incomingMessage.is_out === 1) return;
+
+      // Usamos el ID del chat o contacto como senderId temporal
+      const contactId = incomingMessage.chat_id || incomingMessage.contact_id; 
+      const text = incomingMessage.text || '';
+      
+      console.log(`\n💬 [KOMMO WEBHOOK] Mensaje recibido de ${contactId}: "${text}"`);
+
+      // 2. Inyectar el mensaje al Flow Builder / LangGraph como si fuera de Facebook
+      if (contactId) {
+        await di.handleMessage.execute({
+          senderId: String(contactId),
+          text: text,
+          storyMention: false,
+          hasAttachments: !!incomingMessage.attachment,
+          event: { source: 'kommo', raw_data: incomingMessage } // Guardamos la metadata por si acaso
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error procesando webhook de Kommo:', error.message);
+  }
 });
 
 app.post('/webhook', async (req, res) => {
