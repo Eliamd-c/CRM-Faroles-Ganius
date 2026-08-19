@@ -95,9 +95,9 @@ class KommoService {
   async ensureCustomField(token) {
     if (this.customFieldId) return this.customFieldId;
     
-    // 1. Buscar si el campo ya existe
+    // 1. Buscar si el campo ya existe en LEADS (Tratos)
     try {
-      const res = await axios.get(`https://${this.kommoDomain}/api/v4/contacts/custom_fields`, {
+      const res = await axios.get(`https://${this.kommoDomain}/api/v4/leads/custom_fields`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const fields = res.data?._embedded?.custom_fields || [];
@@ -107,13 +107,13 @@ class KommoService {
         return field.id;
       }
     } catch(e) {
-      console.error('⚠️ [KOMMO] Error buscando campo:', e.message);
+      console.error('⚠️ [KOMMO] Error buscando campo en leads:', e.message);
     }
 
-    // 2. Si no existe, crearlo automáticamente
+    // 2. Si no existe, crearlo automáticamente en LEADS
     try {
-      console.log('🔄 [KOMMO] Creando campo personalizado Respuesta_CRM...');
-      const res = await axios.post(`https://${this.kommoDomain}/api/v4/contacts/custom_fields`, [
+      console.log('🔄 [KOMMO] Creando campo personalizado Respuesta_CRM en Tratos...');
+      const res = await axios.post(`https://${this.kommoDomain}/api/v4/leads/custom_fields`, [
         { name: 'Respuesta_CRM', type: 'text' }
       ], {
         headers: { Authorization: `Bearer ${token}` }
@@ -124,7 +124,7 @@ class KommoService {
         return newField.id;
       }
     } catch(e) {
-      console.error('❌ [KOMMO] Error creando campo:', e.message);
+      console.error('❌ [KOMMO] Error creando campo en leads:', e.message);
     }
     throw new Error("No se pudo obtener ni crear el campo Respuesta_CRM en Kommo");
   }
@@ -134,8 +134,21 @@ class KommoService {
       const token = await this.ensureAccessToken();
       const fieldId = await this.ensureCustomField(token);
 
+      // Paso extra: En Kommo las automatizaciones funcionan mejor con Tratos (Leads).
+      // Buscamos el Trato asociado a este contacto.
+      const leadRes = await axios.get(`https://${this.kommoDomain}/api/v4/leads?filter[contacts_ids]=${chatId}&limit=1`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const leads = leadRes.data?._embedded?.leads || [];
+      if (leads.length === 0) {
+         console.warn(`⚠️ No se encontró un Trato para el contacto ${chatId}. No se puede disparar el bot.`);
+         return false;
+      }
+      const leadId = leads[0].id;
+
+      // Inyectamos el texto en el Trato
       const payload = [{
-        id: parseInt(chatId),
+        id: leadId,
         custom_fields_values: [
           {
             field_id: fieldId,
@@ -144,12 +157,12 @@ class KommoService {
         ]
       }];
       
-      const url = `https://${this.kommoDomain}/api/v4/contacts`; 
+      const url = `https://${this.kommoDomain}/api/v4/leads`; 
       await axios.patch(url, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      console.log(`✅ [KOMMO REAL] Campo Respuesta_CRM actualizado para el contacto ${chatId}`);
+      console.log(`✅ [KOMMO REAL] Campo Respuesta_CRM actualizado para el Trato ${leadId}`);
       return true;
 
     } catch (error) {
