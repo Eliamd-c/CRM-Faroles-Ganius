@@ -41,6 +41,30 @@ async function getUserProfile(senderId) {
 const kommoService = require('./kommo.service');
 
 async function _postToMetaOrProxy(payload) {
+  // 🌉 PUENTE KOMMO: Interceptor Global
+  if (process.env.KOMMO_CLIENT_ID) {
+    const recipientId = payload.recipient?.id;
+    let text = payload.message?.text || "";
+
+    // Extraer texto de templates si existe
+    if (payload.message?.attachment?.payload?.text) {
+      text = payload.message.attachment.payload.text;
+    }
+
+    // Agregar botones / quick replies como viñetas de texto
+    if (payload.message?.quick_replies) {
+      text += '\n\nOpciones:\n' + payload.message.quick_replies.map(qr => `- ${qr.title}`).join('\n');
+    } else if (payload.message?.attachment?.payload?.buttons) {
+      text += '\n\nOpciones:\n' + payload.message.attachment.payload.buttons.map(b => `- ${b.title}`).join('\n');
+    }
+
+    if (!text) text = "[Mensaje multimedia/plantilla]";
+
+    const success = await kommoService.sendMessage(recipientId, text);
+    if (success) return; // Si se envía por Kommo, salimos para no llamar a Meta
+  }
+
+  // Comportamiento por defecto (Graph API)
   if (process.env.N8N_WEBHOOK_URL) {
     await axios.post(process.env.N8N_WEBHOOK_URL, payload);
   } else {
@@ -50,23 +74,7 @@ async function _postToMetaOrProxy(payload) {
 
 async function sendMessage(recipientId, text, quickReplies = null) {
   try {
-    // 🌉 PUENTE KOMMO: Interceptar salida si Kommo está configurado
-    if (process.env.KOMMO_CLIENT_ID) {
-      let finalText = text;
-      // Degradado gracioso de Quick Replies a texto para Kommo
-      if (quickReplies && quickReplies.length > 0) {
-        finalText += '\n\nOpciones:\n' + quickReplies.map(qr => `- ${qr.title}`).join('\n');
-      }
-      const success = await kommoService.sendMessage(recipientId, finalText);
-      if (success) {
-        console.log(`✅ DM enviado a ${recipientId} (Vía Kommo)`);
-        broadcastLog('SYSTEM', `Respuesta enviada a ${recipientId} (Vía Kommo)`);
-        logMessageToDB(recipientId, 'outbound', 'text', finalText);
-        return; // Salir aquí para no ejecutar la Graph API de Meta
-      }
-    }
-
-    if (!state.ACCESS_TOKEN && !process.env.N8N_WEBHOOK_URL) {
+    if (!state.ACCESS_TOKEN && !process.env.N8N_WEBHOOK_URL && !process.env.KOMMO_CLIENT_ID) {
       console.error('❌ Error enviando DM: ACCESS_TOKEN o Proxy no configurado');
       return;
     }
